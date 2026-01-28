@@ -96,7 +96,7 @@ def run_benchmark(n_samples: int = 2000, n_qubits: int = 4, difficulty: str = "m
         print(f"  Recall:    {qsvm_recall:.4f}")
         print(f"  F1-Score:  {qsvm_f1:.4f}")
         print(f"  Time:      {qsvm_time:.2f}s")
-        print(f"  Backend:   {'Quantum Kernel' if qsvm.used_quantum else 'Classical Fallback'}")
+        print(f"  Backend:   {'Quantum Kernel' if qsvm._used_quantum else 'Classical Fallback'}")
         
     except Exception as e:
         print(f"QSVM Error: {e}")
