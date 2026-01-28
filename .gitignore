@@ -64,3 +64,6 @@ models/*.pt
 
 # Papers (optional - uncomment if you want to track)
 # papers/*.pdf
+
+# Benchmark results
+results/*.json
