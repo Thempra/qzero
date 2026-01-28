@@ -407,10 +407,12 @@ class QIVAE:
         
         train_time = time.time() - start_time
         
+        # Mark as fitted before setting threshold (threshold calculation needs model)
+        self._is_fitted = True
+        
         # Set anomaly threshold based on training reconstruction errors
         self._set_anomaly_threshold(X_train)
         
-        self._is_fitted = True
         return train_time
     
     def _set_anomaly_threshold(self, X_train: np.ndarray) -> None:
