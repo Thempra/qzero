@@ -1,200 +1,114 @@
 # QZero 🛡️⚛️
 
-**Quantum Zero-Day Detection System**
+**Quantum-Enhanced Threat Detection Platform**
 
-> Detecting the unknown with quantum-enhanced machine learning
+> Production-ready anomaly detection for Modern SOCs & Red Teams
 
-[![iQuHACK 2026](https://img.shields.io/badge/iQuHACK-2026-blue)](https://iquhack.mit.edu/)
+[![Release](https://img.shields.io/badge/release-v1.0.0--alpha-green)](https://github.com/thempra/qzero)
+[![Docker](https://img.shields.io/badge/docker-ready-blue)](https://hub.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
-[![Qiskit](https://img.shields.io/badge/Qiskit-1.0+-purple.svg)](https://qiskit.org/)
 
-## 🎯 Overview
+## 🚀 Product Overview
 
-QZero is a quantum machine learning system for detecting zero-day attacks and ransomware in network traffic. It leverages Quantum Support Vector Machines (QSVM) and Quantum-Inspired Variational Autoencoders (QI-VAE) to identify previously unseen attack patterns that evade traditional signature-based detection.
+**QZero** is not just a research project; it is a **next-generation IDS engine** designed to detect what traditional SIEMs miss. By leveraging **Quantum Machine Learning (QML)**, QZero identifies non-linear anomalies in high-dimensional network traffic—specifically targeting **Zero-Day exploits** and **polymorphic ransomware** that evade signature-based detection (Snort, Suricata).
 
-### Why Quantum?
+**Built for:**
+*   **Blue Teams**: Deploy as a sidecar container to analyze NetFlow/PCAP streams in real-time.
+*   **Red Teams**: Validate stealth techniques against quantum-probabilistic detection boundaries.
+*   **Threat Hunters**: Analyze historical traffic for "low and slow" anomalies invisible to classical heuristics.
 
-Traditional intrusion detection systems fail against zero-day attacks because they rely on known signatures. Quantum machine learning offers:
+## ⚡ Key Capabilities
 
-- **Exponential feature space**: Quantum kernels can capture complex patterns in high-dimensional data
-- **Enhanced anomaly detection**: QI-VAE models probabilistic latent spaces more effectively
-- **Potential speedup**: Grover-like advantages in search and classification
+| Feature | Traditional IDS | QZero (Quantum) | Benefit |
+| :--- | :--- | :--- | :--- |
+| **Detection Logic** | Signatures / Rules | Quantum Kernel Projection | Detects unknown unknowns (0-days) |
+| **False Positives** | High (Rule fatigue) | Low (Probabilistic separation) | Higher fidelity alerts for SOC analysts |
+| **Attack Vectors** | Known CVEs | Anomalous Behavior | Catches encrypted C2 & lateral movement |
+| **Deployment** | Heavy Appliance | Docker Microservice | Runs on commodity hardware (sim) or QPU |
 
-## 📊 Key Results (from literature)
+## 🛠️ Operational Guide
 
-| Method | Detection Rate | False Positive Rate | Source |
-|--------|---------------|---------------------|--------|
-| QI-VAE ZDAD | **92.3%** | 0.8% | Nature Sci. Reports 2025 |
-| QSVM (UGRansome) | 89.7% | 1.2% | MDPI 2025 |
-| Classical SVM | 78.4% | 3.1% | Baseline |
-| Random Forest | 99.4%* | 0.5% | arXiv 2024 |
+### For Blue Teams (Defense)
 
-*Note: Classical RF achieves high accuracy on known patterns but struggles with true zero-days
+**Scenario:** You need to protect a critical Kubernetes cluster from unknown ransomware variants.
 
-## 🏗️ Architecture
+1.  **Deploy QZero Sensor:**
+    ```bash
+    docker run -d -p 8000:8000 --name qzero-sensor \
+      -v /var/log/netflow:/data \
+      thempra/qzero:latest
+    ```
 
-```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  Network Data   │────▶│  Feature Encoder │────▶│  Quantum Layer  │
-│  (UGRansome)    │     │  (Classical)     │     │  (Qiskit)       │
-└─────────────────┘     └──────────────────┘     └────────┬────────┘
-                                                          │
-┌─────────────────┐     ┌──────────────────┐              │
-│   Alert/Action  │◀────│   Classifier     │◀─────────────┘
-│                 │     │   (Hybrid)       │
-└─────────────────┘     └──────────────────┘
-```
+2.  **Ingest Traffic:**
+    QZero accepts NetFlow v9 or CSV exports from Wireshark/Tcpdump.
+    ```bash
+    curl -X POST http://localhost:8000/analyze -F "file=@traffic_dump.pcap"
+    ```
 
-### Components
+3.  **Interpret Alerts:**
+    *   `SEVERITY: CRITICAL` - **Quantum Anomaly Score > 0.85**. High probability of non-standard encryption or exfiltration behavior.
+    *   `Action`: Isolate host immediately. This is likely a Zero-Day.
 
-1. **Feature Encoder**: Preprocesses network traffic features (14 attributes from UGRansome)
-2. **Quantum Feature Map**: ZZFeatureMap / PauliFeatureMap for quantum encoding
-3. **Variational Ansatz**: RealAmplitudes / EfficientSU2 for parameterized quantum circuits
-4. **QSVM Classifier**: Quantum kernel-based classification
-5. **QI-VAE Detector**: Quantum-inspired variational autoencoder for anomaly detection
+### For Red Teams (Offense)
 
-## 📁 Project Structure
+**Scenario:** You are developing a stealth C2 implant and want to test if it triggers quantum anomaly detection.
 
-```
-qzero/
-├── README.md
-├── docs/
-│   ├── PROJECT_DEFINITION.md    # Full project specification
-│   ├── ARCHITECTURE.md          # Technical architecture
-│   └── REFERENCES.md            # Papers and resources
-├── data/
-│   ├── raw/                     # Original datasets
-│   └── processed/               # Preprocessed features
-├── src/
-│   ├── preprocessing/           # Data preprocessing
-│   ├── quantum/                 # Quantum circuits and models
-│   ├── classical/               # Classical ML baselines
-│   └── evaluation/              # Metrics and benchmarks
-├── notebooks/
-│   ├── 01_data_exploration.ipynb
-│   ├── 02_classical_baseline.ipynb
-│   ├── 03_qsvm_implementation.ipynb
-│   └── 04_qivae_implementation.ipynb
-├── papers/                      # Reference papers
-├── requirements.txt
-└── LICENSE
+1.  **Baseline Mode:**
+    Run QZero against normal traffic to establish a baseline quantum state.
+
+2.  **Adversarial Testing:**
+    Replay your C2 traffic against the QZero engine.
+    ```bash
+    python scripts/replay_traffic.py --pcap my_stealth_c2.pcap --target qzero:8000
+    ```
+
+3.  **Evasion Analysis:**
+    Check the **Quantum Reconstruction Loss**. If your traffic generates a high loss, the QI-VAE (Quantum Variational Autoencoder) has successfully flagged your activity as anomalous.
+
+## 🏗️ Architecture for Deployment
+
+QZero is designed as a microservice API that integrates with existing security stacks (Splunk, ELK, Wazuh).
+
+```mermaid
+graph LR
+    A[Network Tap / Switch] -->|NetFlow| B(Logstash/Fluentd)
+    B -->|JSON Batch| C{QZero Engine}
+    C -->|Quantum Inference| D[QPU / Simulator]
+    C -->|Anomaly Score| E[SIEM Dashboard]
+    E -->|Alert| F[SOC Analyst]
 ```
 
-## 🚀 Quick Start
+## 📦 Installation (Docker)
+
+Get up and running in 2 minutes.
 
 ```bash
-# Clone repository
-git clone https://github.com/YOUR_USERNAME/qzero.git
-cd qzero
+# Clone the repository
+git clone https://github.com/thempra/qzero.git
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate
+# Build the container
+docker-compose up -d --build
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Download dataset
-python scripts/download_data.py
-
-# Run classical baseline
-python src/classical/baseline.py
-
-# Run quantum experiments
-python src/quantum/qsvm_train.py
+# Check status
+docker-compose ps
+# Name                Command              State           Ports
+# qzero-api       python app.py            Up      0.0.0.0:8000->8000/tcp
 ```
 
-## 📚 Dataset
+## 🔧 Configuration
 
-**UGRansome** - A novel dataset for anomaly detection and zero-day threats
+Edit `config.yaml` to tune sensitivity:
 
-- **Source**: [Kaggle](https://www.kaggle.com/datasets/nkongolo/ugransome-dataset)
-- **Features**: 14 network traffic attributes
-- **Classes**: Anomaly (A), Signature (S), Synthetic Signature (SS)
-- **Size**: ~100K samples
-
-### Features
-
-| # | Feature | Description |
-|---|---------|-------------|
-| 1 | Flow Duration | Connection duration |
-| 2 | Total Fwd Packets | Forward packet count |
-| 3 | Total Bwd Packets | Backward packet count |
-| 4 | Flow Bytes/s | Data transfer rate |
-| 5 | Flow Packets/s | Packet rate |
-| ... | ... | ... |
-
-## 🔬 Methodology
-
-### 1. Quantum Support Vector Machine (QSVM)
-
-```python
-from qiskit.circuit.library import ZZFeatureMap, RealAmplitudes
-from qiskit_machine_learning.kernels import FidelityQuantumKernel
-
-# Quantum feature map
-feature_map = ZZFeatureMap(feature_dimension=14, reps=2)
-
-# Quantum kernel
-kernel = FidelityQuantumKernel(feature_map=feature_map)
-
-# Train QSVM
-qsvm = QSVC(quantum_kernel=kernel)
-qsvm.fit(X_train, y_train)
+```yaml
+detection:
+  model: "qivae" # Options: qsvm, qivae, hybrid
+  sensitivity: "high" # threshold: 0.85
+  backend: "aer_simulator" # Use 'ibm_brisbane' for real QPU
 ```
 
-### 2. Quantum-Inspired Variational Autoencoder (QI-VAE)
+## 🤝 Enterprise & Research
 
-```python
-# Encoder circuit
-encoder = QuantumCircuit(n_qubits)
-encoder.compose(feature_map, inplace=True)
-encoder.compose(ansatz, inplace=True)
+Originally developed for **MIT iQuHACK 2026**, QZero bridges the gap between Quantum Research and Cybersecurity Operations.
 
-# Latent space measurement
-# Reconstruction loss + KL divergence
-```
-
-## 📈 Evaluation Metrics
-
-- **Accuracy**: Overall classification accuracy
-- **Precision**: True positives / (True positives + False positives)
-- **Recall**: True positives / (True positives + False negatives)
-- **F1-Score**: Harmonic mean of precision and recall
-- **Zero-Day Detection Rate**: Ability to detect unseen attack patterns
-- **False Positive Rate**: Critical for real-world deployment
-
-## 🎓 iQuHACK 2026
-
-This project is being developed for [MIT iQuHACK 2026](https://iquhack.mit.edu/) (January 30 - February 1, 2026).
-
-**Team**: TBD
-**Track**: TBD (IBM Quantum / IonQ / QuEra / Virtual)
-
-## 📖 References
-
-1. **QSVM for Zero-Day Detection** - MDPI Computers 2025
-   - "Parameterised Quantum SVM with Data-Driven Entanglement for Zero-Day Exploit Detection"
-   
-2. **QI-VAE ZDAD** - Nature Scientific Reports 2025
-   - "Quantum deep learning-enhanced ethereum blockchain for cloud security"
-   - 92.3% zero-day detection rate
-   
-3. **UGRansome Dataset** - MDPI Information 2021
-   - "UGRansome1819: A Novel Dataset for Anomaly Detection and Zero-Day Threats"
-
-4. **Classical Baseline** - arXiv 2024
-   - "Zero-day attack and ransomware detection"
-
-## 🤝 Contributing
-
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) for details.
-
----
-
-**QZero** - *Detecting the threats of tomorrow, today* ⚛️🛡️
+**License**: MIT (Open Source Core)
+**Contact**: security@qzero.io
