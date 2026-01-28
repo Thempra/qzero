@@ -38,3 +38,8 @@ pytest>=7.4.0
 
 # Optional: GPU support (uncomment if needed)
 # qiskit-aer-gpu>=0.13.0
+
+# Dashboard
+streamlit>=1.30.0
+plotly>=5.18.0
+
