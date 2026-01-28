@@ -1,21 +1,36 @@
 """
 Quantum feature maps for encoding classical data.
+
+Updated for Qiskit 2.1+ using functional APIs instead of deprecated classes.
 """
 
 import numpy as np
 from enum import Enum
-from typing import Optional, Callable
+from typing import Optional, Callable, Dict, Any, Union
 
 try:
     from qiskit import QuantumCircuit
-    from qiskit.circuit.library import (
-        ZZFeatureMap,
-        ZFeatureMap,
-        PauliFeatureMap,
-    )
+    from qiskit.circuit import Parameter
+    # Try new functional API (Qiskit 2.1+)
+    try:
+        from qiskit.circuit.library import (
+            zz_feature_map,
+            z_feature_map,
+            pauli_feature_map,
+        )
+        USE_FUNCTIONAL_API = True
+    except ImportError:
+        # Fall back to class-based API (older Qiskit)
+        from qiskit.circuit.library import (
+            ZZFeatureMap,
+            ZFeatureMap,
+            PauliFeatureMap,
+        )
+        USE_FUNCTIONAL_API = False
     QISKIT_AVAILABLE = True
 except ImportError:
     QISKIT_AVAILABLE = False
+    USE_FUNCTIONAL_API = False
 
 
 class FeatureMapType(Enum):
@@ -57,24 +72,39 @@ def create_feature_map(
     """
     check_qiskit()
     
+    if USE_FUNCTIONAL_API:
+        return _create_feature_map_functional(
+            n_qubits, feature_map_type, reps, entanglement
+        )
+    else:
+        return _create_feature_map_class_based(
+            n_qubits, feature_map_type, reps, entanglement
+        )
+
+
+def _create_feature_map_functional(
+    n_qubits: int,
+    feature_map_type: FeatureMapType,
+    reps: int,
+    entanglement: str,
+) -> "QuantumCircuit":
+    """Create feature map using Qiskit 2.1+ functional API."""
+    
     if feature_map_type == FeatureMapType.Z:
-        # Simple Z rotation encoding (no entanglement)
-        return ZFeatureMap(
+        return z_feature_map(
             feature_dimension=n_qubits,
             reps=reps,
         )
     
     elif feature_map_type == FeatureMapType.ZZ:
-        # ZZ feature map with pairwise entanglement
-        return ZZFeatureMap(
+        return zz_feature_map(
             feature_dimension=n_qubits,
             reps=reps,
             entanglement=entanglement,
         )
     
     elif feature_map_type == FeatureMapType.PAULI:
-        # Pauli feature map with customizable gates
-        return PauliFeatureMap(
+        return pauli_feature_map(
             feature_dimension=n_qubits,
             reps=reps,
             entanglement=entanglement,
@@ -82,8 +112,7 @@ def create_feature_map(
         )
     
     elif feature_map_type == FeatureMapType.ZZZ:
-        # Higher-order correlations
-        return PauliFeatureMap(
+        return pauli_feature_map(
             feature_dimension=n_qubits,
             reps=reps,
             entanglement=entanglement,
@@ -91,11 +120,58 @@ def create_feature_map(
         )
     
     elif feature_map_type == FeatureMapType.CUSTOM_ENTANGLED:
-        # Custom feature map with enhanced entanglement for anomaly detection
         return _create_custom_entangled_map(n_qubits, reps)
     
     else:
         raise ValueError(f"Unknown feature map type: {feature_map_type}")
+
+
+def _create_feature_map_class_based(
+    n_qubits: int,
+    feature_map_type: FeatureMapType,
+    reps: int,
+    entanglement: str,
+) -> "QuantumCircuit":
+    """Create feature map using older class-based API (Qiskit < 2.1)."""
+    import warnings
+    # Suppress deprecation warnings for older API
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+        
+        if feature_map_type == FeatureMapType.Z:
+            return ZFeatureMap(
+                feature_dimension=n_qubits,
+                reps=reps,
+            )
+        
+        elif feature_map_type == FeatureMapType.ZZ:
+            return ZZFeatureMap(
+                feature_dimension=n_qubits,
+                reps=reps,
+                entanglement=entanglement,
+            )
+        
+        elif feature_map_type == FeatureMapType.PAULI:
+            return PauliFeatureMap(
+                feature_dimension=n_qubits,
+                reps=reps,
+                entanglement=entanglement,
+                paulis=["Z", "ZZ"],
+            )
+        
+        elif feature_map_type == FeatureMapType.ZZZ:
+            return PauliFeatureMap(
+                feature_dimension=n_qubits,
+                reps=reps,
+                entanglement=entanglement,
+                paulis=["Z", "ZZ", "ZZZ"],
+            )
+        
+        elif feature_map_type == FeatureMapType.CUSTOM_ENTANGLED:
+            return _create_custom_entangled_map(n_qubits, reps)
+        
+        else:
+            raise ValueError(f"Unknown feature map type: {feature_map_type}")
 
 
 def _create_custom_entangled_map(n_qubits: int, reps: int = 2) -> "QuantumCircuit":
@@ -109,7 +185,6 @@ def _create_custom_entangled_map(n_qubits: int, reps: int = 2) -> "QuantumCircui
     - Additional CZ gates for correlation capture
     """
     check_qiskit()
-    from qiskit.circuit import Parameter
     
     qc = QuantumCircuit(n_qubits)
     
@@ -143,17 +218,29 @@ def _create_custom_entangled_map(n_qubits: int, reps: int = 2) -> "QuantumCircui
     return qc
 
 
-def get_feature_map_info(feature_map: "QuantumCircuit") -> dict:
+def get_feature_map_info(
+    feature_map_or_type: Union["QuantumCircuit", FeatureMapType],
+    n_qubits: int = 4,
+    reps: int = 2,
+) -> Dict[str, Any]:
     """
     Get information about a feature map circuit.
     
     Args:
-        feature_map: Qiskit circuit
+        feature_map_or_type: Qiskit circuit or FeatureMapType
+        n_qubits: Number of qubits (if type provided)
+        reps: Number of reps (if type provided)
     
     Returns:
         Dictionary with circuit information
     """
     check_qiskit()
+    
+    # If type provided, create the circuit first
+    if isinstance(feature_map_or_type, FeatureMapType):
+        feature_map = create_feature_map(n_qubits, feature_map_or_type, reps)
+    else:
+        feature_map = feature_map_or_type
     
     return {
         "n_qubits": feature_map.num_qubits,
@@ -166,7 +253,7 @@ def get_feature_map_info(feature_map: "QuantumCircuit") -> dict:
 
 if __name__ == "__main__":
     if QISKIT_AVAILABLE:
-        print("Testing feature maps...")
+        print(f"Testing feature maps (functional API: {USE_FUNCTIONAL_API})...")
         
         for fm_type in FeatureMapType:
             try:
