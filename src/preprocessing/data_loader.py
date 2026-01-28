@@ -206,7 +206,7 @@ class DataLoader:
         self.label_encoder = LabelEncoder()
         self._is_fitted = False
     
-    def load_ugransome(self, filename: str = "UGRansome.csv") -> Tuple[pd.DataFrame, pd.Series]:
+    def load_ugransome(self, filename: str = "final(2).csv") -> Tuple[pd.DataFrame, pd.Series]:
         """
         Load UGRansome dataset from CSV.
         
@@ -226,16 +226,23 @@ class DataLoader:
         
         df = pd.read_csv(filepath)
         
-        # Extract features and labels
-        # UGRansome has a 'Class' column with attack types
-        label_col = "Class" if "Class" in df.columns else "label"
+        # Clean column names
+        df.columns = df.columns.str.strip()
+        df = df.rename(columns={"Protcol": "Protocol", "Prediction": "label"})
         
-        if label_col in df.columns:
-            labels = df[label_col]
-            features = df.drop(columns=[label_col])
-        else:
-            raise ValueError(f"Label column '{label_col}' not found in dataset")
+        # Drop Time as it's likely a timestamp/index
+        if "Time" in df.columns:
+            df = df.drop(columns=["Time"])
+            
+        # Separate features and labels
+        labels = df["label"]
+        features = df.drop(columns=["label"])
         
+        # Encode categorical columns
+        categorical_cols = features.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            features[col] = self.label_encoder.fit_transform(features[col])
+            
         return features, labels
     
     def prepare_data(
