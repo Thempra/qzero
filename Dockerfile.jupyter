@@ -1,0 +1,27 @@
+# QZero Jupyter - Development Environment
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir jupyterlab
+
+# Copy application
+COPY . .
+
+# Expose Jupyter port
+EXPOSE 8888
+
+ENV PYTHONPATH=/app
+
+# Run Jupyter Lab
+CMD ["jupyter", "lab", "--ip=0.0.0.0", "--port=8888", "--no-browser", "--allow-root", "--NotebookApp.token=${JUPYTER_TOKEN:-qzero2026}"]

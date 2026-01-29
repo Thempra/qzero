@@ -1,201 +1,41 @@
-# QZero - References & Resources
+# References & Bibliography
 
-## 📄 Core Papers
+This project builds upon cutting-edge research in Quantum Machine Learning and Cybersecurity. Below are the key papers and datasets used.
 
-### 1. Quantum SVM for Zero-Day Detection (MDPI 2025)
+## 📄 Key Papers
 
-**Title**: Parameterised Quantum SVM with Data-Driven Entanglement for Zero-Day Exploit Detection
+### 1. Quantum Support Vector Machines (QSVM)
+*   **"Parameterised Quantum SVM with Data-Driven Entanglement for Zero-Day Exploit Detection"** (MDPI Computers, 2025)
+    *   *Significance:* Demonstrates that QSVMs can achieve ~89% detection on zero-day attacks, outperforming some classical baselines in low-data regimes.
+    *   [Link to Paper](https://www.mdpi.com/2073-431X/14/8/331)
 
-**Source**: MDPI Computers, Vol 14, Issue 8, Article 331 (August 2025)
+*   **"Quantum support vector machine for big data classification"** (Rebentrost et al., Phys. Rev. Lett., 2014)
+    *   *Significance:* The foundational paper proving exponential speedup for SVM on quantum computers (logarithmic time complexity).
+    *   [arXiv:1307.0471](https://arxiv.org/abs/1307.0471)
 
-**URL**: https://www.mdpi.com/2073-431X/14/8/331
+### 2. Quantum Variational Autoencoders (QVAE)
+*   **"Quantum Variational Autoencoder"** (Khoshaman et al., 2018)
+    *   *Significance:* Introduces the concept of using Quantum Boltzmann Machines in the latent space of a VAE to model complex probability distributions.
+    *   [arXiv:1802.05779](https://arxiv.org/abs/1802.05779)
 
-**Key Points**:
-- Uses UGRansome dataset with 14 network traffic attributes
-- QSVM with parameterised entanglement
-- Compares classical SVM vs QSVM performance
-- Targets 3 classes: Anomaly (A), Signature (S), Synthetic Signature (SS)
-- Implemented with Qiskit
-
-**Methodology**:
-- Feature encoding: Multi-qubit quantum state
-- Entanglement: Data-driven parameterised circuits
-- Classification: Quantum kernel SVM
-
----
-
-### 2. QI-VAE for Zero-Day Attack Detection (Nature 2025)
-
-**Title**: Quantum deep learning-enhanced ethereum blockchain for cloud security: intrusion detection, fraud prevention, and secure data migration
-
-**Source**: Nature Scientific Reports (November 2025)
-
-**URL**: https://www.nature.com/articles/s41598-025-22408-1
-
-**Key Points**:
-- **QI VAE ZDAD**: Quantum-Inspired Variational Autoencoders for Zero-Day Attack Detection
-- **92.3% detection rate** for zero-day attacks
-- Reduces false alarms by two-thirds compared to classical methods
-- Uses probabilistic latent modeling
-- Quantum-inspired representation of features
-
-**Architecture Components**:
-1. BAFL SMT - Blockchain-Aware Federated Learning
-2. GNN-AID - Graph Neural Networks for Adaptive Intrusion Detection (98.7% accuracy)
-3. **QI VAE ZDAD** - Quantum-Inspired VAE for Zero-Day (92.3%)
-4. SSCL-BSA - Self-Supervised Contrastive Learning
-5. HT SDM - Hierarchical Transformers for Secure Data Migration
-
----
-
-### 3. UGRansome Dataset Paper (MDPI 2021)
-
-**Title**: UGRansome1819: A Novel Dataset for Anomaly Detection and Zero-Day Threats
-
-**Source**: MDPI Information, Vol 12, Issue 10, Article 405 (September 2021)
-
-**URL**: https://www.mdpi.com/2078-2489/12/10/405
-
-**Key Points**:
-- Novel dataset for ransomware and zero-day detection
-- Real-world network traffic behaviors
-- Includes financial damages, network status, port numbers
-- Suitable for ML/DL training and evaluation
-
-**Most Important Features** (by Mean Decrease in Gini):
-1. Financial damages (USD and BTC)
-2. Network status (flag)
-3. Zero-day group (clusters)
-4. Normal attacks (threats)
-5. Network traffic (netflow bytes)
-6. Port number (port)
-7. Ransomware-type (family)
-
----
-
-### 4. Classical ML Baseline (arXiv 2024)
-
-**Title**: Zero-day attack and ransomware detection
-
-**Source**: arXiv:2408.05244 (August 2024)
-
-**URL**: https://arxiv.org/abs/2408.05244
-
-**Key Points**:
-- Uses UGRansome dataset
-- Compares multiple ML models
-- **Results**:
-  - Random Forest: Perfect scores (accuracy, precision, recall, F1)
-  - XGBoost: Perfect scores
-  - SVM: Poor performance
-  - Naive Bayes: Poor performance
-- Recommends SMOTE for imbalanced data
-- Master's thesis from University of Pretoria
-
----
-
-### 5. Quantum ML for Anomaly Detection (Review)
-
-**Title**: Quantum machine learning algorithms for anomaly detection: A review
-
-**Source**: ScienceDirect, Future Generation Computer Systems (December 2024)
-
-**URL**: https://www.sciencedirect.com/science/article/pii/S0167739X2400596X
-
-**Key Points**:
-- Comprehensive review of QML for anomaly detection
-- Applications: cybersecurity, fraud detection, particle physics
-- Algorithms: QSVM, QNN, Quantum Autoencoders, VQC
-- Challenges and future directions
-
----
+*   **"$\zeta$-QVAE: A Quantum Variational Autoencoder utilizing Regularized Mixed-state Latent Representations"** (2024)
+    *   *Significance:* A fully quantum VAE framework that handles mixed states, crucial for noisy intermediate-scale quantum (NISQ) devices.
+    *   [arXiv:2402.17749](https://arxiv.org/abs/2402.17749)
 
 ## 📊 Datasets
 
-### UGRansome Dataset
+### UGRansome (2018-2019)
+*   **Description:** A dataset specifically designed for anomaly detection and zero-day threats, containing NetFlow data labeled with various ransomware families and "signature" vs "anomaly" classes.
+*   **Source:** [Kaggle - UGRansome Dataset](https://www.kaggle.com/datasets/nkongolo/ugransome-dataset)
+*   **Usage in QZero:** Used for training both the baseline classical models and the quantum feature extractors.
 
-**Download**: https://www.kaggle.com/datasets/nkongolo/ugransome-dataset
+## 🛠️ Technologies & Frameworks
 
-**Description**:
-- Network traffic data with ransomware and zero-day attack patterns
-- ~100K samples
-- 14+ features
-- 3 target classes
-
-**Features**:
-| Index | Feature | Type | Description |
-|-------|---------|------|-------------|
-| 1 | Financial_damages_USD | Numeric | Financial impact in USD |
-| 2 | Financial_damages_BTC | Numeric | Financial impact in BTC |
-| 3 | Flag | Categorical | Network status |
-| 4 | Clusters | Numeric | Zero-day group |
-| 5 | Threats | Categorical | Normal attack types |
-| 6 | Netflow_bytes | Numeric | Network traffic volume |
-| 7 | Port | Numeric | Port number |
-| 8 | Family | Categorical | Ransomware type |
-| 9 | Protocol | Categorical | Network protocol |
-| 10 | IP_address | Categorical | IP address class |
-| 11 | Time | Timestamp | Event timestamp |
-| ... | ... | ... | ... |
-
-**Target Classes**:
-- **A (Anomaly)**: Zero-day/unknown attacks
-- **S (Signature)**: Known attack signatures
-- **SS (Synthetic Signature)**: Artificially generated signatures
+*   **Qiskit (IBM):** Main SDK for quantum circuit construction and simulation.
+    *   [Documentation](https://qiskit.org/documentation/)
+*   **PyTorch:** Used for the classical components of the hybrid Neural Networks (QI-VAE).
+    *   [Qiskit Machine Learning Connector](https://qiskit.org/ecosystem/machine-learning/)
+*   **FastAPI:** High-performance API framework for the production sidecar.
 
 ---
-
-## 🔧 Tools & Frameworks
-
-### Qiskit
-
-**URL**: https://qiskit.org/
-
-**Components Needed**:
-- `qiskit` - Core quantum circuits
-- `qiskit-aer` - Simulators
-- `qiskit-machine-learning` - ML algorithms (QSVM, VQC)
-
-**Tutorials**:
-- Qiskit ML: https://qiskit.org/ecosystem/machine-learning/
-- QSVM Tutorial: https://qiskit.org/ecosystem/machine-learning/tutorials/03_quantum_kernel.html
-
-### Scikit-learn
-
-For classical baselines and preprocessing.
-
-### Pandas/NumPy
-
-For data manipulation.
-
----
-
-## 📚 Additional Reading
-
-### Quantum Kernels
-- Havlíček et al. (2019): "Supervised learning with quantum-enhanced feature spaces"
-- Schuld & Killoran (2019): "Quantum Machine Learning in Feature Hilbert Spaces"
-
-### Variational Quantum Algorithms
-- Cerezo et al. (2021): "Variational quantum algorithms"
-- McClean et al. (2016): "The theory of variational hybrid quantum-classical algorithms"
-
-### Intrusion Detection Systems
-- Buczak & Guven (2016): "A Survey of Data Mining and Machine Learning Methods for Cyber Security Intrusion Detection"
-
----
-
-## 🔗 Quick Links
-
-| Resource | URL |
-|----------|-----|
-| UGRansome Dataset | https://www.kaggle.com/datasets/nkongolo/ugransome-dataset |
-| Qiskit ML Docs | https://qiskit.org/ecosystem/machine-learning/ |
-| iQuHACK 2026 | https://iquhack.mit.edu/ |
-| MDPI Paper | https://www.mdpi.com/2073-431X/14/8/331 |
-| Nature Paper | https://www.nature.com/articles/s41598-025-22408-1 |
-| arXiv Baseline | https://arxiv.org/abs/2408.05244 |
-
----
-
-*Last Updated: 2026-01-27*
+*Note: Some papers may require academic access.*

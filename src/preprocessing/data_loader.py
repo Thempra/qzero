@@ -210,6 +210,11 @@ class DataLoader:
         """
         Load UGRansome dataset from CSV.
         
+        Dataset format (final(2).csv):
+        - Time, Protcol, Flag, Family, Clusters, SeddAddress, ExpAddress, 
+          BTC, USD, Netflow_Bytes, IPaddress, Threats, Port, Prediction
+        - Prediction: A (Anomaly), S (Signature), SS (Synthetic Signature)
+        
         Args:
             filename: Name of the CSV file in data/raw/
         
@@ -230,20 +235,50 @@ class DataLoader:
         df.columns = df.columns.str.strip()
         df = df.rename(columns={"Protcol": "Protocol", "Prediction": "label"})
         
-        # Drop Time as it's likely a timestamp/index
-        if "Time" in df.columns:
-            df = df.drop(columns=["Time"])
-            
-        # Separate features and labels
-        labels = df["label"]
-        features = df.drop(columns=["label"])
+        # Map labels to integers: A=1 (anomaly/zero-day), S=2, SS=3
+        # We treat A as zero-day (unseen attacks), S as known signatures
+        label_map = {"A": 1, "S": 2, "SS": 3}
+        labels = df["label"].map(label_map)
         
-        # Encode categorical columns
-        categorical_cols = features.select_dtypes(include=['object']).columns
+        # Handle any unmapped labels (shouldn't happen but be safe)
+        if labels.isna().any():
+            print(f"Warning: {labels.isna().sum()} unmapped labels found")
+            labels = labels.fillna(0).astype(int)
+        
+        # Drop label and non-feature columns
+        drop_cols = ["label"]
+        if "Time" in df.columns:
+            drop_cols.append("Time")  # Time is likely index/timestamp
+            
+        features = df.drop(columns=drop_cols)
+        
+        # Store encoders for each categorical column
+        self._categorical_encoders = {}
+        
+        # Encode categorical columns (object and string dtypes)
+        categorical_cols = features.select_dtypes(include=['object', 'string']).columns.tolist()
         for col in categorical_cols:
-            features[col] = self.label_encoder.fit_transform(features[col])
+            encoder = LabelEncoder()
+            features[col] = encoder.fit_transform(features[col].astype(str))
+            self._categorical_encoders[col] = encoder
+        
+        # Convert all to numeric (some might be mixed type)
+        for col in features.columns:
+            features[col] = pd.to_numeric(features[col], errors='coerce')
+        
+        # Fill any NaN with 0 (shouldn't happen but be safe)
+        features = features.fillna(0)
             
         return features, labels
+    
+    def get_label_names(self) -> Dict[int, str]:
+        """Return mapping of label integers to names."""
+        return {
+            0: "Normal",
+            1: "Anomaly (Zero-Day)",
+            2: "Signature (Known)",
+            3: "Synthetic Signature",
+        }
     
     def prepare_data(
         self,
@@ -257,21 +292,27 @@ class DataLoader:
         """
         Prepare data for training: scale, encode, split.
         
+        For UGRansome dataset:
+        - Label 1 (A) = Anomaly/Zero-Day (unknown attacks) - what we want to detect
+        - Label 2 (S) = Signature (known attacks)
+        - Label 3 (SS) = Synthetic Signature (known attacks)
+        
         Args:
             X: Feature DataFrame
             y: Labels Series
             test_size: Test set ratio
             val_size: Validation set ratio (from training set)
             random_state: Random seed
-            binary: If True, convert to binary (normal vs attack)
+            binary: If True, convert to binary (zero-day vs known attacks)
         
         Returns:
             Dictionary with train/val/test splits
         """
         # Convert labels
         if binary:
-            # 0 = normal, 1 = any attack
-            y_encoded = (y != 0).astype(int)
+            # For UGRansome: 1 (Anomaly/Zero-Day) -> 1, others -> 0
+            # This makes it: 1 = zero-day (detect), 0 = known attack
+            y_encoded = (y == 1).astype(int)
         else:
             y_encoded = self.label_encoder.fit_transform(y)
         

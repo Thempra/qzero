@@ -16,8 +16,9 @@ import time
 # Add project root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.preprocessing.data_loader import generate_synthetic_data
+from src.preprocessing.data_loader import generate_synthetic_data, DataLoader
 from src.preprocessing.feature_engineering import FeatureEngineer
+from pathlib import Path
 from src.classical.baseline import ClassicalBaseline, run_all_baselines
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
@@ -82,8 +83,24 @@ def main():
         st.title("Configuration")
         
         st.subheader("📊 Data Settings")
-        n_samples = st.slider("Number of samples", 100, 5000, 1000, 100)
-        difficulty = st.select_slider("Difficulty", ["easy", "medium", "hard"], "medium")
+        
+        # Check if real dataset exists
+        data_dir = Path(__file__).parent.parent / "data" / "raw"
+        real_dataset_exists = (data_dir / "final(2).csv").exists()
+        
+        data_source = st.radio(
+            "Data Source",
+            ["Synthetic", "Real (UGRansome)"] if real_dataset_exists else ["Synthetic"],
+            help="UGRansome dataset contains ~149K ransomware samples"
+        )
+        
+        if data_source == "Synthetic":
+            n_samples = st.slider("Number of samples", 100, 5000, 1000, 100)
+            difficulty = st.select_slider("Difficulty", ["easy", "medium", "hard"], "medium")
+        else:
+            n_samples = st.slider("Sample limit (0=all)", 0, 50000, 10000, 1000,
+                                  help="Limit samples for faster processing (0 = use all ~149K)")
+            difficulty = None  # Not applicable for real data
         
         st.subheader("⚛️ Quantum Settings")
         n_qubits = st.slider("Number of qubits", 2, 8, 4)
@@ -111,30 +128,60 @@ def main():
         col1, col2 = st.columns([2, 1])
         
         with col1:
-            if st.button("Generate Synthetic Data", type="primary"):
-                with st.spinner("Generating data..."):
-                    X, y = generate_synthetic_data(n_samples=n_samples, difficulty=difficulty)
-                    st.session_state.X = X
-                    st.session_state.y = y
-                    st.session_state.data_generated = True
-                st.success(f"✅ Generated {n_samples} samples with {X.shape[1]} features")
+            if data_source == "Synthetic":
+                if st.button("Generate Synthetic Data", type="primary"):
+                    with st.spinner("Generating data..."):
+                        X, y = generate_synthetic_data(n_samples=n_samples, difficulty=difficulty)
+                        st.session_state.X = X
+                        st.session_state.y = y
+                        st.session_state.data_generated = True
+                        st.session_state.data_source = "synthetic"
+                    st.success(f"✅ Generated {n_samples} samples with {X.shape[1]} features")
+            else:
+                if st.button("Load UGRansome Dataset", type="primary"):
+                    with st.spinner("Loading real dataset..."):
+                        loader = DataLoader()
+                        X, y = loader.load_ugransome()
+                        
+                        # Apply sample limit if specified
+                        if n_samples > 0 and n_samples < len(X):
+                            # Stratified sampling to maintain class distribution
+                            from sklearn.model_selection import train_test_split
+                            X, _, y, _ = train_test_split(
+                                X, y, train_size=n_samples, stratify=y, random_state=42
+                            )
+                        
+                        st.session_state.X = X
+                        st.session_state.y = y
+                        st.session_state.data_generated = True
+                        st.session_state.data_source = "real"
+                        st.session_state.label_names = loader.get_label_names()
+                    st.success(f"✅ Loaded {len(X)} samples with {X.shape[1]} features")
         
         with col2:
             if st.session_state.data_generated:
                 st.metric("Samples", len(st.session_state.X))
                 st.metric("Features", st.session_state.X.shape[1])
+                if hasattr(st.session_state, 'data_source'):
+                    st.metric("Source", st.session_state.data_source.title())
         
         if st.session_state.data_generated:
             st.subheader("Class Distribution")
             
-            # Class distribution
-            class_names = ["Normal", "Signature", "Zero-Day"]
-            class_counts = pd.Series(st.session_state.y).value_counts().sort_index()
+            # Class names depend on data source
+            if hasattr(st.session_state, 'data_source') and st.session_state.data_source == "real":
+                label_names = st.session_state.get('label_names', {})
+                class_counts = pd.Series(st.session_state.y).value_counts().sort_index()
+                class_labels = [label_names.get(i, f"Class {i}") for i in class_counts.index]
+            else:
+                class_names = ["Normal", "Signature", "Zero-Day"]
+                class_counts = pd.Series(st.session_state.y).value_counts().sort_index()
+                class_labels = [class_names[i] if i < len(class_names) else f"Class {i}" for i in class_counts.index]
             
             fig = px.pie(
                 values=class_counts.values,
-                names=[class_names[i] for i in class_counts.index],
-                color_discrete_sequence=["#10b981", "#f59e0b", "#ef4444"],
+                names=class_labels,
+                color_discrete_sequence=["#10b981", "#f59e0b", "#ef4444", "#8b5cf6"],
                 hole=0.4
             )
             fig.update_layout(
@@ -149,12 +196,21 @@ def main():
             engineer = FeatureEngineer(n_qubits=min(3, n_qubits), reduction_method='pca')
             X_reduced = engineer.fit_transform(st.session_state.X)
             
+            # Map class indices to names for the scatter plot
+            if hasattr(st.session_state, 'data_source') and st.session_state.data_source == "real":
+                label_names = st.session_state.get('label_names', {})
+                class_mapping = {i: label_names.get(i, f"Class {i}") for i in st.session_state.y.unique()}
+            else:
+                class_names = ["Normal", "Signature", "Zero-Day"]
+                class_mapping = {i: class_names[i] if i < len(class_names) else f"Class {i}" 
+                                for i in st.session_state.y.unique()}
+            
             df_pca = pd.DataFrame(X_reduced[:, :2], columns=['PC1', 'PC2'])
-            df_pca['Class'] = [class_names[c] for c in st.session_state.y]
+            df_pca['Class'] = [class_mapping[c] for c in st.session_state.y]
             
             fig = px.scatter(
                 df_pca, x='PC1', y='PC2', color='Class',
-                color_discrete_map={"Normal": "#10b981", "Signature": "#f59e0b", "Zero-Day": "#ef4444"},
+                color_discrete_sequence=["#10b981", "#f59e0b", "#ef4444", "#8b5cf6"],
                 opacity=0.7
             )
             fig.update_layout(
@@ -200,7 +256,7 @@ def main():
                         "Accuracy": f"{r.accuracy:.4f}",
                         "Precision": f"{r.precision:.4f}",
                         "Recall": f"{r.recall:.4f}",
-                        "F1-Score": f"{r.f1_score:.4f}",
+                        "F1-Score": f"{r.f1:.4f}",
                         "Time (s)": f"{r.train_time:.3f}"
                     }
                     for r in st.session_state.classical_results
@@ -211,7 +267,7 @@ def main():
                 # Bar chart comparison
                 fig = go.Figure()
                 models = [r.model_name for r in st.session_state.classical_results]
-                metrics = ['accuracy', 'precision', 'recall', 'f1_score']
+                metrics = ['accuracy', 'precision', 'recall', 'f1']
                 colors = ['#6366f1', '#8b5cf6', '#a855f7', '#c084fc']
                 
                 for i, metric in enumerate(metrics):
@@ -288,7 +344,7 @@ def main():
                             'accuracy': accuracy,
                             'f1': f1,
                             'time': train_time,
-                            'used_quantum': qsvm.used_quantum
+                            'used_quantum': qsvm._used_quantum
                         }
                         
                         st.success("✅ QSVM trained!")
@@ -314,7 +370,7 @@ def main():
         
         if st.session_state.classical_results and st.session_state.quantum_results:
             # Get best classical
-            best_classical = max(st.session_state.classical_results, key=lambda x: x.f1_score)
+            best_classical = max(st.session_state.classical_results, key=lambda x: x.f1)
             
             col1, col2 = st.columns(2)
             
@@ -325,7 +381,7 @@ def main():
                 </div>
                 """, unsafe_allow_html=True)
                 st.metric("Model", best_classical.model_name)
-                st.metric("F1-Score", f"{best_classical.f1_score:.4f}")
+                st.metric("F1-Score", f"{best_classical.f1:.4f}")
                 st.metric("Accuracy", f"{best_classical.accuracy:.4f}")
             
             with col2:
@@ -344,7 +400,7 @@ def main():
             fig.add_trace(go.Bar(
                 name='Classical (Best)',
                 x=['Accuracy', 'F1-Score'],
-                y=[best_classical.accuracy, best_classical.f1_score],
+                y=[best_classical.accuracy, best_classical.f1],
                 marker_color='#10b981'
             ))
             
