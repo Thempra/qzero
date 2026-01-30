@@ -112,3 +112,43 @@ Originally developed for **MIT iQuHACK 2026**, QZero bridges the gap between Qua
 
 **License**: MIT (Open Source Core)
 **Contact**: security@qzero.io
+
+## 💻 Command Line Interface
+
+### Batch Analysis
+
+Analyze multiple PCAP or log files at once:
+
+```bash
+# Analyze a single file
+python qzero-cli-batch.py -f suspicious.pcap --model qivae
+
+# Analyze multiple files with wildcards
+python qzero-cli-batch.py -f *.pcap --model classical
+
+# Custom parameters
+python qzero-cli-batch.py -f suspicious.pcap -n 32 -m 5000 --output results.json
+```
+
+**Options:**
+- `-f, --files`: Input file(s) to analyze (supports wildcards: `*.pcap`)
+- `--model`: Model type (`qivae`, `classical`, `hybrid`)
+- `-n, --n-qubits`: Number of qubits for quantum models (default: 32)
+- `-m, --max-samples`: Maximum samples per file (default: 1000)
+- `-o, --output`: Output JSON file (default: `batch_results.json`)
+
+### Real-Time Detection
+
+Monitor network traffic in real-time:
+
+```bash
+# NetFlow stream
+python qzero-cli.py detect --stream netflow --model qivae --max-samples 1000
+
+# PCAP stream
+python qzero-cli.py detect --stream pcap --model classical --max-samples 500
+
+# Logs stream
+python qzero-cli.py detect --stream logs --model qivae --max-samples 100
+```
+

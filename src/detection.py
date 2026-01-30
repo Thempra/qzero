@@ -580,17 +580,24 @@ if __name__ == "__main__":
 
     async def main():
         results = await run_detection_stream(stream_type, data_path)
-        stats = detector.get_statistics()
+
+        # Calculate statistics from results
+        total_samples = len(results)
+        anomalies_detected = sum(1 for r in results if r.is_anomaly)
+        anomaly_rate = anomalies_detected / total_samples if total_samples > 0 else 0
+        mean_score = sum(r.anomaly_score for r in results) / total_samples if total_samples > 0 else 0
+        max_score = max((r.anomaly_score for r in results), default=0)
+        critical_alerts = sum(1 for r in results if r.is_anomaly and r.anomaly_score >= 0.85)
 
         print("\n" + "="*50)
         print("Detection Statistics")
         print("="*50)
-        print(f"Total samples: {stats['total_samples']}")
-        print(f"Anomalies detected: {stats['anomalies_detected']}")
-        print(f"Anomaly rate: {stats['anomaly_rate']:.2%}")
-        print(f"Mean anomaly score: {stats['mean_anomaly_score']:.3f}")
-        print(f"Max anomaly score: {stats['max_anomaly_score']:.3f}")
-        print(f"Critical alerts: {stats['critical_alerts']}")
+        print(f"Total samples: {total_samples}")
+        print(f"Anomalies detected: {anomalies_detected}")
+        print(f"Anomaly rate: {anomaly_rate:.2%}")
+        print(f"Mean anomaly score: {mean_score:.3f}")
+        print(f"Max anomaly score: {max_score:.3f}")
+        print(f"Critical alerts: {critical_alerts}")
         print("="*50)
 
     # Run main
