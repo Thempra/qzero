@@ -42,6 +42,7 @@ class FeatureEngineer:
         self.reducer = None
         self.selected_features: Optional[List[int]] = None
         self._is_fitted = False
+        self._data_shift = 0.0  # Track data shift for proper transformation
     
     def fit(self, X: np.ndarray, y: Optional[np.ndarray] = None) -> "FeatureEngineer":
         """
@@ -76,18 +77,27 @@ class FeatureEngineer:
         else:
             X_reduced = X
         
-        # Step 2: Scale to encoding range
-        self.scaler.fit(X_reduced)
+        # Step 2: Shift data to make it non-negative if encoding range starts at 0
+        if self.encoding_range[0] == 0:
+            self._data_shift = -X_reduced.min()
+            X_shifted = X_reduced + self._data_shift
+        else:
+            self._data_shift = 0.0
+            X_shifted = X_reduced
+        
+        # Step 3: Scale to encoding range
+        self.scaler.fit(X_shifted)
         
         self._is_fitted = True
         return self
     
-    def transform(self, X: np.ndarray) -> np.ndarray:
+    def transform(self, X: np.ndarray, clip: bool = True) -> np.ndarray:
         """
         Transform features for quantum encoding.
         
         Args:
             X: Feature array
+            clip: If True, clip values to encoding range (default True for quantum safety)
         
         Returns:
             Transformed features in encoding range
@@ -103,8 +113,15 @@ class FeatureEngineer:
         else:
             X_reduced = X
         
+        # Shift data
+        X_shifted = X_reduced + self._data_shift
+        
         # Scale to encoding range
-        X_scaled = self.scaler.transform(X_reduced)
+        X_scaled = self.scaler.transform(X_shifted)
+        
+        # Clip to encoding range for quantum circuit safety
+        if clip:
+            X_scaled = np.clip(X_scaled, self.encoding_range[0], self.encoding_range[1])
         
         return X_scaled
     
