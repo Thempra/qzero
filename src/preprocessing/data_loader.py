@@ -332,6 +332,12 @@ class DataLoader:
         X_test_scaled = self.scaler.transform(X_test)
         self._is_fitted = True
         
+        # Get feature names (handle both DataFrame and numpy array)
+        if hasattr(X, 'columns'):
+            feature_names = list(X.columns)
+        else:
+            feature_names = [f"feature_{i}" for i in range(X.shape[1])]
+        
         return {
             "X_train": X_train_scaled,
             "X_val": X_val_scaled,
@@ -339,7 +345,7 @@ class DataLoader:
             "y_train": y_train.values if hasattr(y_train, 'values') else y_train,
             "y_val": y_val.values if hasattr(y_val, 'values') else y_val,
             "y_test": y_test.values if hasattr(y_test, 'values') else y_test,
-            "feature_names": list(X.columns),
+            "feature_names": feature_names,
             "scaler": self.scaler,
         }
     
