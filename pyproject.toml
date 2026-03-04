@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qzero"
+version = "2.0.0"
+description = "Sistema de Detección de Anomalías y Monitoreo de Seguridad - QZero"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Thempra", email = "thempra@overxet.com"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Security :: Monitoring",
+    "Programming Language :: Python :: 3",
+]
+
+dependencies = [
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "scikit-learn>=1.3.0",
+    "scapy>=2.5.0",
+    "tqdm>=4.66.0",
+    "click>=8.1.0",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+qzero = "qzero.cli:main"
+qzero-monitor = "qzero.cli:main"
+qzero-pcap = "qzero.cli:main"
+qzero-detect = "qzero.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.5.0",
+]
+quantum = [
+    "qiskit>=0.45.0",
+    "torch>=2.0.0",
+]
+realtime = [
+    "scapy>=2.5.0",
+    "psutil>=5.9.0",
+]
+all = [
+    "qiskit>=0.45.0",
+    "torch>=2.0.0",
+    "scapy>=2.5.0",
+    "psutil>=5.9.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+qzero = ["*.yaml", "*.json", "*.txt"]

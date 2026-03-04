@@ -1,0 +1,46 @@
+QZero API Health & Performance Monitor - 2026-02-06 06:00:57
+============================================================
+
+Health Status: CRITICAL
+Health Score: 0/100
+
+Endpoints Analizados: 0/5 saludables
+Endpoints Degradados: 0
+Endpoints Caídos: 5
+
+Tiempo de Respuesta Promedio: 0.00 ms
+Tiempo Mínimo: 0.00 ms
+Tiempo Máximo: 0.00 ms
+
+Endpoints Detallados:
+------------------------------------------------------------
+
+/:
+  Status: down
+  Response Time: None ms
+  Status Code: None
+  Error: Connection failed - API not running
+
+/api/health:
+  Status: down
+  Response Time: None ms
+  Status Code: None
+  Error: Connection failed - API not running
+
+/api/models:
+  Status: down
+  Response Time: None ms
+  Status Code: None
+  Error: Connection failed - API not running
+
+/api/detection/check:
+  Status: down
+  Response Time: None ms
+  Status Code: None
+  Error: Connection failed - API not running
+
+/api/predictor/predict:
+  Status: down
+  Response Time: None ms
+  Status Code: None
+  Error: Connection failed - API not running

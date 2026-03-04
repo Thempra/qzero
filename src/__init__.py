@@ -1,6 +1,6 @@
-# QZero - Quantum Zero-Day Detection System
+"""
+QZero - Sistema de Detección de Anomalías y Monitoreo de Seguridad
+"""
 __version__ = "1.0.0"
-
-from .predictor import QZeroPredictor
-
-__all__ = ["QZeroPredictor"]
+__author__ = "Thempra"
+__email__ = "thempra@overxet.com"

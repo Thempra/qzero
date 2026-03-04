@@ -1,0 +1,27 @@
+================================================================================
+QZero Security Monitor Report
+================================================================================
+
+Timestamp: 2026-02-08_17-00-01
+Security Score: 0/100
+Health Status: CRITICAL
+
+Severity Counts:
+  CRITICAL: 0
+  HIGH: 1
+  MEDIUM: 0
+  LOW: 31
+
+Recommendations:
+  • HIGH: Revise archivos con contenido sensible no commiteados
+  • LOW: Considerar remover print statements en producción
+
+Uncommitted Changes:
+  • src/quantum/qivae.py (M)
+
+Debug Statements:
+  • qzero-cli.py: 86 prints
+  • train_models.py: 24 prints
+  • autonomous-data-only.py: 13 prints
+  • autonomous-insights.py: 17 prints
+  • run_detection.py: 25 prints

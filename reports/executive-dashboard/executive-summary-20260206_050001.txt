@@ -1,0 +1,17 @@
+================================================================================
+QZERO EXECUTIVE DASHBOARD
+================================================================================
+
+Generated: 2026-02-06 05:00:01 (Europe/Madrid)
+Workspace: /home/thempra/projects/qzero
+
+OVERALL HEALTH SCORE:
+ANOMALIES DETECTED:
+  • WARNING: Uncommitted changes detected
+
+RECOMMENDATIONS:
+  1. 🔴 PRIORIDAD: Review security vulnerabilities and fix API keys
+  2. 🟡 PRIORIDAD: Improve code quality - add tests and remove unused imports
+  3. ⚠️ ACTION: Commit or stash uncommitted changes
+
+================================================================================

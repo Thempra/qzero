@@ -1,0 +1,3 @@
+"""
+Módulo Core de QZero
+"""

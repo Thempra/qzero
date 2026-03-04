@@ -168,7 +168,7 @@ if TORCH_AVAILABLE:
             self.fc_mu = nn.Linear(prev_dim, latent_dim)
             self.fc_logvar = nn.Linear(prev_dim, latent_dim)
         
-        def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        def forward(self, x: Any) -> Tuple[torch.Tensor, torch.Tensor]:
             """
             Encode input to latent distribution parameters.
             
@@ -246,7 +246,7 @@ if TORCH_AVAILABLE:
             self.fc_mu = nn.Linear(q_output_dim, output_dim)
             self.fc_logvar = nn.Linear(q_output_dim, output_dim)
             
-        def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        def forward(self, x: Any) -> Tuple[torch.Tensor, torch.Tensor]:
             # Scale input to [0, 2pi] for rotation encoding if needed
             # For now assume input is normalized/scaled appropriately
             
@@ -295,8 +295,8 @@ if TORCH_AVAILABLE:
         
         def reparameterize(
             self,
-            mu: torch.Tensor,
-            logvar: torch.Tensor,
+            mu: Any,
+            logvar: Any,
             quantum_noise: bool = True,
         ) -> torch.Tensor:
             """
@@ -326,8 +326,8 @@ if TORCH_AVAILABLE:
         
         def forward(
             self,
-            x: torch.Tensor,
-        ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+            x: Any,
+        ) -> Tuple[Any, Any, Any]:
             """
             Forward pass.
             
@@ -339,7 +339,7 @@ if TORCH_AVAILABLE:
             reconstruction = self.decoder(z)
             return reconstruction, mu, logvar
         
-        def encode(self, x: torch.Tensor) -> torch.Tensor:
+        def encode(self, x: Any) -> torch.Tensor:
             """Encode to latent space (for inference)."""
             mu, _ = self.encoder(x)
             return mu
@@ -348,7 +348,7 @@ if TORCH_AVAILABLE:
             """Decode from latent space."""
             return self.decoder(z)
         
-        def reconstruction_error(self, x: torch.Tensor) -> torch.Tensor:
+        def reconstruction_error(self, x: Any) -> torch.Tensor:
             """
             Compute reconstruction error for anomaly detection.
             Higher error indicates more anomalous samples.
@@ -360,12 +360,12 @@ if TORCH_AVAILABLE:
 
 
 def vae_loss(
-    reconstruction: torch.Tensor,
-    x: torch.Tensor,
-    mu: torch.Tensor,
-    logvar: torch.Tensor,
+    reconstruction: Any,
+    x: Any,
+    mu: Any,
+    logvar: Any,
     beta: float = 0.5,
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> Tuple[Any, Any, Any]:
     """
     VAE loss: reconstruction + KL divergence.
     

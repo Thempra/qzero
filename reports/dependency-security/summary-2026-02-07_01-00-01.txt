@@ -1,0 +1,32 @@
+QZero Dependency Security Report
+============================================================
+
+Project: /home/thempra/projects/qzero
+Timestamp: 2026-02-07_01-00-01
+
+SUMMARY
+------------------------------------------------------------
+Dependencies scanned: 20
+Vulnerabilities: 2
+  - Critical: 0
+  - High: 1
+  - Medium: 1
+  - Low: 0
+Obsolete packages: 0
+
+Health Score: 70/100
+Status: GOOD
+
+VULNERABILITIES
+------------------------------------------------------------
+
+numpy (1.24.0) - HIGH
+  CVE-2024-XXXX - Out-of-bounds write
+  CVE: CVE-2024-9471
+
+numpy (1.24.0) - MEDIUM
+
+RECOMMENDATIONS
+------------------------------------------------------------
+  - Update numpy to fix HIGH vulnerability CVE-2024-9471
+  - Update numpy to latest version for security
