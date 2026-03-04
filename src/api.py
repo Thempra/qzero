@@ -12,6 +12,26 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+# Models
+class AnalyzeRequest(BaseModel):
+    method: Optional[str] = "best"
+
+class Alert(BaseModel):
+    timestamp: str
+    severity: str
+    src_ip: str
+    dst_ip: str
+    protocol: str
+    anomaly_score: float
+    message: str
+
+class StatusResponse(BaseModel):
+    status: str
+    message: str
+
+# Global predictor - defined after import
+global_predictor: Optional[QZeroPredictor] = None
+
 # Importar predictor
 try:
     from src.predictor import QZeroPredictor
