@@ -24,7 +24,7 @@ How it works:
 import os
 import sys
 import subprocess
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 # Add src to path
@@ -55,13 +55,13 @@ def check_git_config():
 
         if name and email:
             print(f"    ✓ Git configured: {name} <{email}>")
-            return True
+            return {"status": "ok", "name": name, "email": email}
         else:
             print(f"    ✗ Git config incomplete")
-            return False
+            return {"status": "failed", "error": "incomplete config"}
     except Exception as e:
         print(f"    ✗ Git check failed: {e}")
-        return False
+        return {"status": "failed", "error": str(e)}
 
 
 def check_disk_space():
