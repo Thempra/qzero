@@ -1,6 +1,6 @@
 # Análisis de Anomalías en Tráfico QZero
 
-**Fecha:** 2026-03-04 06:58:13
+**Fecha:** 2026-03-04 07:59:21
 
 **Fuente de datos:** `test-incident-log.jsonl`
 
