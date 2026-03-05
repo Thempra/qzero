@@ -1,15 +1,18 @@
 """
-QZero - Sistema Unificado de Detección de Anomalías
+QZero - Sistema de Detección de Anomalías y Monitoreo de Seguridad
 """
 
-__version__ = "2.0.0"
+__version__ = "2.2.0"
 __author__ = "Thempra"
-__email__ = "thempra@overxet.com"
+__license__ = "MIT"
 
-from .config import QZeroConfig, get_config, reset_config
+from .config import get_config, QZeroConfig, setup_logging
+from .daemons import QZeroDaemon, BaseDaemonTask
 
 __all__ = [
-    "QZeroConfig",
-    "get_config",
-    "reset_config"
+    'get_config',
+    'QZeroConfig',
+    'setup_logging',
+    'QZeroDaemon',
+    'BaseDaemonTask'
 ]

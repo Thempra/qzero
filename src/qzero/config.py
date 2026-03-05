@@ -1,175 +1,198 @@
 """
-QZero Configuration Module
+Configuración de QZero
 
-Centralized configuration management for QZero.
+Gestor centralizado de configuración
 """
 
 import os
-import sys
 from pathlib import Path
 from typing import Dict, Any, Optional
-from dataclasses import dataclass, field
-import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-@dataclass
 class QZeroConfig:
-    """Configuración centralizada de QZero."""
+    """Gestor de configuración para QZero"""
 
-    # Rutas
-    workspace: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent)
-    src_path: Path = field(default_factory=lambda: Path(__file__).parent)
+    def __init__(self, config_file: Optional[str] = None):
+        """
+        Inicializa la configuración.
 
-    # Directorios de datos
-    data_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent / "data")
-    raw_data_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent / "data" / "raw")
-    synthetic_data_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent / "data" / "synthetic")
-    simulated_threats_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent / "data" / "simulated-threats")
-    synthetic_pcaps_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent / "data" / "synthetic-pcaps")
-    threat_intelligence_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent / "data" / "threat-intelligence")
+        Args:
+            config_file: Ruta al archivo de configuración YAML
+        """
+        self.config_file = Path(config_file) if config_file else None
+        self.config_dir = Path.home() / ".qzero"
+        self.config_dir.mkdir(parents=True, exist_ok=True)
 
-    # Directorios de reportes
-    reports_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent / "reports")
-    hourly_monitor_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent / "reports" / "hourly-monitor")
-    api_health_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent / "reports" / "api-health")
-    integrity_reports_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent / "integrity-reports")
-    anomaly_risk_reports_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent / "anomaly-risk-reports")
-    context_compressed_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent / "context-compressed")
+        self._config: Dict[str, Any] = {}
 
-    # Directorios de insights
-    insights_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent / "insights")
+        # Cargar configuración por defecto
+        self._load_defaults()
 
-    # Directorios de logs
-    logs_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent / "logs")
-    archived_logs_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent / "logs" / "archived")
+        # Cargar configuración personalizada si existe
+        if self.config_file and self.config_file.exists():
+            self._load_custom()
 
-    # Directorios de entrenamiento
-    training_health_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent / "training-health")
-    training_status_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent / "training-status")
+    def _load_defaults(self):
+        """Carga configuración por defecto"""
+        self._config = {
+            # Paths
+            "output_dir": str(Path.cwd() / "reports"),
+            "log_dir": str(self.config_dir / "logs"),
+            "data_dir": str(self.config_dir / "data"),
+            "model_dir": str(self.config_dir / "models"),
+            "pcap_dir": str(self.config_dir / "pcaps"),
 
-    # Directorios de seguridad
-    security_reports_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.parent / "security-reports")
+            # Model settings
+            "default_threshold": 0.7,
+            "default_model": "svm",
+            "n_qubits": 4,
 
-    # Directorios de tasks
-    tasks_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent / "tasks")
+            # Monitor settings
+            "default_interface": "eth0",
+            "promiscuous_mode": False,
+            "monitor_interval": 1.0,
 
-    # Archivos de configuración
-    config_file: Path = field(default_factory=lambda: Path(__file__).parent.parent / "qzero-config.yaml")
+            # Daemon settings
+            "daemon_interval": 60,
+            "log_level": "INFO",
 
-    # Configuración de modelos
-    n_qubits: int = 4
-    use_qsvm: bool = True
-    use_qivae: bool = True
-    use_classical: bool = True
+            # Paths absolutos
+            "paths": {
+                "output_dir": Path.cwd() / "reports",
+                "log_dir": self.config_dir / "logs",
+                "data_dir": self.config_dir / "data",
+                "model_dir": self.config_dir / "models",
+                "pcap_dir": self.config_dir / "pcaps"
+            }
+        }
 
-    # Configuración de entrenamiento
-    train_samples: int = 5000
-    train_epochs: int = 50
-    batch_size: int = 32
-    learning_rate: float = 0.001
+    def _load_custom(self):
+        """Carga configuración personalizada desde archivo"""
+        import yaml
 
-    # Configuración de análisis
-    default_threshold: float = 0.7
-    promiscuous_mode: bool = True
-    sample_interval: int = 1  # segundos
+        try:
+            with open(self.config_file, 'r') as f:
+                custom_config = yaml.safe_load(f)
 
-    # Configuración de logging
-    verbose: bool = False
-    log_level: str = "INFO"
-
-    # Configuración de API
-    api_port: int = 8000
-    api_host: str = "0.0.0.0"
-    api_reload: bool = True
-
-    # Configuración de daemon
-    daemon_interval: int = 3600  # 1 hora
-    enable_daemon: bool = True
-
-    # Directorio de salida para análisis
-    output_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent / "output")
-
-    def __post_init__(self):
-        """Crear directorios si no existen."""
-        for dir_path in [
-            self.data_dir,
-            self.raw_data_dir,
-            self.synthetic_data_dir,
-            self.simulated_threats_dir,
-            self.synthetic_pcaps_dir,
-            self.threat_intelligence_dir,
-            self.reports_dir,
-            self.hourly_monitor_dir,
-            self.api_health_dir,
-            self.integrity_reports_dir,
-            self.anomaly_risk_reports_dir,
-            self.context_compressed_dir,
-            self.insights_dir,
-            self.logs_dir,
-            self.archived_logs_dir,
-            self.training_health_dir,
-            self.training_status_dir,
-            self.security_reports_dir,
-            self.tasks_dir,
-            self.output_dir
-        ]:
-            dir_path.mkdir(parents=True, exist_ok=True)
-
-    @classmethod
-    def load(cls, config_file: Optional[Path] = None) -> 'QZeroConfig':
-        """Cargar configuración desde archivo."""
-        if config_file is None:
-            config_file = cls().config_file
-
-        config = cls()
-
-        if config_file.exists():
-            with open(config_file, 'r') as f:
-                data = json.load(f)
-
-            # Cargar configuración del archivo
-            for key, value in data.items():
-                if hasattr(config, key):
-                    setattr(config, key, value)
-
-        return config
-
-    def save(self, config_file: Optional[Path] = None):
-        """Guardar configuración en archivo."""
-        if config_file is None:
-            config_file = self.config_file
-
-        data = {}
-        for key, value in self.__dict__.items():
-            if not key.startswith('_'):
-                data[key] = value
-
-        with open(config_file, 'w') as f:
-            json.dump(data, f, indent=2)
+            if custom_config:
+                self._config.update(custom_config)
+                logger.info(f"Configuración personalizada cargada desde {self.config_file}")
+        except Exception as e:
+            logger.warning(f"No se pudo cargar configuración personalizada: {e}")
 
     def get(self, key: str, default: Any = None) -> Any:
-        """Obtener valor de configuración por clave."""
-        return getattr(self, key, default)
+        """
+        Obtiene un valor de configuración.
+
+        Args:
+            key: Clave de configuración (puede usar puntos para anidación)
+            default: Valor por defecto si la clave no existe
+
+        Returns:
+            Valor de configuración
+        """
+        keys = key.split('.')
+        value = self._config
+
+        for k in keys:
+            if isinstance(value, dict) and k in value:
+                value = value[k]
+            else:
+                return default
+
+        return value
 
     def set(self, key: str, value: Any):
-        """Establecer valor de configuración."""
-        if hasattr(self, key):
-            setattr(self, key, value)
+        """
+        Establece un valor de configuración.
+
+        Args:
+            key: Clave de configuración (puede usar puntos para anidación)
+            value: Valor a establecer
+        """
+        keys = key.split('.')
+        config = self._config
+
+        for k in keys[:-1]:
+            if k not in config:
+                config[k] = {}
+            config = config[k]
+
+        config[keys[-1]] = value
+
+    def save(self, config_file: Optional[str] = None):
+        """
+        Guarda la configuración en un archivo.
+
+        Args:
+            config_file: Ruta para guardar la configuración
+        """
+        output_file = Path(config_file) if config_file else self.config_file
+        if not output_file:
+            output_file = self.config_dir / "qzero.yaml"
+
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+
+        import yaml
+        with open(output_file, 'w') as f:
+            yaml.dump(self._config, f, default_flow_style=False)
+
+        logger.info(f"Configuración guardada en {output_file}")
+
+    def get_path(self, key: str) -> Path:
+        """
+        Obtiene un path de configuración como objeto Path.
+
+        Args:
+            key: Clave de configuración
+
+        Returns:
+            Objeto Path
+        """
+        path_str = self.get(key)
+        return Path(path_str) if path_str else Path.cwd()
 
 
-# Singleton
+# Función global para obtener configuración
 _config: Optional[QZeroConfig] = None
 
 
-def get_config(config_file: Optional[Path] = None) -> QZeroConfig:
-    """Obtener instancia única de configuración."""
+def get_config(config_file: Optional[str] = None) -> QZeroConfig:
+    """
+    Obtiene la instancia global de configuración.
+
+    Args:
+        config_file: Ruta al archivo de configuración
+
+    Returns:
+        Instancia de QZeroConfig
+    """
     global _config
     if _config is None:
-        _config = QZeroConfig.load(config_file)
+        _config = QZeroConfig(config_file)
     return _config
 
 
-def reset_config():
-    """Resetear la configuración (útil para testing)."""
-    global _config
-    _config = None
+def setup_logging(verbose: bool = False):
+    """
+    Configura el logging para QZero.
+
+    Args:
+        verbose: Modo detallado activado
+    """
+    level = logging.DEBUG if verbose else logging.INFO
+    log_dir = get_config().get_path("log_dir")
+
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(log_dir / "qzero.log")
+        ]
+    )
