@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qzero"
-version = "2.0.0"
-description = "Sistema de Detección de Anomalías y Monitoreo de Seguridad - QZero"
+version = "3.0.0"
+description = "Quantum-algorithm-based network threat detection"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -31,12 +31,6 @@ dependencies = [
 
 [project.scripts]
 qzero = "qzero.cli:main"
-qzero-cli = "qzero.cli:main"
-qzero-analyze = "qzero.cli.analyzer:analyze_pcap"
-qzero-monitor = "qzero.cli.monitor:start_monitor"
-qzero-daemon = "qzero.daemons:run_daemon_tasks"
-qzero-train = "qzero.cli.trainer:train_model"
-qzero-daemons-run = "qzero.cli.daemons:run_daemon_tasks"
 
 [project.optional-dependencies]
 dev = [
