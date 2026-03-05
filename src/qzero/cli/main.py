@@ -107,7 +107,9 @@ def server(host, port, model_dir, qubits):
     # Inject predictor into the API module
     _api._predictor = qzero.predictor
 
-    click.echo(f"Starting QZero API on http://{host}:{port}")
+    click.echo(f"Starting QZero API  →  http://{host}:{port}")
+    click.echo(f"Dashboard           →  http://{host}:{port}/dashboard")
+    click.echo(f"WebSocket           →  ws://{host}:{port}/ws")
     uvicorn.run("qzero.api.app:app", host=host, port=port, reload=False)
 
 
