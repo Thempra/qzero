@@ -1,574 +1,459 @@
-# QZero Architecture
+# 🏗️ Arquitectura de QZero v2.0
 
-> Technical architecture documentation for the Quantum-Enhanced Threat Detection Platform
+> **Proyecto unificado y paquetizado**
 
-## Table of Contents
+## 📋 Tabla de Contenidos
 
-- [Overview](#overview)
-- [System Architecture](#system-architecture)
-- [Component Details](#component-details)
-- [Data Flow](#data-flow)
-- [Module Structure](#module-structure)
-- [Quantum Components](#quantum-components)
-- [Integration Points](#integration-points)
-
----
-
-## Overview
-
-QZero is a modular quantum machine learning system designed for zero-day attack detection. The architecture follows a **hybrid quantum-classical** approach, combining the pattern recognition capabilities of quantum computing with the efficiency of classical preprocessing and post-processing.
-
-### Design Principles
-
-1. **Modularity**: Each component can be used independently or as part of the full pipeline
-2. **Fallback Safety**: Quantum components gracefully degrade to classical equivalents
-3. **Scalability**: Supports both simulator-based development and real QPU deployment
-4. **Extensibility**: Easy to add new feature maps, models, and metrics
+1. [Visión General](#visión-general)
+2. [Estructura de Archivos](#estructura-de-archivos)
+3. [Componentes Principales](#componentes-principales)
+4. [Flujo de Trabajo](#flujo-de-trabajo)
+5. [Modo de Análisis](#modo-de-análisis)
+6. [Configuración](#configuración)
+7. [Uso](#uso)
 
 ---
 
-## System Architecture
+## 🎯 Visión General
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           QZero System Architecture                          │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌────────────────────────────────────────────────────────────────────────┐ │
-│  │                          DATA LAYER                                     │ │
-│  │  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐               │ │
-│  │  │  UGRansome   │   │  Synthetic   │   │   NetFlow    │               │ │
-│  │  │   Dataset    │   │  Generator   │   │    CSV/PCAP  │               │ │
-│  │  └──────┬───────┘   └──────┬───────┘   └──────┬───────┘               │ │
-│  │         │                  │                  │                        │ │
-│  │         └──────────────────┼──────────────────┘                        │ │
-│  │                            ▼                                           │ │
-│  │                    ┌──────────────┐                                    │ │
-│  │                    │  DataLoader  │                                    │ │
-│  │                    └──────┬───────┘                                    │ │
-│  └───────────────────────────┼────────────────────────────────────────────┘ │
-│                              │                                               │
-│  ┌───────────────────────────┼────────────────────────────────────────────┐ │
-│  │                    PREPROCESSING LAYER                                  │ │
-│  │                           ▼                                             │ │
-│  │  ┌──────────────────────────────────────────────────────────────────┐  │ │
-│  │  │                    FeatureEngineer                                │  │ │
-│  │  │  ┌────────────┐   ┌────────────┐   ┌────────────┐               │  │ │
-│  │  │  │ Normalizer │ → │    PCA     │ → │   Scaler   │               │  │ │
-│  │  │  │ (Standard) │   │  Reducer   │   │  (0, π)    │               │  │ │
-│  │  │  └────────────┘   └────────────┘   └────────────┘               │  │ │
-│  │  └──────────────────────────┬───────────────────────────────────────┘  │ │
-│  └─────────────────────────────┼──────────────────────────────────────────┘ │
-│                                │                                             │
-│  ┌─────────────────────────────┼──────────────────────────────────────────┐ │
-│  │                       MODEL LAYER                                       │ │
-│  │                            │                                            │ │
-│  │         ┌──────────────────┼──────────────────┐                        │ │
-│  │         │                  │                  │                        │ │
-│  │         ▼                  ▼                  ▼                        │ │
-│  │  ┌────────────┐    ┌────────────┐    ┌────────────┐                   │ │
-│  │  │ Classical  │    │   QSVM     │    │   QI-VAE   │                   │ │
-│  │  │ Baselines  │    │  (Kernel)  │    │ (Anomaly)  │                   │ │
-│  │  ├────────────┤    ├────────────┤    ├────────────┤                   │ │
-│  │  │ • SVM      │    │ • Feature  │    │ • Encoder  │                   │ │
-│  │  │ • RF       │    │   Map      │    │ • Decoder  │                   │ │
-│  │  │ • XGBoost  │    │ • Quantum  │    │ • Latent   │                   │ │
-│  │  │ • MLP      │    │   Kernel   │    │   Space    │                   │ │
-│  │  │ • KNN      │    │ • QSVC     │    │ • Recon.   │                   │ │
-│  │  └────────────┘    └────────────┘    └────────────┘                   │ │
-│  │         │                  │                  │                        │ │
-│  └─────────┼──────────────────┼──────────────────┼────────────────────────┘ │
-│            │                  │                  │                          │
-│  ┌─────────┼──────────────────┼──────────────────┼────────────────────────┐ │
-│  │         └──────────────────┼──────────────────┘                        │ │
-│  │                    EVALUATION LAYER                                     │ │
-│  │                            ▼                                            │ │
-│  │  ┌──────────────────────────────────────────────────────────────────┐  │ │
-│  │  │                       Metrics Engine                              │  │ │
-│  │  │  • Accuracy, Precision, Recall, F1                               │  │ │
-│  │  │  • ROC-AUC, Average Precision                                    │  │ │
-│  │  │  • Zero-Day Detection Rate                                       │  │ │
-│  │  │  • False Positive/Negative Rates                                 │  │ │
-│  │  │  • Quantum Advantage Calculation                                 │  │ │
-│  │  └──────────────────────────────────────────────────────────────────┘  │ │
-│  └────────────────────────────────────────────────────────────────────────┘ │
-│                                                                              │
-│  ┌────────────────────────────────────────────────────────────────────────┐ │
-│  │                         API & INTERFACE LAYER                          │ │
-│  │  ┌────────────┐    ┌────────────┐    ┌────────────┐                   │ │
-│  │  │  FastAPI   │    │ Streamlit  │    │   CLI      │                   │ │
-│  │  │  REST API  │    │ Dashboard  │    │  Scripts   │                   │ │
-│  │  └────────────┘    └────────────┘    └────────────┘                   │ │
-│  └────────────────────────────────────────────────────────────────────────┘ │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+QZero v2.0 es un sistema **unificado y paquetizado** para detección de anomalías cuánticas en tráfico de red. Está diseñado para ser:
+
+- **Modular**: Componentes independientes que se pueden reutilizar
+- **Documentado**: Cada módulo tiene su documentación clara
+- **Prueba**: Tests y ejemplos incluidos
+- **Producción**: Arquitectura diseñada para despliegue real
 
 ---
 
-## Component Details
-
-### 1. Data Layer (`src/preprocessing/`)
-
-#### DataLoader (`data_loader.py`)
-
-Handles all data ingestion and preparation:
-
-```python
-class DataLoader:
-    """
-    Responsibilities:
-    - Load UGRansome CSV dataset
-    - Generate synthetic data for testing
-    - Train/validation/test splitting
-    - Label encoding (binary or multi-class)
-    - Feature scaling (StandardScaler)
-    """
-```
-
-**Supported Data Sources:**
-| Source | Format | Features | Samples |
-|--------|--------|----------|---------|
-| UGRansome | CSV | 14 | ~149K |
-| Synthetic | Generated | 14 | Configurable |
-| NetFlow | CSV | Variable | Variable |
-
-#### FeatureEngineer (`feature_engineering.py`)
-
-Prepares classical data for quantum circuits:
-
-```python
-class FeatureEngineer:
-    """
-    Pipeline:
-    1. Dimensionality reduction (PCA/MI/Variance)
-    2. Scaling to quantum-compatible range [0, π]
-    3. Feature selection for n_qubits constraint
-    """
-```
-
-### 2. Model Layer
-
-#### Classical Baselines (`src/classical/baseline.py`)
-
-Reference implementations for comparison:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                 Classical Baselines                      │
-├─────────────────────────────────────────────────────────┤
-│  Model               │ Type           │ Use Case        │
-├─────────────────────────────────────────────────────────┤
-│  SVM (Linear/RBF)    │ Kernel         │ Baseline        │
-│  Random Forest       │ Ensemble       │ Feature Import. │
-│  Gradient Boosting   │ Ensemble       │ High Accuracy   │
-│  Logistic Regression │ Linear         │ Interpretable   │
-│  K-NN                │ Instance       │ Simple          │
-│  MLP                 │ Neural Network │ Deep Baseline   │
-└─────────────────────────────────────────────────────────┘
-```
-
-#### QSVM (`src/quantum/qsvm.py`)
-
-Quantum Support Vector Machine using quantum kernel:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    QSVM Architecture                             │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Classical Data x ∈ ℝⁿ                                          │
-│         │                                                        │
-│         ▼                                                        │
-│  ┌─────────────────┐                                            │
-│  │   Feature Map   │  φ(x): ℝⁿ → ℋ (Hilbert Space)             │
-│  │   (ZZFeatureMap)│                                            │
-│  └────────┬────────┘                                            │
-│           │                                                      │
-│           ▼                                                      │
-│  ┌─────────────────┐                                            │
-│  │ Quantum State   │  |φ(x)⟩ = U(x)|0⟩ⁿ                         │
-│  │   Preparation   │                                            │
-│  └────────┬────────┘                                            │
-│           │                                                      │
-│           ▼                                                      │
-│  ┌─────────────────┐                                            │
-│  │ Kernel Matrix   │  K(xᵢ,xⱼ) = |⟨φ(xᵢ)|φ(xⱼ)⟩|²               │
-│  │   Computation   │                                            │
-│  └────────┬────────┘                                            │
-│           │                                                      │
-│           ▼                                                      │
-│  ┌─────────────────┐                                            │
-│  │   SVC Fitting   │  Classical SVM with quantum kernel         │
-│  │                 │                                            │
-│  └─────────────────┘                                            │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-#### QI-VAE (`src/quantum/qivae.py`)
-
-Quantum-Inspired Variational Autoencoder for anomaly detection:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    QI-VAE Architecture                           │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Input x ∈ ℝ¹⁴                                                   │
-│     │                                                            │
-│     ▼                                                            │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │                      ENCODER                               │  │
-│  │  ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐   │  │
-│  │  │ Linear  │ → │ BatchNorm│ → │ LeakyReLU│ → │ Dropout │   │  │
-│  │  │  64     │   │         │   │  0.2    │   │  0.1    │   │  │
-│  │  └─────────┘   └─────────┘   └─────────┘   └─────────┘   │  │
-│  │       │                                                    │  │
-│  │       ▼                                                    │  │
-│  │  ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐   │  │
-│  │  │ Linear  │ → │ BatchNorm│ → │ LeakyReLU│ → │ Dropout │   │  │
-│  │  │  32     │   │         │   │  0.2    │   │  0.1    │   │  │
-│  │  └─────────┘   └─────────┘   └─────────┘   └─────────┘   │  │
-│  │       │                                                    │  │
-│  │       ├──────────────────┐                                │  │
-│  │       ▼                  ▼                                │  │
-│  │  ┌─────────┐       ┌─────────┐                           │  │
-│  │  │  fc_μ   │       │fc_logσ² │                           │  │
-│  │  │  (4)    │       │  (4)    │                           │  │
-│  │  └────┬────┘       └────┬────┘                           │  │
-│  └───────┼─────────────────┼─────────────────────────────────┘  │
-│          │                 │                                     │
-│          └────────┬────────┘                                     │
-│                   │                                              │
-│                   ▼                                              │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │           REPARAMETERIZATION (Quantum-Inspired)            │  │
-│  │                                                            │  │
-│  │    z = μ + ε · σ      (ε ~ N(0,1))                        │  │
-│  │                                                            │  │
-│  │    # Quantum-inspired amplitude normalization:             │  │
-│  │    z_norm = z / ||z||                                     │  │
-│  │    z = W · z_norm · ||z||   (W = learned transform)       │  │
-│  │                                                            │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│                   │                                              │
-│                   ▼                                              │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │                      DECODER                               │  │
-│  │  (Mirror of encoder: 4 → 32 → 64 → 14)                    │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│                   │                                              │
-│                   ▼                                              │
-│             Output x̂ ∈ ℝ¹⁴                                      │
-│                                                                  │
-│  Loss = MSE(x, x̂) + β · KL(q(z|x) || p(z))                      │
-│                                                                  │
-│  Anomaly Score = ||x - x̂||²                                     │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 3. Quantum Feature Maps (`src/quantum/feature_maps.py`)
-
-Available quantum feature encoding strategies:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                   Quantum Feature Maps                           │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Z Feature Map (Diagonal):                                       │
-│  ┌───┐                                                          │
-│  │ H ├──Rz(x)──                                                 │
-│  └───┘                                                          │
-│                                                                  │
-│  ZZ Feature Map (Entangled):                                     │
-│  ┌───┐                                                          │
-│  │ H ├──Rz(x₀)──●──────────Rz(x₀x₁)──                          │
-│  └───┘          │                                               │
-│  ┌───┐          │                                               │
-│  │ H ├──Rz(x₁)──⊕──────────Rz(x₁x₂)──                          │
-│  └───┘                                                          │
-│                                                                  │
-│  Custom Entangled Map:                                           │
-│  ┌───┐                                                          │
-│  │ H ├──Ry(x)──●──Rz(x·x')──CZ──                               │
-│  └───┘         │                                                │
-│  ┌───┐         │                                                │
-│  │ H ├──Ry(x)──⊕──Rz(x·x')──CZ──                               │
-│  └───┘                                                          │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Data Flow
-
-### Training Pipeline
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Training Data Flow                           │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Raw Data (CSV/NetFlow)                                          │
-│       │                                                          │
-│       ▼                                                          │
-│  ┌─────────────┐                                                │
-│  │ DataLoader  │ ─── Validate, Clean, Encode Labels             │
-│  └──────┬──────┘                                                │
-│         │                                                        │
-│         ▼                                                        │
-│  ┌─────────────┐                                                │
-│  │ Train/Test  │ ─── Stratified Split (80/20)                   │
-│  │   Split     │                                                │
-│  └──────┬──────┘                                                │
-│         │                                                        │
-│         ├─────────────────────────────────────┐                 │
-│         │                                     │                 │
-│         ▼                                     ▼                 │
-│  ┌─────────────┐                      ┌─────────────┐          │
-│  │  Classical  │                      │   Quantum   │          │
-│  │   Path      │                      │    Path     │          │
-│  └──────┬──────┘                      └──────┬──────┘          │
-│         │                                     │                 │
-│         ▼                                     ▼                 │
-│  ┌─────────────┐                      ┌─────────────┐          │
-│  │StandardScale│                      │FeatureEngineer│         │
-│  └──────┬──────┘                      │ PCA → Scale │          │
-│         │                             └──────┬──────┘          │
-│         │                                     │                 │
-│         ▼                                     ▼                 │
-│  ┌─────────────┐                      ┌─────────────┐          │
-│  │   Model     │                      │ Quantum     │          │
-│  │   .fit()    │                      │ Model.fit() │          │
-│  └──────┬──────┘                      └──────┬──────┘          │
-│         │                                     │                 │
-│         └─────────────────┬───────────────────┘                 │
-│                           │                                     │
-│                           ▼                                     │
-│                    ┌─────────────┐                              │
-│                    │  Evaluate   │                              │
-│                    │  & Compare  │                              │
-│                    └─────────────┘                              │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Inference Pipeline
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Inference Data Flow                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Network Traffic (Real-time)                                     │
-│       │                                                          │
-│       ▼                                                          │
-│  ┌─────────────┐                                                │
-│  │   API       │ ─── POST /analyze                              │
-│  │  Endpoint   │                                                │
-│  └──────┬──────┘                                                │
-│         │                                                        │
-│         ▼                                                        │
-│  ┌─────────────┐                                                │
-│  │ Preprocess  │ ─── Apply fitted scaler/engineer               │
-│  └──────┬──────┘                                                │
-│         │                                                        │
-│         ├────────────────┬────────────────┐                     │
-│         │                │                │                     │
-│         ▼                ▼                ▼                     │
-│  ┌───────────┐   ┌───────────┐   ┌───────────┐                 │
-│  │   QSVM    │   │  QI-VAE   │   │  Ensemble │                 │
-│  │ .predict()│   │.anomaly() │   │  .vote()  │                 │
-│  └─────┬─────┘   └─────┬─────┘   └─────┬─────┘                 │
-│        │               │               │                        │
-│        └───────────────┼───────────────┘                        │
-│                        │                                        │
-│                        ▼                                        │
-│               ┌─────────────┐                                   │
-│               │   Combine   │                                   │
-│               │   Results   │                                   │
-│               └──────┬──────┘                                   │
-│                      │                                          │
-│                      ▼                                          │
-│               ┌─────────────┐                                   │
-│               │    JSON     │                                   │
-│               │  Response   │                                   │
-│               │ {score, ..} │                                   │
-│               └─────────────┘                                   │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Module Structure
+## 📁 Estructura de Archivos
 
 ```
 qzero/
-├── src/
-│   ├── __init__.py
-│   ├── api.py                    # FastAPI REST endpoints
-│   │
-│   ├── preprocessing/
-│   │   ├── __init__.py
-│   │   ├── data_loader.py        # Data ingestion & splitting
-│   │   └── feature_engineering.py # Quantum-ready preprocessing
-│   │
-│   ├── quantum/
-│   │   ├── __init__.py
-│   │   ├── feature_maps.py       # Quantum encoding circuits
-│   │   ├── qsvm.py               # Quantum SVM implementation
-│   │   └── qivae.py              # Quantum-Inspired VAE
-│   │
-│   ├── classical/
-│   │   ├── __init__.py
-│   │   └── baseline.py           # Classical ML baselines
-│   │
-│   └── evaluation/
-│       ├── __init__.py
-│       └── metrics.py            # Evaluation & comparison
+├── qzero.py                          # CLI principal
+├── README.md                         # Documentación principal
+├── ARCHITECTURE.md                   # Esta documentación
+├── requirements.txt                  # Dependencias
+├── setup.py                          # Paquete Python
 │
-├── app/
-│   └── dashboard.py              # Streamlit dashboard
+├── src/                              # Código fuente
+│   ├── __init__.py                   # Paquete principal
+│   ├── predictor.py                  # Predictor cuántico central
+│   ├── detection.py                  # Análisis de tráfico de red
+│   ├── api.py                        # API REST
+│   └── realtime_monitor.py           # Monitor en tiempo real
 │
-├── scripts/
-│   ├── run_pipeline.py           # End-to-end demo
-│   ├── benchmark.py              # Full benchmark suite
-│   ├── download_data.py          # Dataset download
-│   └── generate_report.py        # Report generation
+├── scripts/                          # Scripts auxiliares
+│   ├── generate-synthetic-pcaps-v2.py  # Generador de PCAPs
+│   ├── test-qzero-pcaps.py            # Suite de pruebas
+│   └── [otros scripts]
 │
-├── data/
-│   ├── raw/                      # Original datasets
-│   └── processed/                # Preprocessed data
+├── data/                             # Datos de entrenamiento
+│   ├── synthetic-pcaps/              # PCAPs sintéticos
+│   └── [otros datos]
 │
-├── docs/
-│   ├── ARCHITECTURE.md           # This file
-│   ├── API.md                    # API documentation
-│   ├── INSTALLATION.md           # Setup guide
-│   └── USAGE.md                  # Usage examples
+├── models/                           # Modelos entrenados
+│   ├── qsvm.pkl
+│   ├── qivae.pkl
+│   └── [otros modelos]
 │
-└── tests/
-    └── ...                       # Unit tests
+├── reports/                          # Reportes generados
+├── logs/                             # Logs del sistema
+└── insights/                         # Insights y alertas
 ```
 
 ---
 
-## Quantum Components
+## ⚙️ Componentes Principales
 
-### Qiskit Integration
+### 1. `qzero.py` - CLI Principal
 
-QZero uses **Qiskit 2.1+** with the new functional API:
+Interfaz unificada para todos los comandos de QZero.
+
+**Comandos:**
+
+```bash
+qzero.py train          # Entrenar modelos
+qzero.py analyze        # Analizar tráfico
+qzero.py server         # Iniciar API REST
+qzero.py monitor        # Monitorear en tiempo real
+```
+
+### 2. `predictor.py` - Predictor Cuántico
+
+Clase central para entrenar y hacer predicciones con modelos cuánticos.
+
+**Clases:**
+
+- `QZeroPredictor`: Predictor principal con QSVM y QI-VAE
+
+**Métodos:**
 
 ```python
-# Feature Map Creation (Qiskit 2.1+ style)
-from qiskit.circuit.library import zz_feature_map
+from qzero import QZero
 
-feature_map = zz_feature_map(
-    feature_dimension=4,
-    reps=2,
-    entanglement="linear"
-)
-
-# Quantum Kernel
-from qiskit_machine_learning.kernels import FidelityQuantumKernel
-kernel = FidelityQuantumKernel(feature_map=feature_map)
-
-# QSVM
-from qiskit_machine_learning.algorithms import QSVC
-qsvm = QSVC(quantum_kernel=kernel)
+qzero = QZero(n_qubits=4)
+qzero.train(n_samples=5000)
+predictions = qzero.predict(features)
 ```
 
-### Backend Options
+### 3. `detection.py` - Análisis de Tráfico
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Supported Backends                            │
-├─────────────────────────────────────────────────────────────────┤
-│  Backend          │ Qubits │ Use Case      │ Configuration      │
-├─────────────────────────────────────────────────────────────────┤
-│  AerSimulator     │ 30+    │ Development   │ backend="aer"      │
-│  FakeBackend      │ 5-127  │ Noise Testing │ backend="fake_*"   │
-│  IBM Quantum      │ 5-127  │ Production    │ backend="ibm_*"    │
-│  Classical SVC    │ N/A    │ Fallback      │ auto on failure    │
-└─────────────────────────────────────────────────────────────────┘
-```
+Analiza archivos PCAP y extrae features para detección.
 
----
+**Clases:**
 
-## Integration Points
+- `NetworkTrafficAnalyzer`: Analizador de PCAPs
 
-### SIEM Integration
+**Métodos:**
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                   Enterprise Integration                         │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐   │
-│  │ Network │ ──▶ │Logstash │ ──▶ │ QZero   │ ──▶ │  SIEM   │   │
-│  │  Tap    │     │/Fluentd │     │  API    │     │ (Splunk)│   │
-│  └─────────┘     └─────────┘     └─────────┘     └─────────┘   │
-│                                                                  │
-│  Protocols: Syslog, NetFlow v9, JSON over HTTP                  │
-│  Response: JSON with anomaly scores, classification             │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Docker Deployment
-
-```yaml
-# docker-compose.yml integration
-services:
-  qzero-api:
-    image: qzero:latest
-    ports:
-      - "8000:8000"
-    environment:
-      - QZERO_BACKEND=aer_simulator
-    volumes:
-      - ./data:/app/data
-```
-
----
-
-## Performance Considerations
-
-### Quantum Limitations (NISQ Era)
-
-| Constraint | Impact | Mitigation |
-|------------|--------|------------|
-| Limited qubits | Max 4-8 features | PCA reduction |
-| Circuit depth | Decoherence | Few reps (1-2) |
-| Slow simulation | Training time | Sample subset |
-| No error correction | Noise | Classical fallback |
-
-### Recommended Configurations
-
-**Development:**
 ```python
-QSVMConfig(
-    n_qubits=4,
-    feature_map_reps=2,
-    max_samples_quantum=200,
-    use_classical_fallback=True
-)
+from qzero import NetworkTrafficAnalyzer
+
+analyzer = NetworkTrafficAnalyzer(n_qubits=4)
+result = analyzer.analyze('traffic.pcap', method='best')
 ```
 
-**Production (Simulator):**
+### 4. `api.py` - API REST
+
+Servicio FastAPI para integración con otros sistemas.
+
+**Endpoints:**
+
+- `POST /analyze` - Analizar PCAP
+- `GET /health` - Health check
+- `GET /models` - Modelos entrenados
+- `GET /stats` - Estadísticas
+
+### 5. `realtime_monitor.py` - Monitor en Tiempo Real
+
+Captura tráfico de red y analiza en tiempo real.
+
+**Clases:**
+
+- `RealtimeMonitor`: Monitor de tráfico con modo promiscuo
+
+**Métodos:**
+
 ```python
-QSVMConfig(
-    n_qubits=6,
-    feature_map_reps=2,
-    max_samples_quantum=500,
-    use_classical_fallback=True
+from qzero import RealtimeMonitor
+
+monitor = RealtimeMonitor(
+    interface='eth0',
+    promiscuous=True
 )
+monitor.start()
 ```
 
 ---
 
-*Document Version: 1.0.0 | Last Updated: 2025*
+## 🔄 Flujo de Trabajo
+
+### Flujo de Entrenamiento
+
+```
+1. Datos (PCAPs o CSV)
+   ↓
+2. Preprocesamiento (Feature Engineering)
+   ↓
+3. Modelado Cuántico (QSVM + QI-VAE)
+   ↓
+4. Evaluación (Métricas)
+   ↓
+5. Guardado de Modelos
+```
+
+### Flujo de Análisis
+
+```
+1. Archivo PCAP
+   ↓
+2. Captura y Extracción de Features
+   ↓
+3. Predicción Cuántica
+   ↓
+4. Análisis de Anomalías
+   ↓
+5. Generación de Alertas
+```
+
+### Flujo de Análisis en Tiempo Real
+
+```
+1. Captura de Tráfico (Promiscuo)
+   ↓
+2. Extracción de Features en Tiempo Real
+   ↓
+3. Análisis Cuántico Periodico
+   ↓
+4. Generación de Alertas
+   ↓
+5. Guardado de Logs
+```
+
+---
+
+## 🎮 Modo de Análisis
+
+### 1. Análisis por Archivo
+
+**Uso:**
+
+```bash
+# Analizar un PCAP
+python qzero.py analyze --file traffic.pcap --method best
+
+# Analizar múltiples PCAPs
+python qzero-cli-batch.py -f *.pcap
+```
+
+**Ventajas:**
+- Simple y directo
+- Ideal para pruebas
+- No requiere configuración de red
+
+### 2. Análisis en Tiempo Real (Promiscuo)
+
+**Uso:**
+
+```bash
+# Monitor con modo promiscuo
+python qzero.py monitor --interface eth0 --promiscuous
+
+# Monitor sin promiscuo
+python qzero.py monitor --interface eth0 --no-promiscuous
+```
+
+**Ventajas:**
+- Detección inmediata
+- Captura todo el tráfico
+- Ideal para producción
+
+**Modo Promiscuo:**
+- Captura paquetes no destinados a la máquina
+- Requiere privilegios de root
+- Útil para sniffing de red
+
+### 3. API REST
+
+**Uso:**
+
+```bash
+# Iniciar servidor
+python qzero.py server --host 0.0.0.0 --port 8000
+
+# Usar API
+curl -X POST http://localhost:8000/analyze -F "file=@traffic.pcap"
+```
+
+**Ventajas:**
+- Integración con otros sistemas
+- Arquitectura microservicio
+- Escalable
+
+---
+
+## ⚙️ Configuración
+
+### Configuración de Modelos
+
+```python
+from qzero import QZeroPredictor
+
+# Configurar predictor
+predictor = QZeroPredictor(
+    n_qubits=4,                    # Número de qubits
+    use_qsvm=True,                 # Usar QSVM
+    use_qivae=True,                # Usar QI-VAE
+    use_classical=True,            # Usar modelos clásicos
+    random_state=42                # Semilla aleatoria
+)
+```
+
+### Configuración del Monitor
+
+```python
+from qzero import RealtimeMonitor
+
+# Configurar monitor
+monitor = RealtimeMonitor(
+    interface='eth0',               # Interfaz de red
+    promiscuous=True,               # Modo promiscuo
+    analyze_interval=10,            # Segundos entre análisis
+    threshold_warning=0.65,         # Umbral WARNING
+    threshold_critical=0.85         # Umbral CRITICAL
+)
+```
+
+### Configuración de API
+
+```python
+from qzero import create_app
+
+# Crear app con predictor
+app = create_app()
+
+# Configurar host y puerto
+uvicorn.run(app, host='0.0.0.0', port=8000)
+```
+
+---
+
+## 🚀 Uso
+
+### Instalación
+
+```bash
+# Clonar repositorio
+git clone https://github.com/thempra/qzero.git
+cd qzero
+
+# Instalar dependencias
+pip install -r requirements.txt
+
+# Hacer el script ejecutable
+chmod +x qzero.py
+```
+
+### Entrenar Modelos
+
+```bash
+# Entrenar con datos sintéticos
+python qzero.py train --samples 5000 --qubits 4
+
+# Entrenar con datos reales
+python qzero.py train --samples 5000 --real-data --qubits 4
+```
+
+### Analizar Tráfico
+
+```bash
+# Analizar PCAP
+python qzero.py analyze --file data/synthetic-pcaps/normal_traffic_*.pcap
+
+# Usar CLI batch
+python qzero-cli-batch.py -f data/synthetic-pcaps/*.pcap
+```
+
+### Iniciar API REST
+
+```bash
+# Iniciar servidor
+python qzero.py server --host 0.0.0.0 --port 8000
+
+# O usar el script de API
+python -m qzero.src.api
+```
+
+### Monitorear en Tiempo Real
+
+```bash
+# Con modo promiscuo
+python qzero.py monitor --interface eth0 --promiscuous
+
+# Con intervalo personalizado
+python qzero.py monitor --interface eth0 --interval 5
+
+# Sin modo promiscuo
+python qzero.py monitor --interface eth0 --no-promiscuous
+```
+
+---
+
+## 📊 Datos de Ejemplo
+
+### PCAPs Sintéticos
+
+QZero incluye scripts para generar PCAPs sintéticos con diferentes tipos de tráfico:
+
+```bash
+# Generar todos los tipos
+python scripts/generate-synthetic-pcaps-v2.py --all --duration 30 --rate 20
+
+# Generar solo tráfico normal
+python scripts/generate-synthetic-pcaps-v2.py --type normal --duration 60
+
+# Generar tráfico DDoS
+python scripts/generate-synthetic-pcaps-v2.py --type ddos --rate 100
+```
+
+**Tipos de tráfico:**
+
+- `normal`: Tráfico normal (HTTP, SSH, DNS, ICMP)
+- `ddos`: DDoS attack (SYN flood, UDP flood)
+- `bruteforce`: Brute force attack (SSH, Telnet)
+- `exfiltration`: Data exfiltration (C2, data transfer)
+- `malware`: Malware activity (crypto mining, spider scan)
+
+---
+
+## 🎯 Casos de Uso
+
+### Caso 1: Detección de Anomalías
+
+```python
+from qzero import QZero
+
+# Inicializar
+qzero = QZero(n_qubits=4)
+
+# Entrenar
+qzero.train(n_samples=5000)
+
+# Analizar tráfico
+result = qzero.analyze_traffic('suspicious.pcap', method='best')
+
+# Ver resultados
+print(f"Anomalías detectadas: {result['n_anomalies_detected']}")
+```
+
+### Caso 2: API para SIEM
+
+```bash
+# Iniciar API
+python qzero.py server
+
+# Integrar con Splunk
+curl -X POST http://localhost:8000/analyze -F "file=@alerts.pcap" | jq
+```
+
+### Caso 3: Monitor en Producción
+
+```bash
+# Iniciar monitor
+sudo python qzero.py monitor --interface eth0 --promiscuous
+```
+
+---
+
+## 🔧 Dependencias
+
+### Python 3.7+
+
+### Paquetes Requeridos
+
+```txt
+numpy
+pandas
+scapy
+fastapi
+uvicorn
+scikit-learn
+```
+
+### Instalación
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## 📝 Licencia
+
+MIT License - Ver LICENSE para más detalles.
+
+---
+
+**Version:** 2.0.0
+**Autor:** QZero Development Team
+**Última actualización:** 2026-02-26
