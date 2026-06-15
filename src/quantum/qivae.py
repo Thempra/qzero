@@ -20,7 +20,7 @@ try:
     import torch
     import torch.nn as nn
     import torch.nn.functional as F
-    from torch.utils.data import DataLoader, TensorDataset
+    from torch.utils.data import DataLoader as TorchDataLoader, TensorDataset
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
@@ -29,6 +29,8 @@ try:
     from qiskit import QuantumCircuit
     from qiskit.circuit import Parameter
     from qiskit.primitives import Sampler
+    from qiskit_machine_learning.connectors import TorchConnector
+    from qiskit_machine_learning.neural_networks import SamplerQNN
     QISKIT_AVAILABLE = True
 except ImportError:
     QISKIT_AVAILABLE = False
@@ -81,6 +83,55 @@ class QIVAEResult:
             "f1_score": self.f1_score,
             "train_time": self.train_time,
         }
+
+
+if QISKIT_AVAILABLE:
+    
+    def create_quantum_encoder_circuit(
+        n_qubits: int,
+        n_features: int,
+        reps: int = 2,
+    ) -> QuantumCircuit:
+        """
+        Create a parameterized quantum circuit for encoding.
+        
+        This circuit can be used as an alternative encoder in hybrid models.
+        
+        Args:
+            n_qubits: Number of qubits
+            n_features: Number of input features
+            reps: Number of circuit repetitions
+        
+        Returns:
+            Parameterized QuantumCircuit
+        """
+        qc = QuantumCircuit(n_qubits)
+        
+        # Input parameters (features)
+        inputs = [Parameter(f"x_{i}") for i in range(n_features)]
+        
+        # Trainable parameters
+        params = []
+        
+        for r in range(reps):
+            # Encoding layer: RY rotations based on input
+            for i in range(min(n_qubits, n_features)):
+                qc.ry(inputs[i], i)
+            
+            # Entanglement layer: CNOT ladder
+            for i in range(n_qubits - 1):
+                qc.cx(i, i + 1)
+            
+            # Variational layer: RZ rotations (trainable)
+            layer_params = [Parameter(f"θ_{r}_{i}") for i in range(n_qubits)]
+            params.extend(layer_params)
+            for i, p in enumerate(layer_params):
+                qc.rz(p, i)
+            
+            if r < reps - 1:
+                qc.barrier()
+        
+        return qc
 
 
 if TORCH_AVAILABLE:
@@ -164,6 +215,45 @@ if TORCH_AVAILABLE:
         def forward(self, z: torch.Tensor) -> torch.Tensor:
             """Decode latent vector to reconstruction."""
             return self.decoder(z)
+            
+    
+    class QuantumEncoder(nn.Module):
+        """
+        Quantum circuit encoder using Qiskit QNN.
+        Maps input features to latent distribution parameters.
+        """
+        def __init__(self, n_qubits: int, input_dim: int, output_dim: int):
+            super().__init__()
+            if not QISKIT_AVAILABLE:
+                raise ImportError("Qiskit ML required for QuantumEncoder")
+            
+            # Create quantum circuit
+            self.qc = create_quantum_encoder_circuit(n_qubits, input_dim)
+            
+            # Create QNN (SamplerQNN returns probabilities of bitstrings)
+            # Output size is 2^n_qubits
+            self.qnn = SamplerQNN(
+                circuit=self.qc,
+                input_params=self.qc.parameters[:input_dim],
+                weight_params=self.qc.parameters[input_dim:],
+                input_gradients=True,
+            )
+            
+            self.quantum_layer = TorchConnector(self.qnn)
+            
+            # Map quantum output (probabilities) to latent params
+            q_output_dim = 2**n_qubits
+            self.fc_mu = nn.Linear(q_output_dim, output_dim)
+            self.fc_logvar = nn.Linear(q_output_dim, output_dim)
+            
+        def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+            # Scale input to [0, 2pi] for rotation encoding if needed
+            # For now assume input is normalized/scaled appropriately
+            
+            q_out = self.quantum_layer(x)
+            mu = self.fc_mu(q_out)
+            logvar = self.fc_logvar(q_out)
+            return mu, logvar
     
     
     class QuantumInspiredVAE(nn.Module):
@@ -180,11 +270,19 @@ if TORCH_AVAILABLE:
             super().__init__()
             self.config = config
             
-            self.encoder = Encoder(
-                config.input_dim,
-                config.hidden_dims,
-                config.latent_dim,
-            )
+            # Initialize encoder (classical or quantum)
+            if config.use_quantum_encoder and QISKIT_AVAILABLE:
+                self.encoder = QuantumEncoder(
+                    n_qubits=config.n_qubits,
+                    input_dim=config.input_dim,
+                    output_dim=config.latent_dim
+                )
+            else:
+                self.encoder = Encoder(
+                    config.input_dim,
+                    config.hidden_dims,
+                    config.latent_dim,
+                )
             
             self.decoder = Decoder(
                 config.latent_dim,
@@ -355,7 +453,7 @@ class QIVAE:
         # Prepare data
         X_tensor = torch.FloatTensor(X_train).to(self.device)
         dataset = TensorDataset(X_tensor)
-        dataloader = DataLoader(
+        dataloader = TorchDataLoader(
             dataset,
             batch_size=self.config.batch_size,
             shuffle=True,
@@ -547,55 +645,6 @@ class QIVAE:
         """Fit and evaluate in one step."""
         train_time = self.fit(X_train, X_val, verbose)
         return self.evaluate(X_test, y_test, train_time)
-
-
-if QISKIT_AVAILABLE:
-    
-    def create_quantum_encoder_circuit(
-        n_qubits: int,
-        n_features: int,
-        reps: int = 2,
-    ) -> QuantumCircuit:
-        """
-        Create a parameterized quantum circuit for encoding.
-        
-        This circuit can be used as an alternative encoder in hybrid models.
-        
-        Args:
-            n_qubits: Number of qubits
-            n_features: Number of input features
-            reps: Number of circuit repetitions
-        
-        Returns:
-            Parameterized QuantumCircuit
-        """
-        qc = QuantumCircuit(n_qubits)
-        
-        # Input parameters (features)
-        inputs = [Parameter(f"x_{i}") for i in range(n_features)]
-        
-        # Trainable parameters
-        params = []
-        
-        for r in range(reps):
-            # Encoding layer: RY rotations based on input
-            for i in range(min(n_qubits, n_features)):
-                qc.ry(inputs[i], i)
-            
-            # Entanglement layer: CNOT ladder
-            for i in range(n_qubits - 1):
-                qc.cx(i, i + 1)
-            
-            # Variational layer: RZ rotations (trainable)
-            layer_params = [Parameter(f"θ_{r}_{i}") for i in range(n_qubits)]
-            params.extend(layer_params)
-            for i, p in enumerate(layer_params):
-                qc.rz(p, i)
-            
-            if r < reps - 1:
-                qc.barrier()
-        
-        return qc
 
 
 if __name__ == "__main__":
