@@ -65,7 +65,7 @@ class ClassicalBaseline:
             n_estimators=100, max_depth=5, random_state=42
         ),
         "logistic_regression": lambda: LogisticRegression(
-            max_iter=1000, random_state=42, n_jobs=-1
+            max_iter=1000, random_state=42
         ),
         "knn": lambda: KNeighborsClassifier(n_neighbors=5, n_jobs=-1),
         "mlp": lambda: MLPClassifier(
