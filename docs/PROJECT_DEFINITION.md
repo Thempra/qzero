@@ -279,3 +279,42 @@ iQuHACK (Jan 30 - Feb 1):
 *Document Version: 1.0*
 *Last Updated: 2026-01-27*
 *Author: Radomo (QZero Team)*
+
+---
+
+## Dashboard (Nueva tarea)
+
+### Objetivo
+Crear un dashboard interactivo y visualmente atractivo para QZero.
+
+### Tecnología
+- **Streamlit** o **Gradio** (rápido de desarrollar, bonito por defecto)
+
+### Funcionalidades
+
+1. **Panel de Datos**
+   - Cargar dataset (sintético o UGRansome)
+   - Visualizar distribución de clases
+   - Explorar features (PCA, t-SNE)
+
+2. **Panel de Modelos Clásicos**
+   - Entrenar/evaluar baselines
+   - Comparar métricas (accuracy, F1, precision, recall)
+   - Matriz de confusión interactiva
+
+3. **Panel Cuántico**
+   - Configurar QSVM (qubits, feature map, reps)
+   - Visualizar circuitos cuánticos
+   - Ejecutar y comparar con clásicos
+
+4. **Panel de Resultados**
+   - Comparación lado a lado
+   - Gráficos de rendimiento
+   - Export de resultados
+
+### Diseño
+- Tema oscuro (moderno)
+- Animaciones suaves
+- Responsive
+- Colores: azul cuántico (#6366f1), verde éxito (#10b981), rojo alerta (#ef4444)
+
