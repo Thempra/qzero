@@ -26,18 +26,55 @@ def print_header(title: str):
     print(f" {title}")
     print("=" * 60)
 
-def run_benchmark(n_samples: int = 2000, n_qubits: int = 4, difficulty: str = "medium"):
-    """Run full benchmark."""
+def run_benchmark(
+    n_samples: int = 2000, 
+    n_qubits: int = 4, 
+    difficulty: str = "medium",
+    use_real_data: bool = False,
+    binary: bool = True,
+):
+    """
+    Run full benchmark.
+    
+    Args:
+        n_samples: Number of samples (for synthetic) or sample limit (for real)
+        n_qubits: Number of qubits for quantum models
+        difficulty: Difficulty level for synthetic data
+        use_real_data: If True, use UGRansome dataset instead of synthetic
+        binary: If True, use binary classification (zero-day vs known)
+    """
     
     print_header("QZero Benchmark")
     print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"Samples: {n_samples} | Qubits: {n_qubits} | Difficulty: {difficulty}")
     
-    # 1. Generate synthetic data
-    print_header("1. Data Generation")
-    X, y = generate_synthetic_data(n_samples=n_samples, difficulty=difficulty)
-    print(f"Generated {len(X)} samples with {X.shape[1]} features")
-    print(f"Class distribution: {dict(zip(*np.unique(y, return_counts=True)))}")
+    # 1. Load data
+    print_header("1. Data Loading")
+    
+    if use_real_data:
+        print(f"Source: UGRansome (Real) | Sample limit: {n_samples} | Binary: {binary}")
+        loader = DataLoader()
+        X, y = loader.load_ugransome()
+        
+        # Sample if needed
+        if n_samples > 0 and n_samples < len(X):
+            from sklearn.model_selection import train_test_split
+            X, _, y, _ = train_test_split(
+                X, y, train_size=n_samples, stratify=y, random_state=42
+            )
+        
+        # Convert labels for binary classification
+        if binary:
+            # 1 (Anomaly/Zero-Day) -> 1, others -> 0
+            y = (y == 1).astype(int)
+            
+        print(f"Loaded {len(X)} samples with {X.shape[1]} features")
+        print(f"Class distribution: {dict(zip(*np.unique(y, return_counts=True)))}")
+        
+    else:
+        print(f"Source: Synthetic | Samples: {n_samples} | Difficulty: {difficulty}")
+        X, y = generate_synthetic_data(n_samples=n_samples, difficulty=difficulty)
+        print(f"Generated {len(X)} samples with {X.shape[1]} features")
+        print(f"Class distribution: {dict(zip(*np.unique(y, return_counts=True)))}")
     
     # 2. Feature engineering
     print_header("2. Feature Engineering")
@@ -108,10 +145,10 @@ def run_benchmark(n_samples: int = 2000, n_qubits: int = 4, difficulty: str = "m
     print_header("5. Summary Comparison")
     
     # Get best classical
-    best_classical = max(classical_results, key=lambda x: x.f1_score)
+    best_classical = max(classical_results, key=lambda x: x.f1)
     
     comparison = [
-        ["Best Classical", best_classical.model_name, f"{best_classical.f1_score:.4f}"],
+        ["Best Classical", best_classical.model_name, f"{best_classical.f1:.4f}"],
         ["Quantum QSVM", "QSVM", f"{qsvm_f1:.4f}"],
     ]
     
@@ -132,9 +169,15 @@ def run_benchmark(n_samples: int = 2000, n_qubits: int = 4, difficulty: str = "m
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="QZero Benchmark")
-    parser.add_argument("--samples", type=int, default=1000, help="Number of samples")
+    parser.add_argument("--samples", type=int, default=1000, 
+                        help="Number of samples (synthetic) or sample limit (real)")
     parser.add_argument("--qubits", type=int, default=4, help="Number of qubits")
-    parser.add_argument("--difficulty", choices=["easy", "medium", "hard"], default="medium")
+    parser.add_argument("--difficulty", choices=["easy", "medium", "hard"], default="medium",
+                        help="Difficulty for synthetic data")
+    parser.add_argument("--real", action="store_true", 
+                        help="Use real UGRansome dataset instead of synthetic")
+    parser.add_argument("--multiclass", action="store_true",
+                        help="Use multiclass classification (only for real data)")
     
     args = parser.parse_args()
     
@@ -149,5 +192,7 @@ if __name__ == "__main__":
     run_benchmark(
         n_samples=args.samples,
         n_qubits=args.qubits,
-        difficulty=args.difficulty
+        difficulty=args.difficulty,
+        use_real_data=args.real,
+        binary=not args.multiclass,
     )

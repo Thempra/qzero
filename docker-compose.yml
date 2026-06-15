@@ -1,21 +1,69 @@
+# QZero Docker Compose
+# Quantum-Enhanced Threat Detection Platform
+
 version: '3.8'
 
 services:
+  # Main API service
   qzero-api:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: qzero-api
     ports:
       - "8000:8000"
-    volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
     environment:
-      - QZERO_BACKEND=aer_simulator
-    restart: unless-stopped
+      - QZERO_ENV=production
+      - PYTHONPATH=/app
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./data:/app/data:ro
+      - ./models:/app/models:ro
+      - qzero-results:/app/results
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: unless-stopped
 
-  # Optional: Dashboard service (e.g., Streamlit or Grafana) could go here
+  # Streamlit Dashboard
+  qzero-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    container_name: qzero-dashboard
+    ports:
+      - "8501:8501"
+    environment:
+      - QZERO_API_URL=http://qzero-api:8000
+      - STREAMLIT_SERVER_HEADLESS=true
+    depends_on:
+      - qzero-api
+    restart: unless-stopped
+
+  # Jupyter for development/analysis
+  qzero-jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile.jupyter
+    container_name: qzero-jupyter
+    ports:
+      - "8888:8888"
+    environment:
+      - JUPYTER_TOKEN=qzero2026
+    volumes:
+      - ./notebooks:/app/notebooks
+      - ./data:/app/data
+      - ./results:/app/results
+    profiles:
+      - dev
+    restart: unless-stopped
+
+volumes:
+  qzero-results:
+    driver: local
+
+networks:
+  default:
+    name: qzero-network
