@@ -74,6 +74,41 @@ class TestSyntheticDataGeneration:
         assert abs(counts.get(0, 0) - 0.65) < 0.05  # Normal
         assert abs(counts.get(1, 0) - 0.15) < 0.05  # Anomaly
         assert abs(counts.get(2, 0) - 0.20) < 0.05  # Signature
+    
+    def test_difficulty_levels(self):
+        """Test that difficulty parameter produces valid data."""
+        for difficulty in ["easy", "medium", "hard"]:
+            X, y = generate_synthetic_data(n_samples=500, difficulty=difficulty)
+            
+            # Basic validity checks
+            assert X.shape[0] == len(y)
+            assert (X.values >= 0).all()
+            assert len(y.unique()) == 3  # All classes present
+    
+    def test_difficulty_affects_classification(self):
+        """Test that harder difficulty makes classification harder."""
+        from sklearn.ensemble import RandomForestClassifier
+        from sklearn.model_selection import train_test_split
+        from sklearn.preprocessing import StandardScaler
+        
+        accuracies = {}
+        for difficulty in ["easy", "hard"]:
+            X, y = generate_synthetic_data(n_samples=1000, difficulty=difficulty, random_state=42)
+            y_binary = (y != 0).astype(int)
+            
+            X_train, X_test, y_train, y_test = train_test_split(
+                X.values, y_binary.values, test_size=0.2, random_state=42
+            )
+            scaler = StandardScaler()
+            X_train = scaler.fit_transform(X_train)
+            X_test = scaler.transform(X_test)
+            
+            clf = RandomForestClassifier(n_estimators=50, random_state=42)
+            clf.fit(X_train, y_train)
+            accuracies[difficulty] = clf.score(X_test, y_test)
+        
+        # Hard difficulty should result in lower accuracy
+        assert accuracies["hard"] < accuracies["easy"]
 
 
 class TestDataLoader:
@@ -137,7 +172,8 @@ class TestFeatureEngineer:
         X_reduced = engineer.fit_transform(X.values, y.values)
         
         assert X_reduced.min() >= 0
-        assert X_reduced.max() <= np.pi
+        # Allow small floating point tolerance
+        assert X_reduced.max() <= np.pi + 1e-10
     
     def test_different_reduction_methods(self):
         """Test different reduction methods."""

@@ -43,13 +43,14 @@ def generate_synthetic_data(
     anomaly_ratio: float = 0.15,
     signature_ratio: float = 0.20,
     random_state: int = 42,
+    difficulty: str = "medium",
 ) -> Tuple[pd.DataFrame, pd.Series]:
     """
     Generate synthetic network traffic data for development/testing.
     
     Simulates UGRansome-like data with:
     - Normal traffic: Gaussian distribution around baseline
-    - Anomalies: Outliers with unusual patterns
+    - Anomalies: Outliers with unusual patterns (zero-day simulation)
     - Signatures: Known attack patterns (clustered)
     
     Args:
@@ -58,17 +59,27 @@ def generate_synthetic_data(
         anomaly_ratio: Ratio of anomaly samples
         signature_ratio: Ratio of signature attack samples
         random_state: Random seed for reproducibility
+        difficulty: "easy", "medium", or "hard" - controls class overlap
     
     Returns:
         Tuple of (features DataFrame, labels Series)
     """
     np.random.seed(random_state)
     
+    # Difficulty settings
+    # Higher overlap_factor = more class overlap = harder classification
+    difficulty_settings = {
+        "easy": {"overlap": 0.1, "noise": 0.05, "outlier_frac": 0.3},
+        "medium": {"overlap": 0.5, "noise": 0.20, "outlier_frac": 0.08},
+        "hard": {"overlap": 0.8, "noise": 0.30, "outlier_frac": 0.02},
+    }
+    settings = difficulty_settings.get(difficulty, difficulty_settings["medium"])
+    
     n_anomaly = int(n_samples * anomaly_ratio)
     n_signature = int(n_samples * signature_ratio)
     n_normal = n_samples - n_anomaly - n_signature
     
-    # Normal traffic - centered around typical values
+    # Base normal traffic parameters
     normal_mean = np.array([
         500,    # flow_duration (ms)
         10,     # total_fwd_packets
@@ -83,41 +94,73 @@ def generate_synthetic_data(
         60,     # bwd_iat_mean
         1,      # fwd_psh_flags
         1,      # bwd_psh_flags
-        0,      # fwd_urg_flags
+        0.1,    # fwd_urg_flags (small nonzero to avoid div issues)
     ])[:n_features]
     
-    normal_std = normal_mean * 0.3  # 30% standard deviation
-    X_normal = np.random.normal(normal_mean, normal_std, (n_normal, n_features))
-    X_normal = np.maximum(X_normal, 0)  # No negative values
+    # Variance increases with difficulty (more overlap)
+    base_std_ratio = 0.3 + settings["overlap"] * 0.4
+    normal_std = normal_mean * base_std_ratio
     
-    # Anomaly traffic - unusual patterns (zero-day simulation)
-    # Higher variance, shifted means, correlated features
-    anomaly_shifts = np.random.uniform(-2, 5, n_features)
+    # Generate normal traffic
+    X_normal = np.random.normal(normal_mean, normal_std, (n_normal, n_features))
+    
+    # Anomaly traffic - subtle shifts for harder detection
+    # The anomaly_shift is reduced with higher difficulty (more overlap with normal)
+    shift_magnitude = 2.0 - settings["overlap"] * 1.5  # Less shift = harder
+    anomaly_shifts = np.random.uniform(0.5, 1 + shift_magnitude, n_features)
+    anomaly_std = np.maximum(normal_std * (1.5 - settings["overlap"] * 0.5), 0.01)
+    
     X_anomaly = np.random.normal(
-        normal_mean * (1 + anomaly_shifts), 
-        normal_std * 2, 
+        normal_mean * anomaly_shifts,
+        anomaly_std,
         (n_anomaly, n_features)
     )
-    # Add some extreme outliers
-    outlier_idx = np.random.choice(n_anomaly, size=n_anomaly // 5, replace=False)
-    X_anomaly[outlier_idx] *= np.random.uniform(3, 10, (len(outlier_idx), n_features))
-    X_anomaly = np.maximum(X_anomaly, 0)
     
-    # Signature traffic - known attack patterns (clustered)
-    # Create 3 distinct attack clusters
+    # Add some outliers (fewer in harder mode - anomalies blend in more)
+    n_outliers = max(1, int(n_anomaly * settings["outlier_frac"]))
+    outlier_idx = np.random.choice(n_anomaly, size=n_outliers, replace=False)
+    outlier_scale = np.random.uniform(2, 5 - settings["overlap"] * 2, (n_outliers, n_features))
+    X_anomaly[outlier_idx] *= outlier_scale
+    
+    # Signature traffic - known attack patterns
+    # With higher difficulty, signatures are more similar to normal
     n_clusters = 3
-    signature_centers = [
-        normal_mean * np.array([10, 50, 2, 100, 10, 500, 100, 50, 50, 5, 5, 10, 0, 5])[:n_features],  # DDoS-like
-        normal_mean * np.array([0.1, 5, 100, 10, 1000, 50, 50, 10, 500, 1, 100, 0, 10, 0])[:n_features],  # Exfiltration-like
-        normal_mean * np.array([5, 1, 1, 5000, 5000, 10000, 5, 5000, 5000, 500, 500, 5, 5, 10])[:n_features],  # Ransomware-like
+    cluster_shift = 2.0 - settings["overlap"]  # Less distinct clusters in hard mode
+    
+    signature_patterns = [
+        # DDoS-like: high packet counts, short duration
+        np.array([0.5, 5, 0.5, 3, 0.5, 10, 10, 0.5, 0.5, 0.2, 0.2, 3, 0.5, 2])[:n_features],
+        # Exfiltration-like: asymmetric, high outbound
+        np.array([2, 1, 5, 0.5, 5, 2, 2, 0.3, 3, 0.5, 3, 0.5, 3, 0.5])[:n_features],
+        # Ransomware-like: bursts, high data
+        np.array([3, 0.5, 0.5, 10, 10, 15, 0.5, 10, 10, 5, 5, 2, 2, 5])[:n_features],
     ]
     
     X_signature = []
     samples_per_cluster = n_signature // n_clusters
-    for center in signature_centers:
-        cluster_samples = np.random.normal(center, center * 0.1, (samples_per_cluster, n_features))
+    remaining = n_signature - (samples_per_cluster * n_clusters)
+    
+    for i, pattern in enumerate(signature_patterns):
+        n_cluster = samples_per_cluster + (1 if i < remaining else 0)
+        # Interpolate between normal and attack pattern based on difficulty
+        center = normal_mean * (1 + (pattern - 1) * cluster_shift)
+        center = np.maximum(center, 0.1)  # Ensure positive centers
+        cluster_std = np.abs(center) * (0.15 + settings["overlap"] * 0.2)
+        cluster_std = np.maximum(cluster_std, 0.01)  # Ensure positive std
+        cluster_samples = np.random.normal(center, cluster_std, (n_cluster, n_features))
         X_signature.append(cluster_samples)
+    
     X_signature = np.vstack(X_signature)
+    
+    # Add global noise proportional to difficulty
+    noise_scale = settings["noise"]
+    for X in [X_normal, X_anomaly, X_signature]:
+        noise = np.random.normal(0, normal_mean * noise_scale, X.shape)
+        X += noise
+    
+    # Ensure no negative values
+    X_normal = np.maximum(X_normal, 0)
+    X_anomaly = np.maximum(X_anomaly, 0)
     X_signature = np.maximum(X_signature, 0)
     
     # Combine all data
