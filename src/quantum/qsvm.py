@@ -9,8 +9,7 @@ import time
 
 try:
     from qiskit import QuantumCircuit
-    from qiskit.circuit.library import ZZFeatureMap, RealAmplitudes
-    from qiskit.primitives import Sampler
+    from qiskit.circuit.library import RealAmplitudes
     from qiskit_machine_learning.kernels import FidelityQuantumKernel
     from qiskit_machine_learning.algorithms import QSVC
     QISKIT_ML_AVAILABLE = True
