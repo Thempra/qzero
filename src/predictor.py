@@ -461,8 +461,6 @@ class QZeroPredictor:
             return self.qivae_model.anomaly_threshold
         return 0.5  # Default fallback
 
-
-
     def evaluate(self) -> Dict[str, Any]:
         """
         Evaluate all models on test data.

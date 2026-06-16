@@ -15,12 +15,17 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 import asyncio
 import numpy as np
 import pandas as pd
+import json
+from datetime import datetime
+from typing import List, Dict, Any
+from pathlib import Path
 
 from src.preprocessing.data_loader import generate_synthetic_data, DataLoader
 from src.preprocessing.feature_engineering import FeatureEngineer
 from src.classical.baseline import ClassicalBaseline, run_all_baselines, print_comparison_table
 from src.quantum.qivae import QIVAE, QIVAEConfig
 from src.evaluation.metrics import evaluate_model, print_evaluation_report
+from detection import DetectionStream, QZeroDetector, NetFlowHandler, PCAPHandler, LoggerHandler
 
 
 def cmd_train(config: argparse.Namespace):
@@ -64,10 +69,22 @@ def cmd_train(config: argparse.Namespace):
 
     # Split data
     from sklearn.model_selection import train_test_split
-    X_train, X_test, y_train, y_test = train_test_split(
-        X_reduced, y, test_size=0.2, random_state=42, stratify=y
-    )
-    print(f"Train: {len(X_train)} | Test: {len(X_test)}")
+    try:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_reduced, y, test_size=0.2, random_state=42, stratify=y
+        )
+        print(f"Train: {len(X_train)} | Test: {len(X_test)}")
+    except ValueError as e:
+        # Handle case where stratification fails (e.g., too few samples from a class)
+        if "stratify" in str(e) and "too few" in str(e).lower():
+            print(f"Warning: {e}")
+            print("Falling back to non-stratified split...")
+            X_train, X_test, y_train, y_test = train_test_split(
+                X_reduced, y, test_size=0.2, random_state=42
+            )
+            print(f"Train: {len(X_train)} | Test: {len(X_test)}")
+        else:
+            raise
 
     # Train classical models
     if config.models:
@@ -135,9 +152,185 @@ def cmd_train(config: argparse.Namespace):
                 'difficulty': config.difficulty,
             }
         }
-        import json
         with open(config.output_file, 'w') as f:
             json.dump(results_dict, f, indent=2)
+        print(f"Saved!")
+
+
+def batch_analyze_file(file_path: Path, config: argparse.Namespace,
+                       model_config: Dict[str, Any]) -> Dict[str, Any]:
+    """Analyze a single file and return results."""
+    results = {
+        'file': str(file_path),
+        'status': 'success',
+        'timestamp': datetime.now().isoformat(),
+    }
+
+    try:
+        # Setup stream based on file extension
+        if file_path.suffix == '.pcap':
+            handler = PCAPHandler()
+            stream_type = 'pcap'
+        elif file_path.suffix in ['.csv', '.txt', '.log']:
+            handler = LoggerHandler()
+            stream_type = 'logs'
+        else:
+            results['status'] = 'unsupported_format'
+            results['error'] = f'Unsupported file format: {file_path.suffix}'
+            return results
+
+        detector = QZeroDetector()
+
+        if config.model == 'qivae':
+            from src.predictor import QZeroPredictor
+            predictor = QZeroPredictor(
+                n_qubits=config.n_qubits,
+                use_qsvm=False,
+                use_qivae=True,
+                use_classical=False,
+            )
+            detector.predictor = predictor
+        elif config.model == 'classical':
+            from src.predictor import QZeroPredictor
+            predictor = QZeroPredictor(
+                n_qubits=config.n_qubits,
+                use_qsvm=False,
+                use_qivae=False,
+                use_classical=True,
+            )
+            detector.predictor = predictor
+        else:
+            results['status'] = 'unknown_model'
+            results['error'] = f'Unknown model: {config.model}'
+            return results
+
+        detector.add_stream_handler(handler)
+
+        # Process the file
+        detector.process_stream(handler, max_samples=config.max_samples)
+        stats = detector.get_statistics()
+
+        results['statistics'] = {
+            'total_samples': stats['total_samples'],
+            'anomalies': stats['anomalies_detected'],
+            'anomaly_rate': stats['anomaly_rate'],
+            'mean_score': stats['mean_anomaly_score'],
+            'max_score': stats['max_anomaly_score'],
+            'critical_alerts': stats['critical_alerts'],
+        }
+
+        results['anomalies'] = [
+            {
+                'score': r.anomaly_score,
+                'is_anomaly': r.is_anomaly,
+                'severity': r.severity,
+                'timestamp': r.timestamp,
+            }
+            for r in detector.current_results
+        ]
+
+    except Exception as e:
+        results['status'] = 'error'
+        results['error'] = str(e)
+        import traceback
+        results['traceback'] = traceback.format_exc()
+
+    return results
+
+
+def cmd_batch(config: argparse.Namespace):
+    """Run batch analysis on multiple files."""
+    print(f"\n{'='*60}")
+    print("QZero Batch Analysis")
+    print(f"{'='*60}\n")
+
+    # Expand input files (support wildcards)
+    input_files = []
+    for pattern in config.input_files:
+        files = list(Path('.').glob(pattern))
+        if not files:
+            print(f"Warning: No files found matching: {pattern}")
+        input_files.extend(files)
+
+    if not input_files:
+        print("Error: No input files specified")
+        sys.exit(1)
+
+    print(f"Found {len(input_files)} file(s) to analyze\n")
+
+    # Initialize predictor once for efficiency
+    from src.predictor import QZeroPredictor
+
+    if config.model == 'qivae':
+        predictor = QZeroPredictor(
+            n_qubits=config.n_qubits,
+            use_qsvm=False,
+            use_qivae=True,
+            use_classical=False,
+        )
+        print(f"Model: QI-VAE ({config.n_qubits} qubits)")
+    elif config.model == 'classical':
+        predictor = QZeroPredictor(
+            n_qubits=config.n_qubits,
+            use_qsvm=False,
+            use_qivae=False,
+            use_classical=True,
+        )
+        print(f"Model: Classical baselines")
+    else:
+        print(f"Model: {config.model}")
+        predictor = None
+
+    # Analyze each file
+    all_results = []
+    total_anomalies = 0
+    total_samples = 0
+
+    for i, file_path in enumerate(input_files, 1):
+        print(f"[{i}/{len(input_files)}] Analyzing: {file_path.name}")
+
+        result = batch_analyze_file(file_path, config, {'model': config.model})
+
+        all_results.append(result)
+
+        if result['status'] == 'success':
+            total_samples += result['statistics']['total_samples']
+            total_anomalies += result['statistics']['anomalies']
+
+            if result['statistics']['critical_alerts'] > 0:
+                print(f"  ⚠️  {result['statistics']['critical_alerts']} critical alerts")
+            else:
+                print(f"  ✓ Complete")
+        else:
+            print(f"  ✗ Failed: {result.get('error', 'Unknown error')}")
+
+        print()
+
+    # Summary
+    print(f"{'='*60}")
+    print("Batch Analysis Summary")
+    print(f"{'='*60}")
+    print(f"Total files processed: {len(all_results)}")
+    print(f"Total samples analyzed: {total_samples}")
+    print(f"Total anomalies found: {total_anomalies}")
+    print(f"Overall anomaly rate: {total_anomalies/total_samples:.2%}")
+    print(f"{'='*60}\n")
+
+    # Save results
+    if config.output_file:
+        print(f"Saving results to {config.output_file}...")
+        output = {
+            'summary': {
+                'total_files': len(all_results),
+                'total_samples': total_samples,
+                'total_anomalies': total_anomalies,
+                'overall_anomaly_rate': total_anomalies/total_samples if total_samples > 0 else 0,
+            },
+            'files': all_results,
+            'timestamp': datetime.now().isoformat(),
+        }
+        with open(config.output_file, 'w') as f:
+            json.dump(output, f, indent=2)
         print(f"Saved!")
 
 
@@ -146,14 +339,6 @@ async def cmd_detect(config: argparse.Namespace):
     print(f"\n{'='*60}")
     print("QZero Real-Time Detection")
     print(f"{'='*60}\n")
-
-    from detection import (
-        DetectionStream,
-        QZeroDetector,
-        NetFlowHandler,
-        PCAPHandler,
-        LoggerHandler,
-    )
 
     # Setup stream
     if config.stream == "netflow":
@@ -258,6 +443,9 @@ Examples:
 
   # Compare multiple classical models
   python qzero-cli.py train --models random_forest,svm_rbf,logistic_regression
+
+  # Batch analyze multiple files
+  python qzero-cli.py batch --input "traffic_*.pcap" --output results.json
         """
     )
 
@@ -300,6 +488,22 @@ Examples:
     detect_parser.add_argument("--max-samples", type=int, default=100,
                             help="Maximum samples to process")
     detect_parser.set_defaults(func=cmd_detect)
+
+    # Batch command (NEW)
+    batch_parser = subparsers.add_parser("batch", help="Batch analyze multiple files")
+    batch_parser.add_argument("--input-files", type=str, nargs="+",
+                             required=True,
+                             help="Input file patterns (support wildcards)")
+    batch_parser.add_argument("--model", type=str, default="qivae",
+                             choices=["qivae", "classical"],
+                             help="Model type for detection")
+    batch_parser.add_argument("--n-qubits", type=int, default=4,
+                            help="Number of qubits")
+    batch_parser.add_argument("--max-samples", type=int, default=100,
+                            help="Maximum samples per file")
+    batch_parser.add_argument("--output-file", type=str, default="batch_results.json",
+                            help="Output JSON file for results")
+    batch_parser.set_defaults(func=cmd_batch)
 
     args = parser.parse_args()
 
