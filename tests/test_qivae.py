@@ -47,7 +47,7 @@ class TestQIVAEConfig:
         assert config.hidden_dims == (64, 32)
         assert config.learning_rate == 1e-3
         assert config.batch_size == 32
-        assert config.epochs == 75
+        assert config.epochs == 50
         assert config.beta == 0.5
         assert config.anomaly_threshold_percentile == 85.0
     

@@ -53,8 +53,8 @@ class QIVAEConfig:
     learning_rate: float = 1e-3
     batch_size: int = 32
     epochs: int = 50
-    beta: float = 1.0  # KL divergence weight
-    anomaly_threshold_percentile: float = 95.0
+    beta: float = 0.5  # Reduced KL weight to prioritize reconstruction
+    anomaly_threshold_percentile: float = 85.0  # Lower threshold for better recall
     random_state: int = 42
 
 
@@ -364,7 +364,7 @@ def vae_loss(
     x: torch.Tensor,
     mu: torch.Tensor,
     logvar: torch.Tensor,
-    beta: float = 1.0,
+    beta: float = 0.5,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     VAE loss: reconstruction + KL divergence.
@@ -514,12 +514,42 @@ class QIVAE:
         return train_time
     
     def _set_anomaly_threshold(self, X_train: np.ndarray) -> None:
-        """Set anomaly threshold based on training data reconstruction errors."""
+        """Set anomaly threshold based on training data reconstruction errors.
+        
+        Uses mean + k*std approach for better sensitivity to anomalies.
+        The percentile config is converted to a k-factor:
+        - 95th percentile ≈ 1.65 std
+        - 90th percentile ≈ 1.28 std
+        - 85th percentile ≈ 1.04 std
+        """
         errors = self.reconstruction_errors(X_train)
-        self.anomaly_threshold = np.percentile(
+        
+        # Convert percentile to k-factor (approximation based on normal distribution)
+        # Using both methods and taking the lower threshold for better recall
+        percentile_threshold = np.percentile(
             errors,
             self.config.anomaly_threshold_percentile
         )
+        
+        # Mean + k*std approach (more sensitive)
+        mean_error = np.mean(errors)
+        std_error = np.std(errors)
+        
+        # k-factor based on percentile (approximate)
+        percentile = self.config.anomaly_threshold_percentile
+        if percentile >= 95:
+            k = 1.65
+        elif percentile >= 90:
+            k = 1.28
+        elif percentile >= 85:
+            k = 1.04
+        else:
+            k = 0.84  # 80th percentile
+        
+        std_threshold = mean_error + k * std_error
+        
+        # Use the lower of the two thresholds for better recall
+        self.anomaly_threshold = min(percentile_threshold, std_threshold)
     
     def reconstruction_errors(self, X: np.ndarray) -> np.ndarray:
         """
