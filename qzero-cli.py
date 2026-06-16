@@ -174,9 +174,24 @@ async def cmd_detect(config: argparse.Namespace):
 
     if config.model == "qivae":
         from src.predictor import QZeroPredictor
-        predictor = QZeroPredictor(model_type="qivae", n_qubits=config.n_qubits)
+        predictor = QZeroPredictor(
+            n_qubits=config.n_qubits,
+            use_qsvm=False,
+            use_qivae=True,
+            use_classical=False,
+        )
         detector.predictor = predictor
         print(f"Model: QI-VAE ({config.n_qubits} qubits)")
+    elif config.model == "classical":
+        from src.predictor import QZeroPredictor
+        predictor = QZeroPredictor(
+            n_qubits=config.n_qubits,
+            use_qsvm=False,
+            use_qivae=False,
+            use_classical=True,
+        )
+        detector.predictor = predictor
+        print(f"Model: Classical baselines")
     else:
         print(f"Model: {config.model}")
 
