@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-02-03T15:32:44.195628",
+  "overall_status": "WARNING",
+  "summary": {
+    "files_checked": 2,
+    "total_lines": 5,
+    "valid_lines": 5,
+    "total_issues": 1,
+    "files_ok": 1
+  },
+  "files": [
+    {
+      "file": "quality-monitor-data.jsonl",
+      "total_lines": 0,
+      "valid_lines": 0,
+      "invalid_lines": 0,
+      "issues": [
+        "File not found"
+      ]
+    },
+    {
+      "file": "performance-history.jsonl",
+      "total_lines": 5,
+      "valid_lines": 5,
+      "invalid_lines": 0,
+      "issues": []
+    }
+  ]
+}

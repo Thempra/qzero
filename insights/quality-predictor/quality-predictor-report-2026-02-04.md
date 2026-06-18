@@ -1,8 +1,8 @@
 # QZero Data Quality Predictor Report
 
-**Generado:** 2026-02-04_00-12-56
+**Generado:** 2026-02-04_15-12-15
 
-**Hora:** 00:12 (Europe/Madrid)
+**Hora:** 15:12 (Europe/Madrid)
 
 ## Estadísticas Actuales
 
