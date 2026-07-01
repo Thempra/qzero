@@ -1,0 +1,35 @@
+=== QZero ML Benchmark Runner ===
+Timestamp: 2026-02-07_08-00-02
+API Base: http://localhost:8000
+
+Health Score: 0/100
+Total Endpoints: 3
+Total Requests: 15
+Successful Requests: 0
+Overall Success Rate: 0.0
+
+=== Endpoint Results ===
+
+GET /health:
+  Success Rate: 0.0%
+  Avg Response Time: 0s
+  Min Response Time: 0s
+  Max Response Time: 0s
+
+POST /api/analyze:
+  Success Rate: 0.0%
+  Avg Response Time: 0s
+  Min Response Time: 0s
+  Max Response Time: 0s
+
+GET /health/detailed:
+  Success Rate: 0.0%
+  Avg Response Time: 0s
+  Min Response Time: 0s
+  Max Response Time: 0s
+
+Overall Success Rate: 0.0%
+
+=== Recommendations ===
+[WARNING] Endpoints con éxito bajo: ['/health', '/api/analyze', '/health/detailed']
+[CRITICAL] Health score bajo. Revisar el servidor QZero.

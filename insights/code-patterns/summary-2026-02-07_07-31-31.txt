@@ -1,0 +1,57 @@
+================================================================================
+CODE PATTERN HUNTER - CODE QUALITY ANALYSIS REPORT
+================================================================================
+
+Análisis realizado: 2026-02-07T07:31:31.236119
+
+--------------------------------------------------------------------------------
+MÉTRICAS
+--------------------------------------------------------------------------------
+Archivos analizados: 49
+Patrones buenos encontrados: 0
+Patrones malos encontrados: 0
+Oportunidades identificadas: 49
+Problemas encontrados: 2
+
+--------------------------------------------------------------------------------
+PATRONES BUENOS
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+PATRONES MALOS
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+OPORTUNIDADES DE MEJORA
+--------------------------------------------------------------------------------
+[~] qzero-cli.py: Excessive blank lines (76/526 lines)
+[~] train_models.py: Excessive blank lines (27/126 lines)
+[~] autonomous-data-only.py: Excessive blank lines (30/106 lines)
+[~] autonomous-insights.py: Excessive blank lines (65/253 lines)
+[~] run_detection.py: Excessive blank lines (17/101 lines)
+[~] project-health-monitor.py: Excessive blank lines (85/408 lines)
+[~] dashboard.py: Excessive blank lines (100/471 lines)
+[~] demo_detection.py: Excessive blank lines (30/140 lines)
+[~] autonomous-hourly.py: Excessive blank lines (42/195 lines)
+[~] qzero-cli-batch.py: Excessive blank lines (34/206 lines)
+
+--------------------------------------------------------------------------------
+RECOMENDACIONES
+--------------------------------------------------------------------------------
+
+[MEDIUM - Improvements]
+Address opportunities for code quality
+  • {'file': 'qzero-cli.py', 'path': 'qzero-cli.py', 'message': 'Excessive blank lines (76/526 lines)', 'timestamp': '2026-02-07T07:31:31.236119'}
+  • {'file': 'train_models.py', 'path': 'train_models.py', 'message': 'Excessive blank lines (27/126 lines)', 'timestamp': '2026-02-07T07:31:31.236119'}
+  • {'file': 'autonomous-data-only.py', 'path': 'autonomous-data-only.py', 'message': 'Excessive blank lines (30/106 lines)', 'timestamp': '2026-02-07T07:31:31.236119'}
+  • {'file': 'autonomous-insights.py', 'path': 'autonomous-insights.py', 'message': 'Excessive blank lines (65/253 lines)', 'timestamp': '2026-02-07T07:31:31.236119'}
+  • {'file': 'run_detection.py', 'path': 'run_detection.py', 'message': 'Excessive blank lines (17/101 lines)', 'timestamp': '2026-02-07T07:31:31.236119'}
+
+[HIGH - Code Quality]
+Fix identified issues
+  • {'file': 'api.py', 'path': 'src/api.py', 'type': 'code_smell', 'details': ['Global variables used'], 'timestamp': '2026-02-07T07:31:31.236119'}
+  • {'file': 'real-time-analyzer.py', 'path': 'scripts/real-time-analyzer.py', 'type': 'code_smell', 'details': ['Global variables used'], 'timestamp': '2026-02-07T07:31:31.236119'}
+
+================================================================================
+FIN DEL REPORTE
+================================================================================

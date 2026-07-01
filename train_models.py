@@ -49,7 +49,7 @@ async def train_models():
     )
 
     for result in classical_results:
-        print(f"  ✓ {result.model}: {result.accuracy:.3f} accuracy, {result.f1:.3f} F1")
+        print(f"  ✓ {result.name}: {result.accuracy:.3f} accuracy, {result.f1:.3f} F1")
 
     # QSVM
     print("\nStep 4: Training QSVM...")
@@ -57,24 +57,15 @@ async def train_models():
     X_train_q = engineer.fit_transform(data['X_train'], data['y_train'])
     X_test_q = engineer.transform(data['X_test'])
 
-    qsvm = QSVM(
-        n_qubits=4,
-        max_samples_quantum=200,
-        use_aer=True,
-    )
+    qsvm_config = QSVMConfig(n_qubits=4, max_samples_quantum=200, use_classical_fallback=True)
+    qsvm = QSVM(config=qsvm_config)
 
-    qsvm.train(X_train_q, data['y_train'], X_test_q, data['y_test'])
-    print(f"  ✓ QSVM trained. Accuracy: {qsvm.accuracy:.3f}")
+    qsvm_result = qsvm.fit_evaluate(X_train_q, data['y_train'], X_test_q, data['y_test'])
+    print(f"  ✓ QSVM trained. Accuracy: {qsvm_result.accuracy:.3f}")
 
     # QI-VAE
     print("\nStep 5: Training QI-VAE...")
-    qivae = QIVAE(
-        input_dim=14,
-        latent_dim=4,
-        n_qubits=4,
-        use_quantum_encoder=False,
-        use_aer=False,
-    )
+    qivae = QIVAE(config=QIVAEConfig(input_dim=14, latent_dim=4))
 
     normal_mask_train = data['y_train'] == 0
     X_train_normal = data['X_train'][normal_mask_train]
@@ -101,8 +92,8 @@ async def train_models():
 
     # Evaluation
     print("\nStep 7: Evaluating models...")
-    qivae.eval(data['X_test'], data['y_test'])
-    print(f"  ✓ QI-VAE: Accuracy {qivae.accuracy:.3f}, Precision {qivae.precision:.3f}, Recall {qivae.recall:.3f}")
+    qivae_result = qivae.eval(data['X_test'], data['y_test'])
+    print(f"  ✓ QI-VAE: Accuracy {qivae_result.accuracy:.3f}, Precision {qivae_result.precision:.3f}, Recall {qivae_result.recall:.3f}")
 
     # Zero-day detection simulation
     print("\nStep 8: Simulating zero-day detection...")

@@ -1,0 +1,32 @@
+=== QZero Log Analyzer Report ===
+
+Generated: 2026-02-06T06:31:06.095528
+
+## Metrics
+
+- Health Score: 58.0/100
+- Health Status: FAIR
+- Total Log Size: 0.01MB
+- Total Files: 16
+- Average File Size: 0.0MB
+- Error Rate: 1.00 errors per file
+
+## Errors
+
+- /home/thempra/projects/qzero/logs/quality-improver-2026-02-04_21-00-02.log: 1 errors
+- /home/thempra/projects/qzero/logs/quality-improver-2026-02-04_18-32-56.log: 1 errors
+- /home/thempra/projects/qzero/logs/quality-improver-2026-02-04_18-32-33.log: 1 errors
+- /home/thempra/projects/qzero/logs/quality-improver-2026-02-04_20-00-02.log: 1 errors
+- /home/thempra/projects/qzero/logs/quality-improver-2026-02-04_22-00-02.log: 1 errors
+
+## Warnings
+
+
+## Insights
+
+- [LOW] Error rate is healthy: 1.00 errors per file
+- [MEDIUM] Errors detected in 8 different files
+
+## Recommendations
+
+- [HIGH] Review error logs and investigate root causes

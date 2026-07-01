@@ -1,0 +1,22 @@
+
+## Resumen del Análisis de Seguridad de Dependencias
+
+**Fecha:** 2026-02-06 18:00:02
+
+### Estado General
+- Health Score: 100/100
+- Estado: EXCELLENT
+- Total de vulnerabilidades: 1
+
+### Clasificación por Severidad
+- Critical: 0
+- High: 0
+- Medium: 1
+- Low: 0
+
+### Vulnerabilidades Detectadas
+
+1. **Unknown** (UNKNOWN)
+   - Versión: N/A
+   - No título
+

@@ -1,154 +1,94 @@
-# QZero 🛡️⚛️
+# QZero - Sistema de Detección de Anomalías y Monitoreo de Seguridad
 
-**Quantum-Enhanced Threat Detection Platform**
+QZero es un sistema completo de detección de anomalías y monitoreo de seguridad con capacidad de análisis en tiempo real, usando interfaces promiscuas de red para detectar amenazas desde el primer momento.
 
-> Production-ready anomaly detection for Modern SOCs & Red Teams
+## 🎯 Características
 
-[![Release](https://img.shields.io/badge/release-v1.0.0--alpha-green)](https://github.com/thempra/qzero)
-[![Docker](https://img.shields.io/badge/docker-ready-blue)](https://hub.docker.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+### ✅ Core Features
+- **Análisis de Anomalías**: Detección de patrones inusuales en datos
+- **Modo Promiscuo**: Captura de tráfico de red sin filtro
+- **Análisis en Tiempo Real**: Monitoreo continuo de actividad
+- **Detección de Amenazas**: Identificación de patrones de seguridad
+- **Reportes Detallados**: Insights completos con métricas
 
-## 🚀 Product Overview
+### 📊 Análisis en Tiempo Real
+- Monitor de red con interfaz promiscua
+- Captura de paquetes y análisis de tráfico
+- Detección de anomalías en vivo
+- Alertas en tiempo real
 
-**QZero** is not just a research project; it is a **next-generation IDS engine** designed to detect what traditional SIEMs miss. By leveraging **Quantum Machine Learning (QML)**, QZero identifies non-linear anomalies in high-dimensional network traffic—specifically targeting **Zero-Day exploits** and **polymorphic ransomware** that evade signature-based detection (Snort, Suricata).
+### 🔧 Interfaces Soportadas
+- Interfaz de contenedor
+- Interfaz de red física
+- Interfaz de virtualización
 
-**Built for:**
-*   **Blue Teams**: Deploy as a sidecar container to analyze NetFlow/PCAP streams in real-time.
-*   **Red Teams**: Validate stealth techniques against quantum-probabilistic detection boundaries.
-*   **Threat Hunters**: Analyze historical traffic for "low and slow" anomalies invisible to classical heuristics.
-
-## ⚡ Key Capabilities
-
-| Feature | Traditional IDS | QZero (Quantum) | Benefit |
-| :--- | :--- | :--- | :--- |
-| **Detection Logic** | Signatures / Rules | Quantum Kernel Projection | Detects unknown unknowns (0-days) |
-| **False Positives** | High (Rule fatigue) | Low (Probabilistic separation) | Higher fidelity alerts for SOC analysts |
-| **Attack Vectors** | Known CVEs | Anomalous Behavior | Catches encrypted C2 & lateral movement |
-| **Deployment** | Heavy Appliance | Docker Microservice | Runs on commodity hardware (sim) or QPU |
-
-## 🛠️ Operational Guide
-
-### For Blue Teams (Defense)
-
-**Scenario:** You need to protect a critical Kubernetes cluster from unknown ransomware variants.
-
-1.  **Deploy QZero Sensor:**
-    ```bash
-    docker run -d -p 8000:8000 --name qzero-sensor \
-      -v /var/log/netflow:/data \
-      thempra/qzero:latest
-    ```
-
-2.  **Ingest Traffic:**
-    QZero accepts NetFlow v9 or CSV exports from Wireshark/Tcpdump.
-    ```bash
-    curl -X POST http://localhost:8000/analyze -F "file=@traffic_dump.pcap"
-    ```
-
-3.  **Interpret Alerts:**
-    *   `SEVERITY: CRITICAL` - **Quantum Anomaly Score > 0.85**. High probability of non-standard encryption or exfiltration behavior.
-    *   `Action`: Isolate host immediately. This is likely a Zero-Day.
-
-### For Red Teams (Offense)
-
-**Scenario:** You are developing a stealth C2 implant and want to test if it triggers quantum anomaly detection.
-
-1.  **Baseline Mode:**
-    Run QZero against normal traffic to establish a baseline quantum state.
-
-2.  **Adversarial Testing:**
-    Replay your C2 traffic against the QZero engine.
-    ```bash
-    python scripts/replay_traffic.py --pcap my_stealth_c2.pcap --target qzero:8000
-    ```
-
-3.  **Evasion Analysis:**
-    Check the **Quantum Reconstruction Loss**. If your traffic generates a high loss, the QI-VAE (Quantum Variational Autoencoder) has successfully flagged your activity as anomalous.
-
-## 🏗️ Architecture for Deployment
-
-QZero is designed as a microservice API that integrates with existing security stacks (Splunk, ELK, Wazuh).
-
-```mermaid
-graph LR
-    A[Network Tap / Switch] -->|NetFlow| B(Logstash/Fluentd)
-    B -->|JSON Batch| C{QZero Engine}
-    C -->|Quantum Inference| D[QPU / Simulator]
-    C -->|Anomaly Score| E[SIEM Dashboard]
-    E -->|Alert| F[SOC Analyst]
-```
-
-## 📦 Installation (Docker)
-
-Get up and running in 2 minutes.
+## 🚀 Instalación
 
 ```bash
-# Clone the repository
-git clone https://github.com/thempra/qzero.git
+# Instalar en modo desarrollo
+pip install -e .
 
-# Build the container
-docker-compose up -d --build
-
-# Check status
-docker-compose ps
-# Name                Command              State           Ports
-# qzero-api       python app.py            Up      0.0.0.0:8000->8000/tcp
+# Requisitos de red para modo promiscuo
+sudo apt install tcpdump
 ```
 
-## 🔧 Configuration
+## 📖 Uso
 
-Edit `config.yaml` to tune sensitivity:
-
-```yaml
-detection:
-  model: "qivae" # Options: qsvm, qivae, hybrid
-  sensitivity: "high" # threshold: 0.85
-  backend: "aer_simulator" # Use 'ibm_brisbane' for real QPU
-```
-
-## 🤝 Enterprise & Research
-
-Originally developed for **MIT iQuHACK 2026**, QZero bridges the gap between Quantum Research and Cybersecurity Operations.
-
-**License**: MIT (Open Source Core)
-**Contact**: security@qzero.io
-
-## 💻 Command Line Interface
-
-### Batch Analysis
-
-Analyze multiple PCAP or log files at once:
-
+### CLI Principal
 ```bash
-# Analyze a single file
-python qzero-cli-batch.py -f suspicious.pcap --model qivae
+# Iniciar monitor en tiempo real
+qzero monitor --interface eth0 --promiscuous
 
-# Analyze multiple files with wildcards
-python qzero-cli-batch.py -f *.pcap --model classical
+# Analizar pcap
+qzero pcap --file capture.pcap
 
-# Custom parameters
-python qzero-cli-batch.py -f suspicious.pcap -n 32 -m 5000 --output results.json
+# Ejecutar detección
+qzero detect --mode real-time
 ```
 
-**Options:**
-- `-f, --files`: Input file(s) to analyze (supports wildcards: `*.pcap`)
-- `--model`: Model type (`qivae`, `classical`, `hybrid`)
-- `-n, --n-qubits`: Number of qubits for quantum models (default: 32)
-- `-m, --max-samples`: Maximum samples per file (default: 1000)
-- `-o, --output`: Output JSON file (default: `batch_results.json`)
-
-### Real-Time Detection
-
-Monitor network traffic in real-time:
-
+### Modo Promiscuo
 ```bash
-# NetFlow stream
-python qzero-cli.py detect --stream netflow --model qivae --max-samples 1000
+# Activar modo promiscuo en interfaz
+qzero interface --mode promiscuous --interface eth0
 
-# PCAP stream
-python qzero-cli.py detect --stream pcap --model classical --max-samples 500
-
-# Logs stream
-python qzero-cli.py detect --stream logs --model qivae --max-samples 100
+# Monitor promiscuo activo
+qzero monitor --promiscuous --interface eth0
 ```
 
+## 📁 Estructura
+
+```
+qzero/
+├── src/
+│   ├── cli/           # Interfaz de línea de comandos
+│   ├── core/          # Núcleo del sistema
+│   ├── interface/     # Interfaces de red
+│   ├── analysis/      # Módulos de análisis
+│   └── storage/       # Almacenamiento de datos
+├── data/              # Datos y PCAPs
+├── insights/          # Reportes y análisis
+├── cron/              # Scripts de cron
+└── reports/           # Reportes generados
+```
+
+## 🛡️ Seguridad
+
+- Modo promiscuo requiere privilegios elevados
+- Capturas de red se guardan en `data/raw/`
+- Análisis de PCAPs con Scapy
+- Integración con sistema de alertas
+
+## 📈 Métricas
+
+- Ratio de anomalías: X%
+- Calidad de datos: Y/100
+- Tendencia: UP/DOWN/STABLE
+- Alertas activas: N
+
+## 📝 Licencia
+
+MIT License - See LICENSE for details
+
+## 🤝 Contribuir
+
+Contribuciones son bienvenidas. Por favor, abre un issue o PR.

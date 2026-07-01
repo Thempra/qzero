@@ -1,0 +1,11 @@
+QZero Dependency Health Report
+==================================================
+
+Status: EXCELLENT
+Health Score: 80/100
+
+Packages Analysis:
+  Total: 32
+  Outdated: 4
+  Vulnerable: 0
+
