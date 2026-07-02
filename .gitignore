@@ -67,3 +67,19 @@ models/*.pt
 
 # Benchmark results
 results/*.json
+
+# Generated operational data (never commit these)
+anomaly-risk-reports/
+autonomous-logs/
+context-compressed/
+insights/
+insights-automation/
+backup/
+backups/
+reports/
+
+# Model artifacts
+models/
+*.pkl
+*.pt
+*.h5

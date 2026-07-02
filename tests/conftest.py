@@ -4,14 +4,9 @@ Shared pytest fixtures for QZero tests.
 
 import pytest
 import numpy as np
-import sys
-from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from preprocessing.data_loader import generate_synthetic_data, DataLoader
-from preprocessing.feature_engineering import FeatureEngineer
+from qzero.preprocessing.data_loader import generate_synthetic_data, DataLoader
+from qzero.preprocessing.feature_engineering import FeatureEngineer
 
 
 @pytest.fixture(scope="session")
