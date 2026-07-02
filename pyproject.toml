@@ -31,9 +31,12 @@ dependencies = [
 
 [project.scripts]
 qzero = "qzero.cli:main"
-qzero-monitor = "qzero.cli:main"
-qzero-pcap = "qzero.cli:main"
-qzero-detect = "qzero.cli:main"
+qzero-cli = "qzero.cli:main"
+qzero-analyze = "qzero.cli.analyzer:analyze_pcap"
+qzero-monitor = "qzero.cli.monitor:start_monitor"
+qzero-daemon = "qzero.daemons:run_daemon_tasks"
+qzero-train = "qzero.cli.trainer:train_model"
+qzero-daemons-run = "qzero.cli.daemons:run_daemon_tasks"
 
 [project.optional-dependencies]
 dev = [
