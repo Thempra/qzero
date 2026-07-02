@@ -4,7 +4,7 @@
 
 - **Path**: `/home/thempra/projects/qzero`
 - **Type**: Auto-generated README
-- **Generated**: 2026-03-04 17:05:50
+- **Generated**: 2026-03-04 18:04:59
 
 ## 📁 File Structure
 
@@ -18,9 +18,9 @@ qzero/
 
 ## 📊 Analysis
 
-- **Total Files**: 8991
-- **Python Files**: 80
-- **Data Files**: 5924
+- **Total Files**: 9006
+- **Python Files**: 81
+- **Data Files**: 5927
 
 ## 📦 Dependencies Detected
 
