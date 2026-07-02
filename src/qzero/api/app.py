@@ -2,11 +2,15 @@
 QZero REST API — FastAPI application.
 
 Endpoints:
-  GET  /           — API info
-  GET  /health     — Health check
-  GET  /models     — Loaded model status
-  GET  /stats      — Runtime statistics
-  POST /analyze    — Analyze a PCAP file
+  GET  /                 — API info
+  GET  /health           — Health check
+  GET  /models           — Loaded model status
+  GET  /stats            — Runtime statistics
+  POST /analyze          — Analyze a PCAP file
+  GET  /dashboard        — Real-time web dashboard (HTML)
+  WS   /ws               — WebSocket live data stream
+  POST /monitor/start    — Start real-time traffic monitoring
+  POST /monitor/stop     — Stop monitoring
 """
 
 import tempfile
@@ -14,14 +18,16 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 
 from .schemas import StatusResponse, AnalyzeResponse
+from .monitor import monitor_service
 
 logger = logging.getLogger(__name__)
 
-# Lazy import — Predictor is only needed at request time
 try:
     from ..core.predictor import QZeroPredictor
     PREDICTOR_AVAILABLE = True
@@ -54,20 +60,29 @@ app.add_middleware(
 )
 
 
+# ── Root ─────────────────────────────────────────────────────────────────────
+
 @app.get("/")
 async def root():
     return {
         "name": "QZero API",
         "version": "3.0.0",
         "status": "operational" if PREDICTOR_AVAILABLE else "degraded",
+        "dashboard": "/dashboard",
         "endpoints": {
-            "POST /analyze": "Analyze a PCAP file",
-            "GET /health": "Health check",
-            "GET /models": "Model status",
-            "GET /stats": "Runtime statistics",
+            "GET  /dashboard":      "Real-time web dashboard",
+            "WS   /ws":            "WebSocket live data stream",
+            "POST /analyze":        "Analyze a PCAP file",
+            "GET  /health":         "Health check",
+            "GET  /models":         "Model status",
+            "GET  /stats":          "Runtime statistics",
+            "POST /monitor/start":  "Start live monitoring",
+            "POST /monitor/stop":   "Stop live monitoring",
         },
     }
 
+
+# ── Health ────────────────────────────────────────────────────────────────────
 
 @app.get("/health", response_model=StatusResponse)
 async def health():
@@ -78,6 +93,8 @@ async def health():
         message="ready" if fitted else "not_trained",
     )
 
+
+# ── Models ────────────────────────────────────────────────────────────────────
 
 @app.get("/models")
 async def get_models():
@@ -98,6 +115,8 @@ async def get_models():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ── Analyze PCAP ──────────────────────────────────────────────────────────────
+
 @app.post("/analyze", response_model=AnalyzeResponse)
 async def analyze_pcap(
     file: UploadFile = File(...),
@@ -111,11 +130,9 @@ async def analyze_pcap(
             tmp.write(await file.read())
 
         predictor = _get_predictor()
-
         from ..core.detector import NetworkTrafficAnalyzer
         analyzer = NetworkTrafficAnalyzer(predictor=predictor)
         result = analyzer.analyze(tmp_path, method=method)
-
         return result
 
     except HTTPException:
@@ -127,6 +144,8 @@ async def analyze_pcap(
         if tmp_path:
             Path(tmp_path).unlink(missing_ok=True)
 
+
+# ── Stats ─────────────────────────────────────────────────────────────────────
 
 @app.get("/stats")
 async def get_stats():
@@ -147,6 +166,73 @@ async def get_stats():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ── Dashboard ─────────────────────────────────────────────────────────────────
+
+_DASHBOARD_HTML: Optional[str] = None
+
+def _load_dashboard_html() -> str:
+    global _DASHBOARD_HTML
+    if _DASHBOARD_HTML is None:
+        html_path = Path(__file__).parent / "dashboard.html"
+        _DASHBOARD_HTML = html_path.read_text(encoding="utf-8")
+    return _DASHBOARD_HTML
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard():
+    """Serve the real-time monitoring dashboard."""
+    return HTMLResponse(content=_load_dashboard_html())
+
+
+# ── WebSocket ─────────────────────────────────────────────────────────────────
+
+@app.websocket("/ws")
+async def websocket_endpoint(ws: WebSocket):
+    await monitor_service.connect(ws)
+    try:
+        while True:
+            # Keep connection alive; client doesn't send data
+            await ws.receive_text()
+    except WebSocketDisconnect:
+        monitor_service.disconnect(ws)
+    except Exception:
+        monitor_service.disconnect(ws)
+
+
+# ── Monitor control ───────────────────────────────────────────────────────────
+
+class MonitorStartRequest(BaseModel):
+    interface: str = "eth0"
+    promiscuous: bool = False
+    interval: float = 5.0
+
+
+@app.post("/monitor/start")
+async def monitor_start(req: MonitorStartRequest):
+    """Start the real-time traffic monitoring loop."""
+    if monitor_service.is_running:
+        return {"status": "already_running", "interface": req.interface}
+
+    predictor = _get_predictor()
+    monitor_service.configure(
+        predictor=predictor,
+        interface=req.interface,
+        promiscuous=req.promiscuous,
+        interval=req.interval,
+    )
+    monitor_service.start()
+    return {"status": "started", "interface": req.interface, "interval": req.interval}
+
+
+@app.post("/monitor/stop")
+async def monitor_stop():
+    """Stop the monitoring loop."""
+    monitor_service.stop()
+    return {"status": "stopped"}
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def create_app() -> FastAPI:
     """Return the FastAPI application instance."""

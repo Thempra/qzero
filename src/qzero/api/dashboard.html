@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QZero — Quantum Threat Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:        #0b0e1a;
+      --surface:   #141824;
+      --border:    #1e2537;
+      --accent:    #4f8ef7;
+      --accent2:   #a78bfa;
+      --danger:    #ef4444;
+      --warn:      #f59e0b;
+      --ok:        #22c55e;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --critical:  #ef4444;
+      --high:      #f97316;
+      --medium:    #f59e0b;
+      --low:       #22c55e;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      height: 56px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: 0.03em;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .ws-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .ws-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.3s;
+    }
+
+    .ws-dot.connected    { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+    .ws-dot.disconnected { background: var(--danger); }
+
+    .btn {
+      padding: 6px 16px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+
+    .btn-primary { background: var(--accent);  color: #fff; }
+    .btn-danger  { background: var(--danger);  color: #fff; }
+    .btn-neutral { background: var(--border);  color: var(--text); }
+
+    /* ── Layout ── */
+    .page { padding: 20px 24px; display: flex; flex-direction: column; gap: 20px; }
+
+    /* ── Stat cards ── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+    }
+
+    .stat-card .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .stat-card .value {
+      font-size: 32px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .stat-card .sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .stat-card.danger .value { color: var(--danger); }
+    .stat-card.warn  .value { color: var(--warn); }
+    .stat-card.ok    .value { color: var(--ok); }
+    .stat-card.blue  .value { color: var(--accent); }
+
+    /* ── Charts row ── */
+    .charts-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .charts-row { grid-template-columns: 1fr; }
+    }
+
+    .chart-card { height: 260px; position: relative; }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title .badge {
+      background: var(--border);
+      border-radius: 4px;
+      padding: 1px 7px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted);
+    }
+
+    /* ── Controls ── */
+    .controls-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .form-group label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .form-group input[type="text"],
+    .form-group input[type="number"] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 6px 10px;
+      font-size: 13px;
+      width: 120px;
+    }
+
+    .form-group input:focus { outline: 1px solid var(--accent); }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 16px;
+    }
+
+    .checkbox-group input { accent-color: var(--accent); cursor: pointer; }
+    .checkbox-group label { cursor: pointer; font-size: 13px; }
+
+    /* ── Alerts table ── */
+    .alerts-card { max-height: 340px; overflow: hidden; display: flex; flex-direction: column; }
+
+    .table-wrap { overflow-y: auto; flex: 1; }
+
+    table { width: 100%; border-collapse: collapse; }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: var(--surface);
+      padding: 8px 10px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.1s;
+    }
+
+    tbody tr:hover { background: rgba(255,255,255,0.03); }
+
+    tbody td {
+      padding: 8px 10px;
+      font-size: 12px;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    .sev {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+    }
+
+    .sev.CRITICAL { background: rgba(239,68,68,0.15);  color: var(--critical); }
+    .sev.HIGH     { background: rgba(249,115,22,0.15); color: var(--high); }
+    .sev.MEDIUM   { background: rgba(245,158,11,0.15); color: var(--warn); }
+    .sev.LOW      { background: rgba(34,197,94,0.15);  color: var(--ok); }
+
+    .score-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .score-bar .track {
+      width: 60px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .score-bar .fill {
+      height: 100%;
+      border-radius: 2px;
+      background: var(--accent);
+    }
+
+    /* ── Model info ── */
+    .model-card { display: flex; flex-direction: column; gap: 12px; }
+
+    .model-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .model-row:last-child { border-bottom: none; }
+
+    .model-row .name { font-weight: 500; }
+    .model-row .status { font-size: 12px; }
+    .model-row .status.on  { color: var(--ok); }
+    .model-row .status.off { color: var(--muted); }
+
+    /* ── Bottom row ── */
+    .bottom-row {
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .bottom-row { grid-template-columns: 1fr; }
+    }
+
+    /* ── Empty state ── */
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      padding: 32px;
+      font-size: 13px;
+    }
+
+    /* ── Pulse animation for running indicator ── */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
+
+    .pulse { animation: pulse 1.5s ease-in-out infinite; }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══════════════════════════════════════════════════════════ -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚛</div>
+    QZero
+    <span style="font-size:12px;font-weight:400;color:var(--muted)">Quantum Threat Dashboard</span>
+  </div>
+
+  <div class="header-right">
+    <div class="ws-status">
+      <div class="ws-dot disconnected" id="wsDot"></div>
+      <span id="wsLabel">Connecting…</span>
+    </div>
+    <span id="uptimeLabel" style="font-size:12px;color:var(--muted)">Uptime: 0s</span>
+  </div>
+</header>
+
+<!-- ═══ PAGE ══════════════════════════════════════════════════════════════ -->
+<div class="page">
+
+  <!-- Controls -->
+  <div class="card controls-card">
+    <div class="form-group">
+      <label>Interface</label>
+      <input type="text" id="inputIface" value="eth0" />
+    </div>
+    <div class="form-group">
+      <label>Interval (s)</label>
+      <input type="number" id="inputInterval" value="5" min="1" max="60" />
+    </div>
+    <div class="checkbox-group">
+      <input type="checkbox" id="inputPromisc" />
+      <label for="inputPromisc">Promiscuous mode</label>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;">
+      <button class="btn btn-primary" id="btnStart" onclick="startMonitor()">Start Monitoring</button>
+      <button class="btn btn-danger"  id="btnStop"  onclick="stopMonitor()" disabled>Stop</button>
+    </div>
+    <div id="monitorStatus" style="font-size:12px;color:var(--muted)"></div>
+  </div>
+
+  <!-- Stat cards -->
+  <div class="stats-row">
+    <div class="card stat-card blue">
+      <div class="label">Total Packets</div>
+      <div class="value" id="statPackets">0</div>
+      <div class="sub" id="statPps">0 pkt/s</div>
+    </div>
+    <div class="card stat-card danger">
+      <div class="label">Anomalies Detected</div>
+      <div class="value" id="statAnomalies">0</div>
+      <div class="sub">cumulative</div>
+    </div>
+    <div class="card stat-card warn">
+      <div class="label">Anomaly Rate</div>
+      <div class="value" id="statRate">0%</div>
+      <div class="sub">current window</div>
+    </div>
+    <div class="card stat-card ok">
+      <div class="label">Monitor Status</div>
+      <div class="value" id="statStatus" style="font-size:18px">IDLE</div>
+      <div class="sub" id="statIface">—</div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-row">
+    <div class="card chart-card">
+      <div class="card-title">
+        Anomaly Rate (%)
+        <span class="badge" id="liveTag">LIVE</span>
+      </div>
+      <canvas id="chartRate" style="max-height:195px"></canvas>
+    </div>
+    <div class="card chart-card">
+      <div class="card-title">Throughput (pkt/s)</div>
+      <canvas id="chartPps" style="max-height:195px"></canvas>
+    </div>
+  </div>
+
+  <!-- Bottom row: alerts + model info -->
+  <div class="bottom-row">
+
+    <!-- Alerts feed -->
+    <div class="card alerts-card">
+      <div class="card-title">
+        Live Alerts
+        <span class="badge" id="alertCount">0</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Severity</th>
+              <th>Source</th>
+              <th>Destination</th>
+              <th>Proto</th>
+              <th>Score</th>
+              <th>Size</th>
+            </tr>
+          </thead>
+          <tbody id="alertsBody">
+            <tr><td colspan="7" class="empty">No alerts yet — start monitoring</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Model info -->
+    <div class="card model-card">
+      <div class="card-title">Model Status</div>
+      <div class="model-row">
+        <span class="name">QSVM</span>
+        <span class="status off" id="mQsvm">disabled</span>
+      </div>
+      <div class="model-row">
+        <span class="name">QI-VAE</span>
+        <span class="status off" id="mQivae">disabled</span>
+      </div>
+      <div class="model-row">
+        <span class="name">Qubits</span>
+        <span id="mQubits" style="font-size:13px">—</span>
+      </div>
+      <div class="model-row">
+        <span class="name">Fitted</span>
+        <span class="status off" id="mFitted">no</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ JAVASCRIPT ════════════════════════════════════════════════════════ -->
+<script>
+  // ── WebSocket ────────────────────────────────────────────────────────────
+  let ws = null;
+  let reconnectTimer = null;
+
+  const PROTO = location.protocol === 'https:' ? 'wss' : 'ws';
+  const WS_URL = `${PROTO}://${location.host}/ws`;
+
+  function connect() {
+    ws = new WebSocket(WS_URL);
+
+    ws.onopen = () => {
+      setWsStatus(true);
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    };
+
+    ws.onclose = () => {
+      setWsStatus(false);
+      reconnectTimer = setTimeout(connect, 3000);
+    };
+
+    ws.onerror = () => ws.close();
+
+    ws.onmessage = (ev) => {
+      try { handleMessage(JSON.parse(ev.data)); }
+      catch(e) { console.error('Parse error', e); }
+    };
+  }
+
+  function setWsStatus(connected) {
+    document.getElementById('wsDot').className = 'ws-dot ' + (connected ? 'connected' : 'disconnected');
+    document.getElementById('wsLabel').textContent = connected ? 'Connected' : 'Reconnecting…';
+  }
+
+  // ── Data handler ─────────────────────────────────────────────────────────
+  function handleMessage(msg) {
+    if (msg.type !== 'snapshot') return;
+
+    const { stats, alerts, history, model } = msg;
+
+    // Stats cards
+    document.getElementById('statPackets').textContent   = fmt(stats.total_packets);
+    document.getElementById('statAnomalies').textContent = fmt(stats.total_anomalies);
+    document.getElementById('statRate').textContent      = stats.anomaly_rate.toFixed(1) + '%';
+    document.getElementById('statPps').textContent       = stats.packets_per_sec + ' pkt/s';
+    document.getElementById('statStatus').textContent    = stats.running ? '▶ LIVE' : 'IDLE';
+    document.getElementById('statIface').textContent     =
+      stats.running ? `${stats.interface}${stats.promiscuous ? ' (promisc)' : ''}` : '—';
+    document.getElementById('uptimeLabel').textContent   =
+      'Uptime: ' + fmtTime(stats.uptime_seconds);
+
+    // Rate color
+    const rateEl = document.getElementById('statRate');
+    rateEl.style.color = stats.anomaly_rate > 20 ? 'var(--danger)'
+                       : stats.anomaly_rate > 5  ? 'var(--warn)'
+                       : 'var(--ok)';
+
+    // Charts
+    updateChart(rateChart,  history.labels, history.anomaly_rate);
+    updateChart(ppsChart,   history.labels, history.pps);
+
+    // Model info
+    setModelStatus('mQsvm',  model.qsvm,   model.fitted);
+    setModelStatus('mQivae', model.qivae,  model.fitted);
+    document.getElementById('mQubits').textContent = model.n_qubits || '—';
+    const fEl = document.getElementById('mFitted');
+    fEl.textContent = model.fitted ? 'yes' : 'no';
+    fEl.className   = 'status ' + (model.fitted ? 'on' : 'off');
+
+    // Alerts
+    renderAlerts(alerts);
+  }
+
+  function setModelStatus(id, enabled, fitted) {
+    const el = document.getElementById(id);
+    if (!fitted)   { el.textContent = 'not loaded'; el.className = 'status off'; }
+    else if (!enabled) { el.textContent = 'disabled'; el.className = 'status off'; }
+    else           { el.textContent = 'active';   el.className = 'status on'; }
+  }
+
+  // ── Alerts table ─────────────────────────────────────────────────────────
+  const PROTO_NAMES = { 1:'ICMP', 6:'TCP', 17:'UDP' };
+
+  function renderAlerts(alerts) {
+    document.getElementById('alertCount').textContent = alerts.length;
+    const body = document.getElementById('alertsBody');
+    if (!alerts.length) {
+      body.innerHTML = '<tr><td colspan="7" class="empty">No anomalies detected</td></tr>';
+      return;
+    }
+    body.innerHTML = alerts.slice(0, 50).map(a => {
+      const pname = PROTO_NAMES[a.protocol] || a.protocol;
+      const pct   = Math.round(a.anomaly_score * 100);
+      const color = a.severity === 'CRITICAL' ? 'var(--critical)'
+                  : a.severity === 'HIGH'     ? 'var(--high)'
+                  : a.severity === 'MEDIUM'   ? 'var(--warn)'
+                  : 'var(--ok)';
+      return `<tr>
+        <td>${a.timestamp}</td>
+        <td><span class="sev ${a.severity}">${a.severity}</span></td>
+        <td>${a.src}</td>
+        <td>${a.dst}</td>
+        <td>${pname}</td>
+        <td>
+          <div class="score-bar">
+            <div class="track"><div class="fill" style="width:${pct}%;background:${color}"></div></div>
+            <span style="color:${color}">${a.anomaly_score.toFixed(3)}</span>
+          </div>
+        </td>
+        <td>${a.size}B</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── Charts ───────────────────────────────────────────────────────────────
+  const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    interaction: { intersect: false, mode: 'index' },
+    plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1e2537', titleColor: '#e2e8f0', bodyColor: '#94a3b8' } },
+    scales: {
+      x: { ticks: { color: '#64748b', maxTicksLimit: 8, maxRotation: 0 }, grid: { color: '#1e2537' } },
+      y: { ticks: { color: '#64748b' }, grid: { color: '#1e2537' }, beginAtZero: true },
+    },
+  };
+
+  function makeChart(id, color, label, fill = true) {
+    return new Chart(document.getElementById(id), {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label,
+          data: [],
+          borderColor: color,
+          backgroundColor: fill ? color + '22' : 'transparent',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.4,
+          fill: fill,
+        }]
+      },
+      options: { ...chartDefaults },
+    });
+  }
+
+  const rateChart = makeChart('chartRate', '#ef4444', 'Anomaly Rate %');
+  const ppsChart  = makeChart('chartPps',  '#4f8ef7', 'Packets/s', false);
+
+  function updateChart(chart, labels, values) {
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = values;
+    chart.update('none');
+  }
+
+  // ── Monitor controls ─────────────────────────────────────────────────────
+  async function startMonitor() {
+    const iface    = document.getElementById('inputIface').value.trim() || 'eth0';
+    const interval = parseInt(document.getElementById('inputInterval').value) || 5;
+    const promisc  = document.getElementById('inputPromisc').checked;
+
+    setStatus('Starting…');
+    try {
+      const res = await fetch('/monitor/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interface: iface, interval, promiscuous: promisc }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Unknown error');
+      setStatus('Running on ' + iface);
+      document.getElementById('btnStart').disabled = true;
+      document.getElementById('btnStop').disabled  = false;
+    } catch (e) {
+      setStatus('Error: ' + e.message, true);
+    }
+  }
+
+  async function stopMonitor() {
+    setStatus('Stopping…');
+    try {
+      await fetch('/monitor/stop', { method: 'POST' });
+      setStatus('Stopped');
+      document.getElementById('btnStart').disabled = false;
+      document.getElementById('btnStop').disabled  = true;
+    } catch (e) {
+      setStatus('Error: ' + e.message, true);
+    }
+  }
+
+  function setStatus(msg, isError = false) {
+    const el = document.getElementById('monitorStatus');
+    el.textContent = msg;
+    el.style.color = isError ? 'var(--danger)' : 'var(--muted)';
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  function fmt(n) { return n >= 1e6 ? (n/1e6).toFixed(1)+'M' : n >= 1e3 ? (n/1e3).toFixed(1)+'K' : String(n); }
+  function fmtTime(s) {
+    s = Math.floor(s);
+    if (s < 60)   return s + 's';
+    if (s < 3600) return Math.floor(s/60) + 'm ' + (s%60) + 's';
+    return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
+  }
+
+  // ── Boot ─────────────────────────────────────────────────────────────────
+  connect();
+</script>
+</body>
+</html>
