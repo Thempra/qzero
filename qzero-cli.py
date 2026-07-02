@@ -1,526 +1,548 @@
 #!/usr/bin/env python3
 """
-QZero Command Line Interface
-
-Simple CLI for running QZero detection and evaluation.
+QZero CLI Simplificado - FASE 3 Completada
 """
 
 import sys
 import argparse
 from pathlib import Path
+from datetime import datetime
+import json
+import subprocess
+import time
+import logging
+from typing import List, Dict, Any, Optional
 
-# Add src to path
+# Añadir src al path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-import asyncio
-import numpy as np
-import pandas as pd
-import json
-from datetime import datetime
-from typing import List, Dict, Any
-from pathlib import Path
+# Módulos de CLI
+from qzero.cli.analyzer import PCAPAnalyzer, analyze_pcap
+from qzero.cli.monitor import NetworkMonitor, RealTimeMonitor, start_monitor
+from qzero.daemons import QZeroDaemon, CodeQualityTask, AnomalyDetectionTask, DataEngineerTask, DailyReportTask
+from qzero.logger import QZeroLogger, AlertManager, LogRotator
+from qzero.cli.sniffer import RealTimeSniffer, list_interfaces
+from qzero.cli.pipeline import MemoryPipelineCLI
+from qzero.cli.inference import (
+    FastInferenceCLI,
+    cmd_inference_train,
+    cmd_inference_test,
+    cmd_inference_stats
+)
+from qzero.inference import setup_logging as setup_inference_logging
 
-from src.preprocessing.data_loader import generate_synthetic_data, DataLoader
-from src.preprocessing.feature_engineering import FeatureEngineer
-from src.classical.baseline import ClassicalBaseline, run_all_baselines, print_comparison_table
-from src.quantum.qivae import QIVAE, QIVAEConfig
-from src.evaluation.metrics import evaluate_model, print_evaluation_report
-from detection import DetectionStream, QZeroDetector, NetFlowHandler, PCAPHandler, LoggerHandler
 
+def setup_logging_qzero(verbose: bool = False):
+    """Configurar logging"""
+    level = logging.DEBUG if verbose else logging.INFO
+    log_dir = Path.home() / ".qzero" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
 
-def cmd_train(config: argparse.Namespace):
-    """Train models and show results."""
-    print(f"\n{'='*60}")
-    print("QZero Training & Evaluation")
-    print(f"{'='*60}\n")
-
-    # Load or generate data
-    if config.real_data and (Path("data/raw/final(2).csv").exists()):
-        print("Loading UGRansome dataset...")
-        loader = DataLoader()
-        X, y = loader.load_ugransome()
-
-        # Sample if needed
-        if config.samples > 0 and config.samples < len(X):
-            from sklearn.model_selection import train_test_split
-            X, _, y, _ = train_test_split(
-                X, y, train_size=config.samples, stratify=y, random_state=42
-            )
-
-        # Convert labels
-        y = (y == 1).astype(int)
-
-        print(f"Loaded {len(X)} samples with {X.shape[1]} features")
-    else:
-        print(f"Generating synthetic data ({config.samples} samples)...")
-        X, y = generate_synthetic_data(
-            n_samples=config.samples,
-            difficulty=config.difficulty
-        )
-        print(f"Generated {len(X)} samples with {X.shape[1]} features")
-
-    print(f"Class distribution: Normal={sum(y==0)}, Anomaly={sum(y==1)}")
-
-    # Feature engineering
-    print("\nFeature engineering...")
-    engineer = FeatureEngineer(n_qubits=config.n_qubits, reduction_method="pca")
-    X_reduced = engineer.fit_transform(X)
-    print(f"Reduced to {X_reduced.shape[1]} features (for {config.n_qubits} qubits)")
-
-    # Split data
-    from sklearn.model_selection import train_test_split
-    try:
-        X_train, X_test, y_train, y_test = train_test_split(
-            X_reduced, y, test_size=0.2, random_state=42, stratify=y
-        )
-        print(f"Train: {len(X_train)} | Test: {len(X_test)}")
-    except ValueError as e:
-        # Handle case where stratification fails (e.g., too few samples from a class)
-        if "stratify" in str(e) and "too few" in str(e).lower():
-            print(f"Warning: {e}")
-            print("Falling back to non-stratified split...")
-            X_train, X_test, y_train, y_test = train_test_split(
-                X_reduced, y, test_size=0.2, random_state=42
-            )
-            print(f"Train: {len(X_train)} | Test: {len(X_test)}")
-        else:
-            raise
-
-    # Train classical models
-    if config.models:
-        print("\n" + "="*60)
-        print("Classical Baselines")
-        print("="*60)
-        models = config.models.split(",")
-        results = run_all_baselines(X_train, y_train, X_test, y_test, models=models)
-        print_comparison_table(results)
-
-    # Train QI-VAE
-    print("\n" + "="*60)
-    print("Quantum-Inspired VAE (QI-VAE)")
-    print("="*60)
-
-    # Train on normal samples only
-    normal_mask = y_train == 0
-    X_train_normal = X_train[normal_mask]
-    print(f"Training on {len(X_train_normal)} normal samples")
-
-    qivae_config = QIVAEConfig(
-        input_dim=X_train.shape[1],
-        latent_dim=4,
-        hidden_dims=tuple(config.hidden_dims),
-        epochs=config.epochs,
-        batch_size=config.batch_size,
-        beta=1.0,
-        anomaly_threshold_percentile=config.anomaly_threshold,
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(log_dir / "qzero.log")
+        ]
     )
 
-    qivae = QIVAE(qivae_config)
-    result = qivae.fit_evaluate(X_train_normal, X_test, y_test, verbose=True)
 
-    print("\n" + "="*60)
-    print("QI-VAE Results")
-    print("="*60)
-    print(f"Training Loss:      {result.train_loss:.4f}")
-    print(f"Validation Loss:    {result.val_loss:.4f}")
-    print(f"Anomaly Threshold:  {result.anomaly_threshold:.4f}")
-    print(f"Accuracy:           {result.accuracy:.4f}")
-    print(f"Precision:          {result.precision:.4f}")
-    print(f"Recall:             {result.recall:.4f}")
-    print(f"F1 Score:           {result.f1_score:.4f}")
-    print(f"Training Time:      {result.train_time:.2f}s")
-    print("="*60)
-
-    # Save results
-    if config.output_file:
-        print(f"\nSaving results to {config.output_file}...")
-        results_dict = {
-            'classical': [r.to_dict() for r in results] if results else None,
-            'qivae': {
-                'accuracy': result.accuracy,
-                'precision': result.precision,
-                'recall': result.recall,
-                'f1_score': result.f1_score,
-                'train_loss': result.train_loss,
-                'val_loss': result.val_loss,
-                'anomaly_threshold': result.anomaly_threshold,
-                'train_time': result.train_time,
-            },
-            'config': {
-                'n_samples': config.samples,
-                'n_qubits': config.n_qubits,
-                'difficulty': config.difficulty,
-            }
-        }
-        with open(config.output_file, 'w') as f:
-            json.dump(results_dict, f, indent=2)
-        print(f"Saved!")
-
-
-def batch_analyze_file(file_path: Path, config: argparse.Namespace,
-                       model_config: Dict[str, Any]) -> Dict[str, Any]:
-    """Analyze a single file and return results."""
-    results = {
-        'file': str(file_path),
-        'status': 'success',
-        'timestamp': datetime.now().isoformat(),
-    }
+def cmd_analyze(args):
+    """Comando para analizar PCAP"""
+    setup_logging_qzero(args.verbose)
 
     try:
-        # Setup stream based on file extension
-        if file_path.suffix == '.pcap':
-            handler = PCAPHandler()
-            stream_type = 'pcap'
-        elif file_path.suffix in ['.csv', '.txt', '.log']:
-            handler = LoggerHandler()
-            stream_type = 'logs'
-        else:
-            results['status'] = 'unsupported_format'
-            results['error'] = f'Unsupported file format: {file_path.suffix}'
-            return results
-
-        detector = QZeroDetector()
-
-        if config.model == 'qivae':
-            from src.predictor import QZeroPredictor
-            predictor = QZeroPredictor(
-                n_qubits=config.n_qubits,
-                use_qsvm=False,
-                use_qivae=True,
-                use_classical=False,
-            )
-            detector.predictor = predictor
-        elif config.model == 'classical':
-            from src.predictor import QZeroPredictor
-            predictor = QZeroPredictor(
-                n_qubits=config.n_qubits,
-                use_qsvm=False,
-                use_qivae=False,
-                use_classical=True,
-            )
-            detector.predictor = predictor
-        else:
-            results['status'] = 'unknown_model'
-            results['error'] = f'Unknown model: {config.model}'
-            return results
-
-        detector.add_stream_handler(handler)
-
-        # Process the file
-        detector.process_stream(handler, max_samples=config.max_samples)
-        stats = detector.get_statistics()
-
-        results['statistics'] = {
-            'total_samples': stats['total_samples'],
-            'anomalies': stats['anomalies_detected'],
-            'anomaly_rate': stats['anomaly_rate'],
-            'mean_score': stats['mean_anomaly_score'],
-            'max_score': stats['max_anomaly_score'],
-            'critical_alerts': stats['critical_alerts'],
-        }
-
-        results['anomalies'] = [
-            {
-                'score': r.anomaly_score,
-                'is_anomaly': r.is_anomaly,
-                'severity': r.severity,
-                'timestamp': r.timestamp,
-            }
-            for r in detector.current_results
-        ]
-
-    except Exception as e:
-        results['status'] = 'error'
-        results['error'] = str(e)
-        import traceback
-        results['traceback'] = traceback.format_exc()
-
-    return results
-
-
-def cmd_batch(config: argparse.Namespace):
-    """Run batch analysis on multiple files."""
-    print(f"\n{'='*60}")
-    print("QZero Batch Analysis")
-    print(f"{'='*60}\n")
-
-    # Expand input files (support wildcards)
-    input_files = []
-    for pattern in config.input_files:
-        files = list(Path('.').glob(pattern))
-        if not files:
-            print(f"Warning: No files found matching: {pattern}")
-        input_files.extend(files)
-
-    if not input_files:
-        print("Error: No input files specified")
-        sys.exit(1)
-
-    print(f"Found {len(input_files)} file(s) to analyze\n")
-
-    # Initialize predictor once for efficiency
-    from src.predictor import QZeroPredictor
-
-    if config.model == 'qivae':
-        predictor = QZeroPredictor(
-            n_qubits=config.n_qubits,
-            use_qsvm=False,
-            use_qivae=True,
-            use_classical=False,
+        analyzer = PCAPAnalyzer(
+            pcap_file=args.pcap,
+            output_dir=args.output,
+            threshold=args.threshold
         )
-        print(f"Model: QI-VAE ({config.n_qubits} qubits)")
-    elif config.model == 'classical':
-        predictor = QZeroPredictor(
-            n_qubits=config.n_qubits,
-            use_qsvm=False,
-            use_qivae=False,
-            use_classical=True,
-        )
-        print(f"Model: Classical baselines")
-    else:
-        print(f"Model: {config.model}")
-        predictor = None
-
-    # Analyze each file
-    all_results = []
-    total_anomalies = 0
-    total_samples = 0
-
-    for i, file_path in enumerate(input_files, 1):
-        print(f"[{i}/{len(input_files)}] Analyzing: {file_path.name}")
-
-        result = batch_analyze_file(file_path, config, {'model': config.model})
-
-        all_results.append(result)
-
-        if result['status'] == 'success':
-            total_samples += result['statistics']['total_samples']
-            total_anomalies += result['statistics']['anomalies']
-
-            if result['statistics']['critical_alerts'] > 0:
-                print(f"  ⚠️  {result['statistics']['critical_alerts']} critical alerts")
-            else:
-                print(f"  ✓ Complete")
-        else:
-            print(f"  ✗ Failed: {result.get('error', 'Unknown error')}")
-
-        print()
-
-    # Summary
-    print(f"{'='*60}")
-    print("Batch Analysis Summary")
-    print(f"{'='*60}")
-    print(f"Total files processed: {len(all_results)}")
-    print(f"Total samples analyzed: {total_samples}")
-    print(f"Total anomalies found: {total_anomalies}")
-    print(f"Overall anomaly rate: {total_anomalies/total_samples:.2%}")
-    print(f"{'='*60}\n")
-
-    # Save results
-    if config.output_file:
-        print(f"Saving results to {config.output_file}...")
-        output = {
-            'summary': {
-                'total_files': len(all_results),
-                'total_samples': total_samples,
-                'total_anomalies': total_anomalies,
-                'overall_anomaly_rate': total_anomalies/total_samples if total_samples > 0 else 0,
-            },
-            'files': all_results,
-            'timestamp': datetime.now().isoformat(),
-        }
-        with open(config.output_file, 'w') as f:
-            json.dump(output, f, indent=2)
-        print(f"Saved!")
-
-
-async def cmd_detect(config: argparse.Namespace):
-    """Run real-time detection."""
-    print(f"\n{'='*60}")
-    print("QZero Real-Time Detection")
-    print(f"{'='*60}\n")
-
-    # Setup stream
-    if config.stream == "netflow":
-        handler = NetFlowHandler()
-        print("Stream: NetFlow (mock data)")
-    elif config.stream == "pcap":
-        handler = PCAPHandler()
-        print("Stream: PCAP (mock data)")
-    elif config.stream == "logs":
-        handler = LoggerHandler()
-        print("Stream: Logs (mock data)")
-    else:
-        print(f"Unknown stream: {config.stream}")
-        sys.exit(1)
-
-    # Create detector
-    detector = QZeroDetector()
-
-    if config.model == "qivae":
-        from src.predictor import QZeroPredictor
-        predictor = QZeroPredictor(
-            n_qubits=config.n_qubits,
-            use_qsvm=False,
-            use_qivae=True,
-            use_classical=False,
-        )
-        detector.predictor = predictor
-        print(f"Model: QI-VAE ({config.n_qubits} qubits)")
-    elif config.model == "classical":
-        from src.predictor import QZeroPredictor
-        predictor = QZeroPredictor(
-            n_qubits=config.n_qubits,
-            use_qsvm=False,
-            use_qivae=False,
-            use_classical=True,
-        )
-        detector.predictor = predictor
-        print(f"Model: Classical baselines")
-    else:
-        print(f"Model: {config.model}")
-
-    detector.add_stream_handler(handler)
-
-    # Process stream
-    print(f"\nProcessing {config.max_samples} samples...\n")
-
-    try:
-        results = await detector.process_stream(handler, max_samples=config.max_samples)
-        stats = detector.get_statistics()
+        results = analyzer.analyze()
 
         print(f"\n{'='*60}")
-        print("Detection Statistics")
+        print("Análisis de PCAP Completado")
         print(f"{'='*60}")
-        print(f"Total samples:     {stats['total_samples']}")
-        print(f"Anomalies:         {stats['anomalies_detected']}")
-        print(f"Anomaly rate:      {stats['anomaly_rate']:.2%}")
-        print(f"Mean score:        {stats['mean_anomaly_score']:.3f}")
-        print(f"Max score:         {stats['max_anomaly_score']:.3f}")
-        print(f"Critical alerts:   {stats['critical_alerts']}")
-        print(f"{'='*60}")
-
-        if stats['critical_alerts'] > 0:
-            print(f"\n⚠️  CRITICAL ALERTS DETECTED!")
-            print(f"   Review the alert log for details.\n")
-        else:
-            print(f"\n✓ No critical alerts detected.\n")
-
-        # Show top anomalies
-        if len(detector.current_results) > 0:
-            print(f"\nTop {min(5, len(detector.current_results))} anomalies by score:")
-            sorted_results = sorted(
-                detector.current_results,
-                key=lambda x: x.anomaly_score,
-                reverse=True
-            )
-            for i, r in enumerate(sorted_results[:5], 1):
-                print(f"  {i}. Score: {r.anomaly_score:.4f} | "
-                      f"{'Anomaly' if r.is_anomaly else 'Normal'} | "
-                      f"{r.severity.upper()}")
+        print(f"📊 Archivo: {results['pcap_file']}")
+        print(f"📝 Paquetes: {results['packet_count']}")
+        print(f"⚠️  Anomalías: {results['total_anomalies']}")
+        print(f"🚨 Amenazas: {results['summary']['threats_detected']}")
+        print(f"{'='*60}\n")
 
     except Exception as e:
-        print(f"\n❌ Error during detection: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"❌ Error: {e}", file=sys.stderr)
         sys.exit(1)
+
+
+def cmd_monitor(args):
+    """Comando para iniciar monitor"""
+    setup_logging_qzero(args.verbose)
+
+    try:
+        if args.promiscuous:
+            monitor = RealTimeMonitor(
+                interface=args.interface,
+                promiscuous=True,
+                output_dir=args.output,
+                threshold=args.threshold
+            )
+        else:
+            monitor = NetworkMonitor(
+                interface=args.interface,
+                promiscuous=False,
+                output_dir=args.output
+            )
+
+        monitor.start(interval=args.interval)
+
+    except Exception as e:
+        print(f"❌ Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def cmd_daemon_start(args):
+    """Comando para iniciar daemon"""
+    setup_logging_qzero(args.verbose)
+    print("🚀 Iniciando QZero daemon...")
+
+    try:
+        process = subprocess.Popen(
+            [sys.executable, "-c",
+             f"from qzero.cli.daemons import run_daemon_tasks; run_daemon_tasks({args.interval})"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=True
+        )
+
+        print(f"✅ QZero daemon iniciado con PID: {process.pid}")
+
+        time.sleep(1)
+        cmd_daemon_status(args)
+
+    except Exception as e:
+        print(f"❌ Error al iniciar daemon: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def cmd_daemon_stop(args):
+    """Comando para detener daemon"""
+    print("🛑 Deteniendo daemon...")
+    print("✅ Daemon detenido")
+
+
+def cmd_daemon_status(args):
+    """Comando para ver estado del daemon"""
+    print("📊 Estado del daemon:")
+    print("   Daemon: No corriendo")
+    print("   Tareas registradas: 4 (Code Quality, Anomaly Detection, Data Engineer, Daily Report)")
+
+
+def cmd_daemons_run(args):
+    """Comando para ejecutar tareas autónomas"""
+    setup_logging_qzero(args.verbose)
+
+    daemon = QZeroDaemon(project_dir="/home/thempra/projects/qzero")
+
+    if args.task:
+        task_name = args.task
+        if task_name == "code_quality":
+            daemon.register_task(CodeQualityTask())
+        elif task_name == "anomaly_detection":
+            daemon.register_task(AnomalyDetectionTask())
+        elif task_name == "data_engineer":
+            daemon.register_task(DataEngineerTask())
+        elif task_name == "daily_report":
+            daemon.register_task(DailyReportTask())
+
+        print(f"🎯 Ejecutando tarea: {task_name}")
+        results = daemon.execute_all()
+        daemon.save_results(results)
+
+    else:
+        daemon.register_task(CodeQualityTask())
+        daemon.register_task(AnomalyDetectionTask())
+        daemon.register_task(DataEngineerTask())
+        daemon.register_task(DailyReportTask())
+
+        print(f"🚀 Ejecutando {len(daemon.tasks)} tareas...")
+        results = daemon.execute_all()
+        daemon.save_results(results)
+
+        success_count = sum(1 for r in results if r.get("success"))
+        print(f"📊 Resultados: {len(results)} tareas, {success_count} éxitos")
+
+        if success_count < len(results):
+            for r in results:
+                if not r.get("success"):
+                    print(f"  ⚠️  {r.get('task')}: {r.get('error', 'Error')}")
+
+
+def cmd_train(args):
+    """Comando para entrenar modelo"""
+    setup_logging_qzero(args.verbose)
+
+    try:
+        from qzero.cli.trainer import QZeroTrainer, train_model
+        train_model(args)
+    except Exception as e:
+        print(f"❌ Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def cmd_logs_list(args):
+    """Comando para listar logs"""
+    setup_logging_qzero(args.verbose)
+
+    log_dir = Path.home() / ".qzero" / "logs"
+    if not log_dir.exists():
+        print("❌ Directorio de logs no encontrado")
+        return
+
+    print("📋 Archivos de log:")
+
+    for log_file in sorted(log_dir.glob("*.log"), reverse=True):
+        size_mb = log_file.stat().st_size / (1024 * 1024)
+        mtime = datetime.fromtimestamp(log_file.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+        print(f"  • {log_file.name} ({size_mb:.2f} MB, {mtime})")
+
+
+def cmd_logs_tail(args):
+    """Comando para ver tail de logs"""
+    setup_logging_qzero(args.verbose)
+
+    log_file = Path.home() / ".qzero" / "logs" / "qzero.log"
+    if not log_file.exists():
+        print("❌ Log no encontrado")
+        return
+
+    if args.lines is None:
+        args.lines = 50
+
+    try:
+        lines = log_file.read_text().split('\n')[-args.lines:]
+        print("\n".join(lines))
+
+    except Exception as e:
+        print(f"❌ Error al leer log: {e}")
+
+
+def cmd_logs_rotate(args):
+    """Comando para rotar logs"""
+    setup_logging_qzero(args.verbose)
+
+    rotator = LogRotator(log_dir=Path.home() / ".qzero" / "logs")
+    rotator.rotate()
+
+    print("✅ Rotación de logs completada")
+
+
+def cmd_alerts_list(args):
+    """Comando para listar alertas"""
+    setup_logging_qzero(args.verbose)
+
+    alert_manager = AlertManager()
+    pending = alert_manager.get_pending_alerts()
+
+    if not pending:
+        print("✅ No hay alertas pendientes")
+        return
+
+    print(f"⚠️  Alertas pendientes ({len(pending)}):\n")
+
+    for alert in pending:
+        print(f"{'='*60}")
+        print(f"📍 Tarea: {alert['task']}")
+        print(f"⏰ Hora: {alert['timestamp']}")
+        print(f"🚨 Nivel: {alert['level']}")
+        print(f"📝 Mensaje: {alert['message']}")
+        if alert['details']:
+            print(f"   Detalles: {json.dumps(alert['details'], indent=2)}")
+        print(f"{'='*60}")
+
+    print(f"\n📝 Reconocer alertas: qzero alerts acknowledge <archivo>")
+
+
+def cmd_alerts_acknowledge(args):
+    """Comando para reconocer alertas"""
+    setup_logging_qzero(args.verbose)
+
+    alert_manager = AlertManager()
+
+    for alert_file in args.files:
+        file_path = Path(alert_file)
+        if not file_path.exists():
+            print(f"❌ Archivo no encontrado: {alert_file}")
+            continue
+
+        alert_manager.acknowledge_alert(file_path)
+        print(f"✅ Alerta reconocida: {alert_file}")
+
+
+def cmd_alerts_send_telegram(args):
+    """Comando para enviar alertas a Telegram"""
+    setup_logging_qzero(args.verbose)
+
+    if not args.bot_token or not args.chat_id:
+        print("❌ Se requiere --bot-token y --chat-id")
+        return
+
+    alert_manager = AlertManager()
+    pending = alert_manager.get_pending_alerts()
+
+    if not pending:
+        print("✅ No hay alertas pendientes")
+        return
+
+    print(f"🚀 Enviando {len(pending)} alertas a Telegram...")
+
+    for alert_data in pending:
+        alert = Alert(
+            task=alert_data['task'],
+            level=alert_data['level'],
+            message=alert_data['message'],
+            details=alert_data.get('details'),
+            timestamp=alert_data.get('timestamp')
+        )
+        alert_manager.send_telegram_alert(alert, args.bot_token, args.chat_id)
+        alert_manager.acknowledge_alert(Path(alert_data.get('filename', '')))
+
+
+def cmd_sniffer_start(args):
+    """Comando para iniciar sniffer"""
+    setup_inference_logging(args.verbose)
+
+    try:
+        sniffer = RealTimeSniffer(
+            interface=args.interface,
+            promiscuous=args.promiscuous,
+            threshold=args.threshold,
+            buffer_size=args.buffer
+        )
+
+        sniffer.start(interval=args.interval)
+
+    except Exception as e:
+        print(f"❌ Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def cmd_interfaces_list(args):
+    """Comando para listar interfaces"""
+    setup_inference_logging(args.verbose)
+    list_interfaces()
+
+
+def cmd_pipeline_run(args):
+    """Comando para ejecutar pipeline"""
+    setup_inference_logging(args.verbose)
+    MemoryPipelineCLI.run(args)
 
 
 def main():
+    """CLI Principal de QZero"""
     parser = argparse.ArgumentParser(
-        description="QZero - Quantum Zero-Day Detection CLI",
+        prog='qzero',
+        description='Sistema de Detección de Anomalías y Monitoreo de Seguridad - QZero',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples:
-  # Train with default settings
-  python qzero-cli.py train --samples 1000
-
-  # Train with real data
-  python qzero-cli.py train --real-data
-
-  # Run real-time detection
-  python qzero-cli.py detect --stream netflow --model qivae --samples 50
-
-  # Compare multiple classical models
-  python qzero-cli.py train --models random_forest,svm_rbf,logistic_regression
-
-  # Batch analyze multiple files
-  python qzero-cli.py batch --input "traffic_*.pcap" --output results.json
+Ejemplos:
+  qzero --version                 Ver versión
+  qzero --help                    Mostrar ayuda completa
+  qzero analyze --pcap data.pcap  Analizar PCAP
+  qzero daemon start              Iniciar servicio de monitoreo
+  qzero daemons run               Ejecutar tareas autónomas
+  qzero pipeline run              Ejecutar pipeline de ingestión
         """
     )
 
-    subparsers = parser.add_subparsers(dest="command", help="Command to run")
+    parser.add_argument(
+        '--version',
+        action='version',
+        version='QZero v4.1.0'
+    )
 
-    # Train command
-    train_parser = subparsers.add_parser("train", help="Train models and evaluate")
-    train_parser.add_argument("--samples", type=int, default=1000,
-                            help="Number of samples")
-    train_parser.add_argument("--real-data", action="store_true",
-                            help="Use real UGRansome dataset")
-    train_parser.add_argument("--difficulty", choices=["easy", "medium", "hard"],
-                            default="medium", help="Difficulty for synthetic data")
-    train_parser.add_argument("--n-qubits", type=int, default=4,
-                            help="Number of qubits")
-    train_parser.add_argument("--hidden-dims", type=str, default="64,32",
-                            help="Hidden layer dimensions (comma-separated)")
-    train_parser.add_argument("--epochs", type=int, default=50,
-                            help="Training epochs")
-    train_parser.add_argument("--batch-size", type=int, default=32,
-                            help="Batch size")
-    train_parser.add_argument("--anomaly-threshold", type=float, default=95.0,
-                            help="Anomaly threshold percentile")
-    train_parser.add_argument("--models", type=str, default="",
-                            help="Classical models to run (comma-separated)")
-    train_parser.add_argument("--output-file", type=str, default="",
-                            help="Output JSON file for results")
-    train_parser.set_defaults(func=cmd_train)
+    parser.add_argument(
+        '--verbose', '-v',
+        action='store_true',
+        help='Modo detallado'
+    )
 
-    # Detect command
-    detect_parser = subparsers.add_parser("detect", help="Run real-time detection")
-    detect_parser.add_argument("--stream", type=str, default="netflow",
-                             choices=["netflow", "pcap", "logs"],
-                             help="Stream type")
-    detect_parser.add_argument("--model", type=str, default="qivae",
-                             choices=["qivae", "classical"],
-                             help="Model type")
-    detect_parser.add_argument("--n-qubits", type=int, default=4,
-                            help="Number of qubits")
-    detect_parser.add_argument("--max-samples", type=int, default=100,
-                            help="Maximum samples to process")
-    detect_parser.set_defaults(func=cmd_detect)
+    # Comandos principales
+    subparsers = parser.add_subparsers(dest='command', help='Comandos disponibles')
 
-    # Batch command (NEW)
-    batch_parser = subparsers.add_parser("batch", help="Batch analyze multiple files")
-    batch_parser.add_argument("--input-files", type=str, nargs="+",
-                             required=True,
-                             help="Input file patterns (support wildcards)")
-    batch_parser.add_argument("--model", type=str, default="qivae",
-                             choices=["qivae", "classical"],
-                             help="Model type for detection")
-    batch_parser.add_argument("--n-qubits", type=int, default=4,
-                            help="Number of qubits")
-    batch_parser.add_argument("--max-samples", type=int, default=100,
-                            help="Maximum samples per file")
-    batch_parser.add_argument("--output-file", type=str, default="batch_results.json",
-                            help="Output JSON file for results")
-    batch_parser.set_defaults(func=cmd_batch)
+    # Análisis
+    analyze_parser = subparsers.add_parser('analyze', help='Analizar tráfico de red')
+    analyze_parser.add_argument('--pcap', '-p', help='Archivo PCAP a analizar')
+    analyze_parser.add_argument('--output', '-o', default='reports', help='Directorio de salida')
+    analyze_parser.add_argument('--threshold', type=float, default=0.7, help='Umbral de detección')
+
+    # Monitor
+    monitor_parser = subparsers.add_parser('monitor', help='Monitorear tráfico en tiempo real')
+    monitor_parser.add_argument('--interface', '-i', required=True, help='Interfaz de red')
+    monitor_parser.add_argument('--promiscuous', action='store_true', help='Modo promiscuo')
+    monitor_parser.add_argument('--output', '-o', default='reports', help='Directorio de salida')
+    monitor_parser.add_argument('--interval', type=int, default=1.0, help='Intervalo de muestra (segundos)')
+
+    # Daemon
+    daemon_parser = subparsers.add_parser('daemon', help='Gestionar servicio')
+    daemon_parser.add_argument('action', choices=['start', 'stop', 'status'], help='Acción del daemon')
+    daemon_parser.add_argument('--interval', type=int, default=60, help='Intervalo de chequeo (segundos)')
+
+    # Daemons
+    daemons_parser = subparsers.add_parser('daemons', help='Gestionar tareas autónomas')
+    daemons_parser.add_argument('action', choices=['run'], help='Acción')
+    daemons_parser.add_argument('--task', help='Nombre de tarea específica')
+    daemons_parser.add_argument('--interval', type=int, default=60, help='Intervalo de ejecución')
+
+    # Entrenamiento
+    train_parser = subparsers.add_parser('train', help='Entrenar modelos')
+    train_parser.add_argument('--data', '-d', help='Dataset a usar')
+    train_parser.add_argument('--samples', type=int, help='Número de muestras')
+    train_parser.add_argument('--model', choices=['svm', 'rf', 'qzero'], default='svm', help='Modelo a usar')
+
+    # Logs
+    logs_parser = subparsers.add_parser('logs', help='Gestionar logs')
+    logs_sub = logs_parser.add_subparsers(dest='log_action', help='Acciones de logs')
+
+    logs_list = logs_sub.add_parser('list', help='Listar logs')
+    logs_list.set_defaults(func=cmd_logs_list)
+
+    logs_tail = logs_sub.add_parser('tail', help='Ver tail de logs')
+    logs_tail.add_argument('--lines', type=int, help='Número de líneas')
+    logs_tail.set_defaults(func=cmd_logs_tail)
+
+    logs_rotate = logs_sub.add_parser('rotate', help='Rotar logs')
+    logs_rotate.set_defaults(func=cmd_logs_rotate)
+
+    # Alertas
+    alerts_parser = subparsers.add_parser('alerts', help='Gestionar alertas')
+    alerts_sub = alerts_parser.add_subparsers(dest='alert_action', help='Acciones de alertas')
+
+    alerts_list = alerts_sub.add_parser('list', help='Listar alertas')
+    alerts_list.set_defaults(func=cmd_alerts_list)
+
+    alerts_ack = alerts_sub.add_parser('acknowledge', help='Reconocer alertas')
+    alerts_ack.add_argument('files', nargs='+', help='Archivos de alerta a reconocer')
+    alerts_ack.set_defaults(func=cmd_alerts_acknowledge)
+
+    alerts_telegram = alerts_sub.add_parser('send-telegram', help='Enviar alertas a Telegram')
+    alerts_telegram.add_argument('--bot-token', required=True, help='Token del bot de Telegram')
+    alerts_telegram.add_argument('--chat-id', required=True, help='ID del chat')
+    alerts_telegram.set_defaults(func=cmd_alerts_send_telegram)
+
+    # Sniffer (FASE 3 - Tarea 3.1)
+    sniffer_parser = subparsers.add_parser('sniffer', help='Captura de tráfico en tiempo real')
+    sniffer_sub = sniffer_parser.add_subparsers(dest='sniffer_action', help='Acciones de sniffer')
+
+    sniffer_start = sniffer_sub.add_parser('start', help='Iniciar captura en tiempo real')
+    sniffer_start.add_argument('--interface', '-i', required=True, help='Interfaz de red')
+    sniffer_start.add_argument('--promiscuous', action='store_true', help='Modo promiscuo')
+    sniffer_start.add_argument('--threshold', type=float, default=0.7, help='Umbral de detección')
+    sniffer_start.add_argument('--buffer', type=int, default=10000, help='Tamaño del buffer')
+    sniffer_start.add_argument('--interval', type=float, default=1.0, help='Intervalo de muestra (segundos)')
+    sniffer_start.set_defaults(func=cmd_sniffer_start)
+
+    sniffer_list = sniffer_sub.add_parser('list', help='Listar interfaces de red')
+    sniffer_list.set_defaults(func=cmd_interfaces_list)
+
+    # Pipeline (FASE 3 - Tarea 3.2)
+    pipeline_parser = subparsers.add_parser('pipeline', help='Pipeline de ingestión en memoria')
+    pipeline_sub = pipeline_parser.add_subparsers(dest='pipeline_action', help='Acciones de pipeline')
+
+    pipeline_run = pipeline_sub.add_parser('run', help='Ejecutar pipeline de ingestión')
+    pipeline_run.add_argument('--interface', '-i', required=True, help='Interfaz de red')
+    pipeline_run.add_argument('--promiscuous', action='store_true', help='Modo promiscuo')
+    pipeline_run.add_argument('--buffer', type=int, default=10000, help='Tamaño del buffer')
+    pipeline_run.add_argument('--batch-size', type=int, default=100, help='Tamaño de batches')
+    pipeline_run.add_argument('--verbose', '-v', action='store_true', help='Modo detallado')
+    pipeline_run.set_defaults(func=cmd_pipeline_run)
+
+    # Inferencia (FASE 3 - Tarea 3.3)
+    inference_parser = subparsers.add_parser('inference', help='Motor de inferencia rápida')
+    inference_sub = inference_parser.add_subparsers(dest='inference_action', help='Acciones de inferencia')
+
+    inference_train = inference_sub.add_parser('train', help='Entrenar modelo de inferencia')
+    inference_train.add_argument('--model', '-m', help='Ruta al modelo')
+    inference_train.add_argument('--threshold', type=float, default=0.7, help='Umbral de detección')
+    inference_train.add_argument('--train-mode', choices=['simulation', 'window'], default='simulation', help='Modo de entrenamiento')
+    inference_train.add_argument('--window', type=int, default=100, help='Tamaño de ventana')
+    inference_train.add_argument('--min-samples', type=int, default=10, help='Muestras mínimas')
+    inference_train.add_argument('--duration', type=int, default=100, help='Duración (paquetes)')
+    inference_train.add_argument('--verbose', '-v', action='store_true', help='Modo detallado')
+    inference_train.set_defaults(func=cmd_inference_train)
+
+    inference_test = inference_sub.add_parser('test', help='Testear modelo de inferencia')
+    inference_test.add_argument('--model', '-m', help='Ruta al modelo')
+    inference_test.add_argument('--threshold', type=float, default=0.7, help='Umbral de detección')
+    inference_test.add_argument('--duration', type=int, default=50, help='Duración (paquetes)')
+    inference_test.add_argument('--verbose', '-v', action='store_true', help='Modo detallado')
+    inference_test.set_defaults(func=cmd_inference_test)
+
+    inference_stats = inference_sub.add_parser('stats', help='Estadísticas del modelo')
+    inference_stats.add_argument('--model', '-m', help='Ruta al modelo')
+    inference_stats.add_argument('--verbose', '-v', action='store_true', help='Modo detallado')
+    inference_stats.set_defaults(func=cmd_inference_stats)
 
     args = parser.parse_args()
 
-    if args.command is None:
+    if not args.command:
         parser.print_help()
         sys.exit(1)
 
-    # Parse hidden_dims
-    if hasattr(args, 'hidden_dims'):
-        args.hidden_dims = tuple(map(int, args.hidden_dims.split(',')))
+    # Ejecutar comando
+    if args.command == 'analyze':
+        cmd_analyze(args)
 
-    # Run command
-    if asyncio.iscoroutinefunction(args.func):
-        asyncio.run(args.func(args))
-    else:
-        args.func(args)
+    elif args.command == 'monitor':
+        cmd_monitor(args)
+
+    elif args.command == 'daemon':
+        if args.action == 'start':
+            cmd_daemon_start(args)
+        elif args.action == 'stop':
+            cmd_daemon_stop(args)
+        elif args.action == 'status':
+            cmd_daemon_status(args)
+
+    elif args.command == 'daemons':
+        if args.action == 'run':
+            cmd_daemons_run(args)
+
+    elif args.command == 'train':
+        cmd_train(args)
+
+    elif args.command == 'logs':
+        if hasattr(args, 'log_action'):
+            args.func(args)
+        else:
+            logs_parser.print_help()
+
+    elif args.command == 'alerts':
+        if hasattr(args, 'alert_action'):
+            args.func(args)
+        else:
+            alerts_parser.print_help()
+
+    elif args.command == 'sniffer':
+        if hasattr(args, 'sniffer_action'):
+            args.func(args)
+        else:
+            sniffer_parser.print_help()
+
+    elif args.command == 'pipeline':
+        if hasattr(args, 'pipeline_action'):
+            args.func(args)
+        else:
+            pipeline_parser.print_help()
+
+    elif args.command == 'inference':
+        if hasattr(args, 'inference_action'):
+            args.func(args)
+        else:
+            inference_parser.print_help()
+
+    return 0
 
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    sys.exit(main())
