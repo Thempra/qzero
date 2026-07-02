@@ -31,10 +31,15 @@ from qzero.cli.inference import (
 )
 from qzero.cli.response import (
     cmd_alerts_list,
-    cmd_alerts_create,
     cmd_alerts_acknowledge,
-    cmd_alerts_stats,
     cmd_alerts_send_telegram
+)
+from qzero.cli.containers import (
+    cmd_containers_list,
+    cmd_containers_scan,
+    cmd_containers_info,
+    cmd_containers_monitor,
+    cmd_containers_alerts
 )
 from qzero.inference import setup_logging as setup_inference_logging
 
@@ -365,7 +370,7 @@ Ejemplos:
     parser.add_argument(
         '--version',
         action='version',
-        version='QZero v4.2.0'
+        version='QZero v5.0.0'
     )
 
     parser.add_argument(
@@ -490,6 +495,33 @@ Ejemplos:
     inference_stats.add_argument('--verbose', '-v', action='store_true', help='Modo detallado')
     inference_stats.set_defaults(func=cmd_inference_stats)
 
+    # Contenedores (FASE 3 - Tarea 3.5)
+    containers_parser = subparsers.add_parser('containers', help='Soporte para contenedores')
+    containers_sub = containers_parser.add_subparsers(dest='containers_action', help='Acciones de contenedores')
+
+    containers_list = containers_sub.add_parser('list', help='Listar contenedores')
+    containers_list.set_defaults(func=cmd_containers_list)
+
+    containers_scan = containers_sub.add_parser('scan', help='Escanear contenedores')
+    containers_scan.add_argument('--verbose', '-v', action='store_true', help='Modo detallado')
+    containers_scan.set_defaults(func=cmd_containers_scan)
+
+    containers_info = containers_sub.add_parser('info', help='Información de contenedor')
+    containers_info.add_argument('--container-type', choices=['docker', 'kubernetes'], required=True, help='Tipo de contenedor')
+    containers_info.add_argument('--container', required=True, help='Nombre del contenedor')
+    containers_info.add_argument('--namespace', default='default', help='Namespace')
+    containers_info.set_defaults(func=cmd_containers_info)
+
+    containers_monitor = containers_sub.add_parser('monitor', help='Monitorear contenedores')
+    containers_monitor.add_argument('--container-type', choices=['docker', 'kubernetes'], required=True, help='Tipo de contenedor')
+    containers_monitor.add_argument('--container', required=True, help='Nombre del contenedor')
+    containers_monitor.add_argument('--namespace', default='default', help='Namespace')
+    containers_monitor.add_argument('--interval', type=float, default=1.0, help='Intervalo (segundos)')
+    containers_monitor.set_defaults(func=cmd_containers_monitor)
+
+    containers_alerts = containers_sub.add_parser('alerts', help='Generar alertas de contenedores')
+    containers_alerts.set_defaults(func=cmd_containers_alerts)
+
     args = parser.parse_args()
 
     if not args.command:
@@ -548,11 +580,11 @@ Ejemplos:
         else:
             inference_parser.print_help()
 
-    elif args.command == 'alerts':
-        if hasattr(args, 'alert_action'):
+    elif args.command == 'containers':
+        if hasattr(args, 'containers_action'):
             args.func(args)
         else:
-            alerts_parser.print_help()
+            containers_parser.print_help()
 
     return 0
 
