@@ -29,6 +29,13 @@ from qzero.cli.inference import (
     cmd_inference_test,
     cmd_inference_stats
 )
+from qzero.cli.response import (
+    cmd_alerts_list,
+    cmd_alerts_create,
+    cmd_alerts_acknowledge,
+    cmd_alerts_stats,
+    cmd_alerts_send_telegram
+)
 from qzero.inference import setup_logging as setup_inference_logging
 
 
@@ -358,7 +365,7 @@ Ejemplos:
     parser.add_argument(
         '--version',
         action='version',
-        version='QZero v4.1.0'
+        version='QZero v4.2.0'
     )
 
     parser.add_argument(
@@ -540,6 +547,12 @@ Ejemplos:
             args.func(args)
         else:
             inference_parser.print_help()
+
+    elif args.command == 'alerts':
+        if hasattr(args, 'alert_action'):
+            args.func(args)
+        else:
+            alerts_parser.print_help()
 
     return 0
 
