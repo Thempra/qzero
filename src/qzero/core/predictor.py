@@ -392,13 +392,20 @@ class QZeroPredictor:
         elif method == "qivae" and self.qivae_model:
             return self.qivae_model.predict(X)
         elif method == "best":
-            # Use model with highest F1 score
-            if self.qivae_result and self.qivae_result.f1_score > 0:
+            # Prefer QI-VAE, then QSVM, then first classical model.
+            # Fall back gracefully when result objects are absent (e.g. after load()).
+            if self.qivae_model and (
+                self.qivae_result is None or self.qivae_result.f1_score > 0
+            ):
                 return self.qivae_model.predict(X)
-            elif self.qsvm_result and self.qsvm_result.f1_score > 0:
+            elif self.qsvm_model and (
+                self.qsvm_result is None or self.qsvm_result.f1_score > 0
+            ):
                 return self.qsvm_model.predict(X)
+            elif self.classical_models_dict:
+                return list(self.classical_models_dict.values())[0].predict(X)
             else:
-                return self.classical_models_dict[self.classical_models[0]].predict(X)
+                raise RuntimeError("No models available for prediction")
         else:
             # Ensemble vote
             predictions = []
@@ -589,8 +596,21 @@ class QZeroPredictor:
             for name, model in self.classical_models_dict.items():
                 pickle.dump(model, open(path / f"classical_{name}.pkl", "wb"))
 
-        # Save metadata
+        # Save evaluation results (so load() doesn't need test data to re-evaluate)
         import json
+        results_to_save = {}
+        if hasattr(self, "qsvm_result") and self.qsvm_result:
+            results_to_save["qsvm"] = self.qsvm_result.to_dict()
+        if hasattr(self, "qivae_result") and self.qivae_result:
+            results_to_save["qivae"] = self.qivae_result.to_dict()
+        if hasattr(self, "classical_results"):
+            results_to_save["classical"] = {
+                k: v.to_dict() for k, v in self.classical_results.items()
+            }
+
+        with open(path / "results.json", "w") as f:
+            json.dump(results_to_save, f, indent=2)
+
         with open(path / "training_info.json", "w") as f:
             json.dump(self.training_info, f, indent=2)
 
@@ -613,18 +633,55 @@ class QZeroPredictor:
         self.scaler = pickle.load(open(path / "scaler.pkl", "rb"))
         self.feature_engineer = pickle.load(open(path / "feature_engineer.pkl", "rb"))
 
-        # Load models
+        import json
+
+        # Load models (no re-evaluation — test data is not available at load time)
         if (path / "qsvm.pkl").exists():
             self.qsvm_model = pickle.load(open(path / "qsvm.pkl", "rb"))
-            self.qsvm_result = self.qsvm_model.evaluate(self.X_test_q, self.y_test, 0)
+            self.qsvm_result = None
 
         if (path / "qivae.pkl").exists():
             self.qivae_model = pickle.load(open(path / "qivae.pkl", "rb"))
-            self.qivae_result = self.qivae_model.evaluate(self.X_test, self.y_test, 0)
+            self.qivae_result = None
+
+        # Restore saved evaluation results (produced during save())
+        if (path / "results.json").exists():
+            with open(path / "results.json") as f:
+                saved = json.load(f)
+
+            if "qsvm" in saved and self.qsvm_model:
+                from ..quantum.qsvm import QSVMResult, QSVMConfig
+                d = saved["qsvm"]
+                self.qsvm_result = QSVMResult(
+                    accuracy=d.get("accuracy", 0.0),
+                    f1_score=d.get("f1_score", 0.0),
+                    train_time=d.get("train_time", 0.0),
+                    kernel_computation_time=d.get("kernel_computation_time", 0.0),
+                    n_support_vectors=d.get("n_support_vectors", 0),
+                    used_quantum=d.get("used_quantum", False),
+                )
+
+            if "qivae" in saved and self.qivae_model:
+                import numpy as np
+                from ..quantum.qivae import QIVAEResult, QIVAEConfig
+                d = saved["qivae"]
+                self.qivae_result = QIVAEResult(
+                    train_loss=d.get("train_loss", 0.0),
+                    val_loss=d.get("val_loss", 0.0),
+                    reconstruction_errors=np.array([]),
+                    anomaly_threshold=d.get("anomaly_threshold", 0.5),
+                    accuracy=d.get("accuracy", 0.0),
+                    precision=d.get("precision", 0.0),
+                    recall=d.get("recall", 0.0),
+                    f1_score=d.get("f1_score", 0.0),
+                    train_time=d.get("train_time", 0.0),
+                )
+
+        # Restore classical model results
+        self.classical_results = {}
 
         if (path / "training_info.json").exists():
-            import json
-            with open(path / "training_info.json", "r") as f:
+            with open(path / "training_info.json") as f:
                 self.training_info = json.load(f)
 
         self.model_fitted = True
