@@ -1,492 +1,524 @@
-# QZero API Reference
+# API Reference - QZero
 
-> REST API documentation for the Quantum Zero-Day Detection Platform
+## Módulo: sniffer.py
 
-## Table of Contents
+### Clases
 
-- [Overview](#overview)
-- [Base URL](#base-url)
-- [Authentication](#authentication)
-- [Endpoints](#endpoints)
-- [Data Models](#data-models)
-- [Error Handling](#error-handling)
-- [Examples](#examples)
-- [Python SDK](#python-sdk)
+#### `ScapySniffer`
 
----
+Módulo de captura de paquetes usando Scapy.
 
-## Overview
-
-QZero exposes a RESTful API built with **FastAPI** for analyzing network traffic and detecting zero-day threats. The API accepts CSV files containing network flow data and returns anomaly scores with classification results.
-
-### Features
-
-- **File Upload**: Analyze network traffic from CSV files
-- **Real-time Scoring**: Get quantum anomaly scores instantly
-- **JSON Responses**: Clean, structured response format
-- **OpenAPI/Swagger**: Auto-generated documentation at `/docs`
-
----
-
-## Base URL
-
-```
-# Local development
-http://localhost:8000
-
-# Docker deployment
-http://<host>:8000
-
-# Production (example)
-https://api.qzero.io/v1
-```
-
----
-
-## Authentication
-
-> ⚠️ **Current Version**: No authentication required (development mode)
-
-For production deployments, implement one of:
-- API Key header: `X-API-Key: your-key`
-- Bearer token: `Authorization: Bearer <token>`
-- OAuth 2.0 for enterprise integration
-
----
-
-## Endpoints
-
-### Health Check
-
-Check if the API is running and get backend information.
-
-```http
-GET /
-```
-
-#### Response
-
-```json
-{
-    "status": "online",
-    "backend": "quantum-simulator",
-    "version": "1.0.0"
-}
-```
-
-#### Example
-
-```bash
-curl http://localhost:8000/
-```
-
----
-
-### Analyze Traffic
-
-Analyze network traffic data for anomalies and zero-day threats.
-
-```http
-POST /analyze
-```
-
-#### Request
-
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `file` | File (CSV) | Yes | Network traffic data file |
-
-#### Headers
-
-```
-Content-Type: multipart/form-data
-```
-
-#### Request Body
-
-Upload a CSV file with network flow features. Expected columns:
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `flow_duration` | float | Duration of the flow in ms |
-| `total_fwd_packets` | int | Forward packet count |
-| `total_bwd_packets` | int | Backward packet count |
-| `total_length_fwd_packets` | int | Total forward bytes |
-| `total_length_bwd_packets` | int | Total backward bytes |
-| `flow_bytes_per_sec` | float | Flow rate (bytes/s) |
-| `flow_packets_per_sec` | float | Flow rate (packets/s) |
-| `fwd_packet_length_mean` | float | Mean forward packet size |
-| `bwd_packet_length_mean` | float | Mean backward packet size |
-| `fwd_iat_mean` | float | Forward inter-arrival time |
-| `bwd_iat_mean` | float | Backward inter-arrival time |
-| `fwd_psh_flags` | int | PSH flag count (forward) |
-| `bwd_psh_flags` | int | PSH flag count (backward) |
-| `fwd_urg_flags` | int | URG flag count |
-
-#### Response
-
-```json
-{
-    "filename": "traffic_sample.csv",
-    "total_flows": 1000,
-    "anomalies_detected": 47,
-    "quantum_anomaly_score": 0.87,
-    "status": "CRITICAL"
-}
-```
-
-#### Response Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `filename` | string | Name of analyzed file |
-| `total_flows` | integer | Number of network flows analyzed |
-| `anomalies_detected` | integer | Count of detected anomalies |
-| `quantum_anomaly_score` | float | Quantum model confidence (0.0-1.0) |
-| `status` | string | Threat level: `SAFE`, `WARNING`, `CRITICAL` |
-
-#### Status Levels
-
-| Status | Score Range | Action |
-|--------|-------------|--------|
-| `SAFE` | 0.0 - 0.5 | Normal traffic, no action needed |
-| `WARNING` | 0.5 - 0.85 | Suspicious patterns, investigate |
-| `CRITICAL` | 0.85 - 1.0 | High probability zero-day, isolate immediately |
-
-#### Example
-
-```bash
-curl -X POST http://localhost:8000/analyze \
-    -F "file=@network_traffic.csv"
-```
-
----
-
-### Interactive Documentation
-
-FastAPI provides automatic interactive documentation:
-
-```http
-GET /docs      # Swagger UI
-GET /redoc     # ReDoc interface
-GET /openapi.json  # OpenAPI schema
-```
-
----
-
-## Data Models
-
-### AnalysisResult
-
-Pydantic model for analysis response:
-
+**Constructor:**
 ```python
-from pydantic import BaseModel
-
-class AnalysisResult(BaseModel):
-    filename: str
-    total_flows: int
-    anomalies_detected: int
-    quantum_anomaly_score: float
-    status: str
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "filename": "traffic.csv",
-                "total_flows": 5000,
-                "anomalies_detected": 127,
-                "quantum_anomaly_score": 0.92,
-                "status": "CRITICAL"
-            }
-        }
+ScapySniffer(interface, promiscuous=False, buffer_size=10000)
 ```
 
-### Input CSV Schema
+**Parámetros:**
+- `interface` (str): Nombre de la interfaz de red
+- `promiscuous` (bool): Modo promiscuo (default: False)
+- `buffer_size` (int): Tamaño del buffer (default: 10000)
 
-Example CSV structure:
+**Métodos:**
+- `start()`: Inicia la captura
+- `stop()`: Detiene la captura
+- `capture_packet()`: Captura un paquete
+- `run(callback=None)`: Ejecuta captura en un loop
 
-```csv
-flow_duration,total_fwd_packets,total_bwd_packets,total_length_fwd_packets,total_length_bwd_packets,flow_bytes_per_sec,flow_packets_per_sec,fwd_packet_length_mean,bwd_packet_length_mean,fwd_iat_mean,bwd_iat_mean,fwd_psh_flags,bwd_psh_flags,fwd_urg_flags
-500.5,10,8,1500,1200,3000.0,20.0,150.0,150.0,50.0,60.0,1,1,0
-250.3,50,5,8000,500,15000.0,100.0,160.0,100.0,10.0,100.0,5,1,2
-```
-
----
-
-## Error Handling
-
-### Error Response Format
-
-```json
-{
-    "detail": "Error message describing what went wrong"
-}
-```
-
-### HTTP Status Codes
-
-| Code | Meaning | Description |
-|------|---------|-------------|
-| `200` | OK | Request successful |
-| `400` | Bad Request | Invalid input (e.g., non-CSV file) |
-| `422` | Unprocessable Entity | Validation error |
-| `500` | Internal Server Error | Server-side error |
-
-### Common Errors
-
-#### Invalid File Type
-
-```http
-POST /analyze
-Content-Type: multipart/form-data
-
-file=data.xlsx  # Wrong format
-```
-
-Response (400):
-```json
-{
-    "detail": "Only CSV files supported in this version"
-}
-```
-
-#### Missing Required Columns
-
-Response (500):
-```json
-{
-    "detail": "Missing required columns: flow_duration, total_fwd_packets"
-}
-```
-
----
-
-## Examples
-
-### Python (requests)
-
+**Ejemplo:**
 ```python
-import requests
+from qzero.sniffer import ScapySniffer
 
-# Health check
-response = requests.get("http://localhost:8000/")
-print(response.json())
+sniffer = ScapySniffer("eth0", promiscuous=True)
+sniffer.start()
 
-# Analyze file
-with open("traffic.csv", "rb") as f:
-    response = requests.post(
-        "http://localhost:8000/analyze",
-        files={"file": ("traffic.csv", f, "text/csv")}
+# Capturar paquetes
+while sniffer.running:
+    packet = sniffer.capture_packet()
+    if packet:
+        process(packet)
+
+sniffer.stop()
+```
+
+#### `TcpDumpSniffer`
+
+Módulo de captura usando TcpDump como fallback.
+
+**Constructor:**
+```python
+TcpDumpSniffer(interface, promiscuous=False, buffer_size=10000)
+```
+
+**Métodos:**
+- Igual que `ScapySniffer`
+
+#### `RealTimeSniffer`
+
+Sniffer en tiempo real con detección de anomalías.
+
+**Constructor:**
+```python
+RealTimeSniffer(interface, promiscuous=False, threshold=0.7, buffer_size=10000)
+```
+
+**Parámetros:**
+- `threshold` (float): Umbral de detección (0-1)
+
+**Métodos:**
+- `start(interval=1.0)`: Inicia captura con intervalo
+
+**Ejemplo:**
+```python
+from qzero.cli.sniffer import RealTimeSniffer
+
+sniffer = RealTimeSniffer("eth0", promiscuous=True, threshold=0.8)
+sniffer.start()
+```
+
+#### `NetworkInterface`
+
+Gestor de interfaces de red.
+
+**Constructor:**
+```python
+NetworkInterface(interface_name)
+```
+
+**Parámetros:**
+- `interface_name` (str): Nombre de la interfaz
+
+**Métodos:**
+- `is_up()`: Verifica si está activa
+- `set_promiscuous(enable)`: Activa/desactiva modo promiscuo
+- `get_status()`: Obtiene estado completo
+
+**Ejemplo:**
+```python
+from qzero.cli.sniffer import RealTimeSniffer
+
+sniffer = RealTimeSniffer("eth0", promiscuous=True)
+interface = sniffer.interface_obj
+interface.set_promiscuous(True)
+```
+
+### Dataclasses
+
+#### `Packet`
+
+Representa un paquete capturado.
+
+**Atributos:**
+- `timestamp` (float): Timestamp de captura
+- `source` (str): IP de origen
+- `destination` (str): IP de destino
+- `protocol` (str): Protocolo
+- `size` (int): Tamaño en bytes
+- `payload` (bytes): Payload del paquete
+- `metadata` (dict): Metadata adicional
+
+**Método:**
+- `to_dict()`: Convierte a diccionario JSON
+
+### Enums
+
+#### `InterfaceType`
+
+Tipos de interfaces de red.
+- `ETHERNET`: Ethernet
+- `WIFI`: WiFi
+- `LOOPBACK`: Loopback
+- `DOCKER`: Docker
+- `KUBERNETES`: Kubernetes
+
+---
+
+## Módulo: pipeline.py
+
+### Clases
+
+#### `RingBuffer`
+
+Buffer circular para paquetes.
+
+**Constructor:**
+```python
+RingBuffer(max_size=10000)
+```
+
+**Parámetros:**
+- `max_size` (int): Tamaño máximo del buffer
+
+**Métodos:**
+- `add_packet(packet)`: Añade paquete
+- `get_packets(count=None)`: Obtiene paquetes
+- `get_batches(batch_size=100)`: Genera batches
+- `get_stats()`: Obtiene estadísticas
+
+**Ejemplo:**
+```python
+from qzero.pipeline import RingBuffer, Packet
+
+buffer = RingBuffer(max_size=10000)
+
+for i in range(100):
+    packet = Packet(
+        timestamp=time.time(),
+        source="192.168.1.1",
+        destination="10.0.0.1",
+        protocol="TCP",
+        size=100,
+        payload=b"test"
     )
-
-result = response.json()
-print(f"Status: {result['status']}")
-print(f"Anomaly Score: {result['quantum_anomaly_score']}")
-
-if result['status'] == 'CRITICAL':
-    print("⚠️ ALERT: Potential zero-day detected!")
+    buffer.add_packet(packet)
 ```
 
-### Python (httpx - async)
+#### `PacketProcessor`
 
+Procesador de paquetes en tiempo real.
+
+**Constructor:**
 ```python
-import httpx
-import asyncio
-
-async def analyze_traffic(filepath: str):
-    async with httpx.AsyncClient() as client:
-        with open(filepath, "rb") as f:
-            response = await client.post(
-                "http://localhost:8000/analyze",
-                files={"file": ("data.csv", f)}
-            )
-        return response.json()
-
-# Run
-result = asyncio.run(analyze_traffic("network.csv"))
-print(result)
+PacketProcessor(buffer, batch_size=100, threshold=0.7)
 ```
 
-### cURL
+**Parámetros:**
+- `buffer` (RingBuffer): Buffer de paquetes
+- `batch_size` (int): Tamaño de batches
+- `threshold` (float): Umbral de detección
 
-```bash
-# Health check
-curl http://localhost:8000/
+**Métodos:**
+- `start()`: Inicia procesamiento
+- `process_stream()`: Procesa stream completo
 
-# Analyze file
-curl -X POST http://localhost:8000/analyze \
-    -H "Content-Type: multipart/form-data" \
-    -F "file=@/path/to/traffic.csv"
+#### `MemoryEfficientSniffer`
 
-# Pretty print JSON
-curl -s -X POST http://localhost:8000/analyze \
-    -F "file=@traffic.csv" | python -m json.tool
+Sniffer con ingestión eficiente en memoria.
+
+**Constructor:**
+```python
+MemoryEfficientSniffer(interface, promiscuous=False, buffer_size=10000, batch_size=100)
 ```
 
-### JavaScript (fetch)
-
-```javascript
-// Health check
-const health = await fetch('http://localhost:8000/');
-console.log(await health.json());
-
-// Analyze file
-const formData = new FormData();
-formData.append('file', fileInput.files[0]);
-
-const response = await fetch('http://localhost:8000/analyze', {
-    method: 'POST',
-    body: formData
-});
-
-const result = await response.json();
-
-if (result.status === 'CRITICAL') {
-    alert(`⚠️ Zero-day detected! Score: ${result.quantum_anomaly_score}`);
-}
-```
-
-### PowerShell
-
-```powershell
-# Health check
-Invoke-RestMethod -Uri "http://localhost:8000/"
-
-# Analyze file
-$file = Get-Item ".\traffic.csv"
-$form = @{
-    file = $file
-}
-$response = Invoke-RestMethod -Uri "http://localhost:8000/analyze" `
-    -Method Post -Form $form
-
-Write-Host "Status: $($response.status)"
-Write-Host "Score: $($response.quantum_anomaly_score)"
-```
+**Métodos:**
+- `start()`: Inicia sniffer
+- `get_stats()`: Obtiene estadísticas
 
 ---
 
-## Python SDK
+## Módulo: inference.py
 
-### Direct Module Usage
+### Clases
 
-Instead of HTTP, you can use QZero modules directly:
+#### `InferenceEngine`
 
+Motor de inferencia para detección de anomalías.
+
+**Constructor:**
 ```python
-from src.preprocessing.data_loader import DataLoader, generate_synthetic_data
-from src.preprocessing.feature_engineering import FeatureEngineer
-from src.quantum.qsvm import QSVM, QSVMConfig
-from src.quantum.qivae import QIVAE, QIVAEConfig
-from src.classical.baseline import ClassicalBaseline
-
-# Load data
-loader = DataLoader()
-X, y = generate_synthetic_data(n_samples=1000)
-data = loader.prepare_data(X, y, binary=True)
-
-# Train QSVM
-config = QSVMConfig(n_qubits=4, max_samples_quantum=200)
-engineer = FeatureEngineer(n_qubits=4)
-
-X_train_q = engineer.fit_transform(data["X_train"], data["y_train"])
-X_test_q = engineer.transform(data["X_test"])
-
-qsvm = QSVM(config)
-result = qsvm.fit_evaluate(X_train_q, data["y_train"], X_test_q, data["y_test"])
-
-print(f"QSVM Accuracy: {result.accuracy:.4f}")
-print(f"QSVM F1 Score: {result.f1_score:.4f}")
+InferenceEngine(model_path=None, threshold=0.7)
 ```
 
-### QI-VAE for Anomaly Detection
+**Parámetros:**
+- `model_path` (str): Ruta al modelo ML
+- `threshold` (float): Umbral de detección
 
+**Métodos:**
+- `extract_features(packet)`: Extrae features
+- `predict(packet)`: Predice anomalía
+- `is_anomaly(packet)`: Determina si es anomalía
+- `_simulate_prediction(packet)`: Predicción simulada
+
+**Ejemplo:**
 ```python
-from src.quantum.qivae import QIVAE, QIVAEConfig
+from qzero.inference import InferenceEngine
 
-# Configure
-config = QIVAEConfig(
-    input_dim=14,
-    latent_dim=4,
-    hidden_dims=(64, 32),
-    epochs=50,
-    batch_size=32,
-    anomaly_threshold_percentile=95.0
+engine = InferenceEngine(threshold=0.7)
+
+packet = {
+    "source": "192.168.1.1",
+    "destination": "10.0.0.1",
+    "protocol": "TCP",
+    "size": 100,
+    "payload": b"test",
+    "metadata": {
+        "ttl": 64,
+        "flags": "S"
+    }
+}
+
+is_anomaly, confidence, probability = engine.is_anomaly(packet)
+```
+
+#### `FastInferencePipeline`
+
+Pipeline de inferencia rápido.
+
+**Constructor:**
+```python
+FastInferencePipeline(engine, window_size=100, min_samples=10)
+```
+
+**Parámetros:**
+- `engine` (InferenceEngine): Engine de inferencia
+- `window_size` (int): Tamaño de ventana
+- `min_samples` (int): Muestras mínimas
+
+**Métodos:**
+- `add_packet(packet)`: Añade paquete
+- `get_stats()`: Obtiene estadísticas
+- `train_from_window()`: Entrena con ventana
+- `get_anomaly_pattern()`: Detecta patrones
+
+---
+
+## Módulo: response.py
+
+### Clases
+
+#### `Alert`
+
+Representa una alerta.
+
+**Atributos:**
+- `id` (str): ID único
+- `timestamp` (datetime): Timestamp
+- `level` (AlertLevel): Nivel de severidad
+- `alert_type` (AlertType): Tipo de alerta
+- `source` (str): Fuente
+- `destination` (str): Destino
+- `message` (str): Mensaje
+- `details` (dict): Detalles adicionales
+- `confidence` (float): Confianza
+- `is_acknowledged` (bool): Si está reconocida
+
+**Método:**
+- `to_dict()`: Convierte a diccionario
+
+#### `AlertManager`
+
+Gestor de alertas.
+
+**Constructor:**
+```python
+AlertManager(alert_dir="/home/thempra/projects/qzero/alerts", max_age_hours=24)
+```
+
+**Parámetros:**
+- `alert_dir` (str): Directorio de alertas
+- `max_age_hours` (int): Máxima edad
+
+**Métodos:**
+- `create_alert(...)`: Crea alerta
+- `check_anomaly(...)`: Verifica anomalía
+- `acknowledge_alert(alert_id)`: Reconoce alerta
+- `get_pending_alerts()`: Obtiene alertas pendientes
+- `cleanup_old_alerts()`: Limpia alertas antiguas
+- `get_stats()`: Obtiene estadísticas
+
+**Ejemplo:**
+```python
+from qzero.response import AlertManager, AlertLevel, AlertType
+
+manager = AlertManager()
+
+alert = manager.create_alert(
+    alert_type=AlertType.ANOMALY_DETECTED,
+    level=AlertLevel.WARNING,
+    source="192.168.1.1",
+    destination="10.0.0.1",
+    message="Tráfico anómalo detectado",
+    confidence=0.8
 )
 
-# Train on normal data only
-qivae = QIVAE(config)
-normal_mask = data["y_train"] == 0
-X_normal = data["X_train"][normal_mask]
-
-qivae.fit(X_normal, verbose=True)
-
-# Detect anomalies
-anomaly_scores = qivae.predict_anomaly_scores(data["X_test"])
-predictions = qivae.predict(data["X_test"])
-
-print(f"Detected {predictions.sum()} anomalies")
+manager.acknowledge_alert(alert.id)
 ```
 
-### Classical Baselines
+#### `ResponseEngine`
 
+Motor de respuesta automática.
+
+**Constructor:**
 ```python
-from src.classical.baseline import run_all_baselines, print_comparison_table
-
-# Run all classical models
-results = run_all_baselines(
-    data["X_train"], data["y_train"],
-    data["X_test"], data["y_test"],
-    models=["random_forest", "svm_rbf", "gradient_boosting", "mlp"]
-)
-
-# Print comparison
-print_comparison_table(results)
-
-# Get best model
-best = max(results, key=lambda r: r.f1)
-print(f"Best model: {best.name} (F1: {best.f1:.4f})")
+ResponseEngine(alert_manager)
 ```
 
----
-
-## Rate Limiting
-
-> ⚠️ **Not Implemented**: Rate limiting should be added for production
-
-Recommended limits:
-- `/analyze`: 10 requests/minute per IP
-- `/`: 100 requests/minute per IP
+**Métodos:**
+- `register_callback(callback)`: Registra callback
+- `process_alert(alert)`: Procesa alerta
+- `auto_response(alert)`: Respuesta automática
 
 ---
 
-## Versioning
+## Módulo: containers.py
 
-API versioning will be introduced in future releases:
+### Clases
 
+#### `DockerNamespace`
+
+Monitor de namespaces Docker.
+
+**Constructor:**
+```python
+DockerNamespace(namespace="default")
 ```
-/v1/analyze  # Current (implicit)
-/v2/analyze  # Future
+
+**Parámetros:**
+- `namespace` (str): Namespace de Docker
+
+**Métodos:**
+- `is_available()`: Verifica disponibilidad
+- `list_containers()`: Lista contenedores
+- `get_container_traffic(container_name)`: Obtiene tráfico
+- `get_namespace_containers()`: Obtiene todos
+- `get_container_stats(container_name)`: Obtiene stats
+
+#### `KubeNamespace`
+
+Monitor de namespaces Kubernetes.
+
+**Constructor:**
+```python
+KubeNamespace(namespace="default")
 ```
 
+**Parámetros:**
+- `namespace` (str): Namespace de Kubernetes
+
+**Métodos:**
+- `is_available()`: Verifica disponibilidad
+- `list_pods()`: Lista pods
+- `get_pod_traffic(pod_name)`: Obtiene tráfico
+- `get_namespace_pods()`: Obtiene todos
+- `get_pod_stats(pod_name)`: Obtiene stats
+
+#### `ContainerMonitor`
+
+Monitor general de contenedores.
+
+**Constructor:**
+```python
+ContainerMonitor(container_type, namespace="default")
+```
+
+**Parámetros:**
+- `container_type` (ContainerType): Tipo de contenedor
+- `namespace` (str): Namespace
+
+**Métodos:**
+- `get_containers()`: Lista contenedores
+- `get_container_info(container_name)`: Información
+- `get_all_containers_info()`: Todos
+- `monitor_traffic(container_name, callback)`: Monitorea
+- `start_namespace_monitor(interval, callback)`: Monitor namespace
+
+#### `ContainerIntegration`
+
+Integración de contenedores con QZero.
+
+**Constructor:**
+```python
+ContainerIntegration()
+```
+
+**Métodos:**
+- `is_available()`: Verifica disponibilidad
+- `scan_containers()`: Escanea contenedores
+- `get_container_alerts(container_name)`: Alertas
+- `monitor_intra_container(container_name)`: Monitoreo intra-contenedor
+
 ---
 
-## Changelog
+## Enums
 
-### v1.0.0 (Current)
-- Initial release
-- `/analyze` endpoint for CSV files
-- Health check endpoint
-- Quantum anomaly scoring (simulated)
+### `AlertLevel`
 
-### Planned Features
-- [ ] Batch analysis endpoint
-- [ ] Streaming analysis (WebSocket)
-- [ ] Model selection parameter
-- [ ] Detailed per-flow results
-- [ ] Authentication/API keys
-- [ ] Rate limiting
+Niveles de alerta.
+- `INFO`: Información
+- `WARNING`: Advertencia
+- `CRITICAL`: Crítico
+- `SEVERE`: Severo
+
+### `AlertType`
+
+Tipos de alerta.
+- `ANOMALY_DETECTED`: Anomalía detectada
+- `PORT_SCAN`: Port scan
+- `MALWARE_TRAFFIC`: Tráfico malware
+- `SUSPICIOUS_PATTERN`: Patrón sospechoso
+- `HIGH_RATE`: Tasa alta
+- `NETWORK_SPAWN`: Spawn de red
+- `RESOURCE_SPIKE`: Spike de recursos
+
+### `ContainerType`
+
+Tipos de contenedores.
+- `DOCKER`: Docker
+- `KUBERNETES`: Kubernetes
+- `POD`: Pod
 
 ---
 
-*Document Version: 1.0.0 | Last Updated: 2025*
+## Módulos CLI
+
+### `qzero/cli/sniffer.py`
+
+Funciones y clases para el CLI de sniffer.
+
+### `qzero/cli/pipeline.py`
+
+Funciones para el CLI de pipeline.
+
+### `qzero/cli/inference.py`
+
+Funciones para el CLI de inference.
+
+### `qzero/cli/response.py`
+
+Funciones para el CLI de response.
+
+### `qzero/cli/containers.py`
+
+Funciones para el CLI de containers.
+
+---
+
+## Comandos CLI
+
+### `qzero sniffer list`
+Lista interfaces de red.
+
+### `qzero sniffer start --interface eth0 --promiscuous`
+Inicia captura en tiempo real.
+
+### `qzero pipeline run --interface eth0`
+Ejecuta pipeline de ingestión.
+
+### `qzero inference train --threshold 0.7`
+Entrena modelo de inferencia.
+
+### `qzero inference test --duration 50`
+Testea modelo de inferencia.
+
+### `qzero alerts list`
+Lista alertas pendientes.
+
+### `qzero alerts create --type anomaly_detected --level warning ...`
+Crea alerta manual.
+
+### `qzero containers list`
+Lista contenedores.
+
+### `qzero containers scan`
+Escanea contenedores.
+
+### `qzero containers info --container-type docker --container myapp`
+Información de contenedor.
+
+### `qzero containers monitor --container-type docker --container myapp`
+Monitorea contenedor.
+
+---
+
+## Licencia
+
+Este módulo es parte del proyecto QZero y está licenciado bajo la Licencia MIT.

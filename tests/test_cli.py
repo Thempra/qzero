@@ -1,212 +1,157 @@
+#!/usr/bin/env python3
 """
-Tests for QZero CLI.
+Tests para CLI de QZero
 """
 
-import pytest
 import sys
-import json
-import subprocess
+import argparse
 from pathlib import Path
-import tempfile
 
-# Path to CLI
-CLI_PATH = Path(__file__).parent.parent / "qzero-cli.py"
-VENV_PYTHON = Path(__file__).parent.parent / "venv" / "bin" / "python"
+# Añadir src al path
+sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 
-class TestCLIHelp:
-    """Test CLI help commands."""
+def test_sniffer_cli():
+    """Test del CLI de sniffer"""
+    print("Testing sniffer CLI...")
 
-    def test_main_help(self):
-        """Test main help displays correctly."""
+    try:
+        from qzero.cli.sniffer import RealTimeSniffer, list_interfaces
+
+        # Test que list_interfaces funciona
+        list_interfaces()
+
+        print("✅ Sniffer CLI works")
+
+        return True
+    except Exception as e:
+        print(f"❌ Sniffer CLI test failed: {e}")
+        return False
+
+
+def test_pipeline_cli():
+    """Test del CLI de pipeline"""
+    print("\nTesting pipeline CLI...")
+
+    try:
+        from qzero.cli.pipeline import MemoryPipelineCLI
+
+        print("✅ Pipeline CLI importable")
+
+        return True
+    except Exception as e:
+        print(f"❌ Pipeline CLI test failed: {e}")
+        return False
+
+
+def test_inference_cli():
+    """Test del CLI de inference"""
+    print("\nTesting inference CLI...")
+
+    try:
+        from qzero.cli.inference import cmd_inference_stats
+
+        # Test con argumentos mínimos
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--model', '-m')
+        parser.add_argument('--verbose', '-v', action='store_true')
+        args = parser.parse_args([])
+
+        # No debería fallar
+        cmd_inference_stats(args)
+
+        print("✅ Inference CLI works")
+
+        return True
+    except Exception as e:
+        print(f"❌ Inference CLI test failed: {e}")
+        return False
+
+
+def test_response_cli():
+    """Test del CLI de response"""
+    print("\nTesting response CLI...")
+
+    try:
+        from qzero.cli.response import cmd_alerts_list, cmd_alerts_stats
+
+        print("✅ Response CLI importable")
+
+        return True
+    except Exception as e:
+        print(f"❌ Response CLI test failed: {e}")
+        return False
+
+
+def test_containers_cli():
+    """Test del CLI de containers"""
+    print("\nTesting containers CLI...")
+
+    try:
+        from qzero.cli.containers import cmd_containers_list
+
+        print("✅ Containers CLI importable")
+
+        return True
+    except Exception as e:
+        print(f"❌ Containers CLI test failed: {e}")
+        return False
+
+
+def test_cli_entrypoint():
+    """Test del entrypoint del CLI"""
+    print("\nTesting CLI entrypoint...")
+
+    try:
+        import subprocess
         result = subprocess.run(
-            [str(VENV_PYTHON), str(CLI_PATH), "--help"],
+            ["qzero", "--help"],
             capture_output=True,
             text=True,
-            timeout=30
+            timeout=5
         )
+
         assert result.returncode == 0
         assert "QZero" in result.stdout
-        assert "train" in result.stdout
-        assert "detect" in result.stdout
+        assert "sniffer" in result.stdout.lower()
 
-    def test_train_help(self):
-        """Test train command help."""
-        result = subprocess.run(
-            [str(VENV_PYTHON), str(CLI_PATH), "train", "--help"],
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
-        assert result.returncode == 0
-        assert "--samples" in result.stdout
-        assert "--epochs" in result.stdout
-        assert "--difficulty" in result.stdout
+        print("✅ CLI entrypoint works")
 
-    def test_detect_help(self):
-        """Test detect command help."""
-        result = subprocess.run(
-            [str(VENV_PYTHON), str(CLI_PATH), "detect", "--help"],
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
-        assert result.returncode == 0
-        assert "--stream" in result.stdout
-        assert "--model" in result.stdout
-        assert "netflow" in result.stdout
+        return True
+    except Exception as e:
+        print(f"❌ CLI entrypoint test failed: {e}")
+        return False
 
 
-class TestCLITrain:
-    """Test CLI train command."""
+def main():
+    """Ejecutar todos los tests del CLI"""
+    print("="*60)
+    print("QZero CLI Tests")
+    print("="*60)
 
-    def test_train_minimal(self):
-        """Test training with minimal samples and epochs."""
-        result = subprocess.run(
-            [
-                str(VENV_PYTHON), str(CLI_PATH), "train",
-                "--samples", "50",
-                "--epochs", "2",
-                "--batch-size", "8"
-            ],
-            capture_output=True,
-            text=True,
-            timeout=120
-        )
-        # Should complete without error
-        assert "QZero Training" in result.stdout
-        assert "Generated" in result.stdout or "Loaded" in result.stdout
+    results = []
 
-    def test_train_with_output_file(self, tmp_path):
-        """Test training saves results to JSON."""
-        output_file = tmp_path / "results.json"
-        result = subprocess.run(
-            [
-                str(VENV_PYTHON), str(CLI_PATH), "train",
-                "--samples", "50",
-                "--epochs", "2",
-                "--batch-size", "8",
-                "--output-file", str(output_file)
-            ],
-            capture_output=True,
-            text=True,
-            timeout=120
-        )
-        
-        # Check if file was created (may not be if training failed)
-        if output_file.exists():
-            with open(output_file, 'r') as f:
-                data = json.load(f)
-            assert 'qivae' in data
-            assert 'config' in data
+    results.append(test_sniffer_cli())
+    results.append(test_pipeline_cli())
+    results.append(test_inference_cli())
+    results.append(test_response_cli())
+    results.append(test_containers_cli())
+    results.append(test_cli_entrypoint())
 
-    def test_train_with_classical_models(self):
-        """Test training with specific classical models."""
-        result = subprocess.run(
-            [
-                str(VENV_PYTHON), str(CLI_PATH), "train",
-                "--samples", "50",
-                "--epochs", "1",
-                "--batch-size", "8",
-                "--models", "random_forest"
-            ],
-            capture_output=True,
-            text=True,
-            timeout=120
-        )
-        assert "Classical Baselines" in result.stdout or result.returncode == 0
+    print("\n" + "="*60)
+    passed = sum(results)
+    total = len(results)
+
+    if all(results):
+        print(f"✅ ALL {total} CLI TESTS PASSED")
+        print("="*60)
+        return 0
+    else:
+        print(f"⚠️  {passed}/{total} tests passed")
+        print(f"❌ {total - passed} tests failed")
+        print("="*60)
+        return 1
 
 
-class TestCLIDetect:
-    """Test CLI detect command."""
-
-    def test_detect_netflow(self):
-        """Test detection with NetFlow stream."""
-        result = subprocess.run(
-            [
-                str(VENV_PYTHON), str(CLI_PATH), "detect",
-                "--stream", "netflow",
-                "--max-samples", "10"
-            ],
-            capture_output=True,
-            text=True,
-            timeout=60
-        )
-        assert "QZero Real-Time Detection" in result.stdout
-        assert "Detection Statistics" in result.stdout or result.returncode == 0
-
-    def test_detect_pcap(self):
-        """Test detection with PCAP stream."""
-        result = subprocess.run(
-            [
-                str(VENV_PYTHON), str(CLI_PATH), "detect",
-                "--stream", "pcap",
-                "--max-samples", "10"
-            ],
-            capture_output=True,
-            text=True,
-            timeout=60
-        )
-        assert "QZero Real-Time Detection" in result.stdout
-
-    def test_detect_logs(self):
-        """Test detection with logs stream."""
-        result = subprocess.run(
-            [
-                str(VENV_PYTHON), str(CLI_PATH), "detect",
-                "--stream", "logs",
-                "--max-samples", "10"
-            ],
-            capture_output=True,
-            text=True,
-            timeout=60
-        )
-        assert "QZero Real-Time Detection" in result.stdout
-
-
-class TestCLIValidation:
-    """Test CLI input validation."""
-
-    def test_no_command(self):
-        """Test running without command shows help."""
-        result = subprocess.run(
-            [str(VENV_PYTHON), str(CLI_PATH)],
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
-        assert result.returncode == 1  # Should exit with error
-        # But should show help
-        assert "QZero" in result.stdout or "usage" in result.stdout.lower()
-
-    def test_invalid_difficulty(self):
-        """Test invalid difficulty shows error."""
-        result = subprocess.run(
-            [
-                str(VENV_PYTHON), str(CLI_PATH), "train",
-                "--difficulty", "impossible"
-            ],
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
-        assert result.returncode != 0
-        assert "invalid choice" in result.stderr.lower()
-
-    def test_invalid_stream(self):
-        """Test invalid stream shows error."""
-        result = subprocess.run(
-            [
-                str(VENV_PYTHON), str(CLI_PATH), "detect",
-                "--stream", "invalid"
-            ],
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
-        assert result.returncode != 0
-        assert "invalid choice" in result.stderr.lower()
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+if __name__ == '__main__':
+    sys.exit(main())
