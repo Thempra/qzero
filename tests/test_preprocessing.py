@@ -11,12 +11,12 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from preprocessing.data_loader import (
+from qzero.preprocessing.data_loader import (
     generate_synthetic_data,
     DataLoader,
     UGRANSOME_FEATURES,
 )
-from preprocessing.feature_engineering import FeatureEngineer, create_quantum_features
+from qzero.preprocessing.feature_engineering import FeatureEngineer, create_quantum_features
 
 
 class TestSyntheticDataGeneration:

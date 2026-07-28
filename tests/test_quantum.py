@@ -9,8 +9,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from preprocessing.data_loader import generate_synthetic_data, DataLoader
-from preprocessing.feature_engineering import FeatureEngineer
+from qzero.preprocessing.data_loader import generate_synthetic_data, DataLoader
+from qzero.preprocessing.feature_engineering import FeatureEngineer
 
 # Conditional imports - tests skip if Qiskit not available
 try:

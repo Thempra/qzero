@@ -6,7 +6,7 @@ import pytest
 import numpy as np
 import pandas as pd
 
-from src.preprocessing.feature_engineering import FeatureEngineer, create_quantum_features
+from qzero.preprocessing.feature_engineering import FeatureEngineer, create_quantum_features
 
 
 class TestFeatureEngineer:

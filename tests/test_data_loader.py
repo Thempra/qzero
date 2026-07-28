@@ -6,7 +6,7 @@ import pytest
 import numpy as np
 import pandas as pd
 
-from src.preprocessing.data_loader import DataLoader, generate_synthetic_data
+from qzero.preprocessing.data_loader import DataLoader, generate_synthetic_data
 
 
 class TestGenerateSyntheticData:

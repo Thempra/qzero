@@ -11,12 +11,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from preprocessing.data_loader import generate_synthetic_data, DataLoader
-from preprocessing.feature_engineering import FeatureEngineer
-from classical.baseline import ClassicalBaseline, run_all_baselines
-from quantum.qsvm import QSVM, QSVMConfig
-from quantum.qivae import QIVAE, QIVAEConfig
-from evaluation.metrics import evaluate_model, evaluate_zero_day_detection
+from qzero.preprocessing.data_loader import generate_synthetic_data, DataLoader
+from qzero.preprocessing.feature_engineering import FeatureEngineer
+from qzero.classical.baseline import ClassicalBaseline, run_all_baselines
+from qzero.quantum.qsvm import QSVM, QSVMConfig
+from qzero.quantum.qivae import QIVAE, QIVAEConfig
+from qzero.evaluation.metrics import evaluate_model, evaluate_zero_day_detection
 
 
 class TestFullPipeline:

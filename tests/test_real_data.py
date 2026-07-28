@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from preprocessing.data_loader import DataLoader
+from qzero.preprocessing.data_loader import DataLoader
 
 
 class TestRealDataset:

@@ -1,31 +1,34 @@
-# Base image
-FROM python:3.10-slim
+# QZero API — Production Dockerfile for Coolify
+# Quantum-Enhanced Threat Detection Platform v3.0.0
 
-# Set working directory
+FROM python:3.11-slim
+
 WORKDIR /app
 
-# Install system dependencies (needed for some scientific packages)
+# Install system deps
 RUN apt-get update && apt-get install -y \
     build-essential \
+    curl \
+    tcpdump \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first to leverage Docker cache
-COPY requirements.txt .
+# Copy dependency files first (Docker layer caching)
+COPY pyproject.toml requirements.txt requirements-dev.txt ./
+COPY src/ ./src/
 
-# Install Python dependencies
-# Agregamos fastapi y uvicorn que no estaban en el requirements original
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir fastapi uvicorn python-multipart
-
-# Copy project files
-COPY . .
+# Install the project (editable — keeps src/ layout)
+RUN pip install --no-cache-dir -e ".[api]"
 
 # Expose API port
 EXPOSE 8000
 
-# Set environment variables
-ENV PYTHONPATH=/app
-ENV QZERO_ENV=production
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
 
-# Command to run the API
-CMD ["python", "src/api.py"]
+ENV QZERO_ENV=production
+ENV PYTHONPATH=/app/src
+ENV LOG_LEVEL=INFO
+
+# Run API via uvicorn
+CMD ["uvicorn", "qzero.api.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--log-level", "info"]

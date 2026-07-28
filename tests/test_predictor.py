@@ -7,8 +7,8 @@ import numpy as np
 import tempfile
 from pathlib import Path
 
-from src.predictor import QZeroPredictor
-from src.preprocessing.data_loader import generate_synthetic_data
+from qzero.core.predictor import QZeroPredictor
+from qzero.preprocessing.data_loader import generate_synthetic_data
 
 
 class TestQZeroPredictorInit:
