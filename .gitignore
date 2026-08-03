@@ -83,3 +83,5 @@ models/
 *.pkl
 *.pt
 *.h5
+data/*.db
+data/hub/
