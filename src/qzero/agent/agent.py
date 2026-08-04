@@ -125,9 +125,14 @@ class QZeroAgent:
             use_qsvm=self.config.use_qsvm,
             use_qivae=self.config.use_qivae,
         )
-        if self.config.model_dir and Path(self.config.model_dir).exists():
-            qzero.load(self.config.model_dir)
-            logger.info("Loaded pre-trained models from %s", self.config.model_dir)
+        model_dir = Path(self.config.model_dir) if self.config.model_dir else None
+        # A mounted-but-empty volume creates the dir but holds no models yet.
+        has_models = bool(
+            model_dir and model_dir.exists() and (model_dir / "scaler.pkl").exists()
+        )
+        if has_models:
+            qzero.load(str(model_dir))
+            logger.info("Loaded pre-trained models from %s", model_dir)
         else:
             logger.info(
                 "No model dir — training on synthetic data (qsvm=%s, qivae=%s, "
