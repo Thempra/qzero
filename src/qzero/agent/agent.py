@@ -131,8 +131,18 @@ class QZeroAgent:
             model_dir and model_dir.exists() and (model_dir / "scaler.pkl").exists()
         )
         if has_models:
-            qzero.load(str(model_dir))
-            logger.info("Loaded pre-trained models from %s", model_dir)
+            try:
+                qzero.load(str(model_dir))
+                logger.info("Loaded pre-trained models from %s", model_dir)
+            except Exception as e:  # noqa: BLE001 — corrupt/incomplete volume
+                logger.warning("Model load failed (%s) — retraining.", e)
+                qzero = QZero(
+                    n_qubits=self.config.n_qubits,
+                    use_qsvm=self.config.use_qsvm,
+                    use_qivae=self.config.use_qivae,
+                )
+                qzero.train(n_samples=self.config.train_samples)
+                self._persist_models(qzero)
         else:
             logger.info(
                 "No model dir — training on synthetic data (qsvm=%s, qivae=%s, "
@@ -142,16 +152,21 @@ class QZeroAgent:
             qzero.train(n_samples=self.config.train_samples)
             # Persist trained models so the agent starts fast on next boot
             # instead of re-training the quantum stack every time.
-            if self.config.model_dir:
-                try:
-                    qzero.save(self.config.model_dir)
-                    logger.info("Saved freshly trained models to %s", self.config.model_dir)
-                except Exception as e:  # noqa: BLE001
-                    logger.warning("Could not save models: %s", e)
+            self._persist_models(qzero)
         self._predictor = qzero.predictor
 
         from qzero.core.detector import NetworkTrafficAnalyzer
         self._analyzer = NetworkTrafficAnalyzer(predictor=self._predictor)
+
+    def _persist_models(self, qzero) -> None:
+        """Save freshly trained models if a model_dir is configured."""
+        if not self.config.model_dir:
+            return
+        try:
+            qzero.save(self.config.model_dir)
+            logger.info("Saved freshly trained models to %s", self.config.model_dir)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Could not save models: %s", e)
 
     # ------------------------------------------------------------------
     # Capture + analyze loop
