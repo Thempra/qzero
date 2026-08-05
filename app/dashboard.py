@@ -16,10 +16,10 @@ import time
 # Add project root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.preprocessing.data_loader import generate_synthetic_data, DataLoader
-from src.preprocessing.feature_engineering import FeatureEngineer
+from qzero.preprocessing.data_loader import generate_synthetic_data, DataLoader
+from qzero.preprocessing.feature_engineering import FeatureEngineer
 from pathlib import Path
-from src.classical.baseline import ClassicalBaseline, run_all_baselines
+from qzero.classical.baseline import ClassicalBaseline, run_all_baselines
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 
@@ -309,7 +309,7 @@ def main():
             if st.button("Train QSVM", type="primary"):
                 with st.spinner("Training quantum model... (this may take a while)"):
                     try:
-                        from src.quantum.qsvm import QSVM, QSVMConfig
+                        from qzero.quantum.qsvm import QSVM, QSVMConfig
                         
                         # Feature engineering
                         engineer = FeatureEngineer(n_qubits=n_qubits, reduction_method='pca')
