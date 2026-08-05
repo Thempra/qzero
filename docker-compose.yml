@@ -11,15 +11,6 @@ services:
     container_name: qzero-api
     ports:
       - "${API_PORT:-8000}:8000"
-    networks:
-      - default
-      - traefik
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.qzero.entrypoints=web,websecure"
-      - "traefik.http.routers.qzero.rule=Host(`qzero.thempra.net`)"
-      - "traefik.http.routers.qzero.tls=true"
-      - "traefik.http.routers.qzero.tls.certresolver=letsencrypt"
     environment:
       - QZERO_ENV=${QZERO_ENV:-production}
       - PYTHONPATH=${PYTHONPATH:-/app/src}
@@ -49,7 +40,7 @@ services:
           cpus: '${QZERO_CPU_LIMIT:-4}'
           memory: ${QZERO_MEM_LIMIT:-8G}
 
-  # Streamlit Dashboard (optional)
+  # Streamlit Dashboard (public UI at qzero.thempra.net via main Traefik)
   qzero-dashboard:
     build:
       context: .
@@ -57,14 +48,21 @@ services:
     container_name: qzero-dashboard
     ports:
       - "${DASHBOARD_PORT:-8501}:8501"
+    networks:
+      - default
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.qzero.entrypoints=web,websecure"
+      - "traefik.http.routers.qzero.rule=Host(`qzero.thempra.net`)"
+      - "traefik.http.routers.qzero.tls=true"
+      - "traefik.http.routers.qzero.tls.certresolver=letsencrypt"
     environment:
       - QZERO_API_URL=http://qzero-api:8000
       - STREAMLIT_SERVER_HEADLESS=true
     depends_on:
       qzero-api:
         condition: service_healthy
-    profiles:
-      - dashboard
     restart: unless-stopped
 
 volumes:
