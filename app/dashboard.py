@@ -270,7 +270,9 @@ def module_overview(online_window_min):
     with col_l:
         st.markdown("##### Distribución por severidad")
         fig = severity_donut(sev_df)
-        st.plotly_chart(fig, use_container_width=True) if fig else \
+        if fig is not None:
+            st.plotly_chart(fig, use_container_width=True)
+        else:
             st.dataframe(sev_df, use_container_width=True, hide_index=True)
 
     with col_r:
@@ -293,7 +295,9 @@ def module_overview(online_window_min):
                 return "viol" if "Brute" in t or "Listener" in t else (
                     "high" if "ICMP" in t else "")
             fig = threat_type_bar(tc.head(8))
-            st.plotly_chart(fig, use_container_width=True) if fig else \
+            if fig is not None:
+                st.plotly_chart(fig, use_container_width=True)
+            else:
                 st.dataframe(tc.head(8), use_container_width=True, hide_index=True)
         else:
             st.info("Enriquecimiento no disponible.")
@@ -437,7 +441,8 @@ def module_threats(enriched):
         st.dataframe(df, use_container_width=True, hide_index=True)
     with col2:
         fig = threat_type_bar(df)
-        st.plotly_chart(fig, use_container_width=True) if fig else None
+        if fig is not None:
+            st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("#### Detalle por tipo")
     seen = []
