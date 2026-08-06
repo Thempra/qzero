@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application + project source (dashboard.py imports `from src...`)
 COPY app/ ./app/
 COPY src/ ./src/
+COPY .streamlit/ ./.streamlit/
 
 # Expose Streamlit port
 EXPOSE 8501
