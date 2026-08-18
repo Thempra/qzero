@@ -29,6 +29,15 @@ services:
     volumes:
       - qzero-agent-models:/app/models
     restart: unless-stopped
+    # Liveness probe for monitoring: the agent exposes no HTTP, so check the
+    # process is alive. [q] avoids pgrep -f matching this healthcheck itself.
+    # start_period covers the startup model training (TRAIN_SAMPLES captures).
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f '[q]zero agent' >/dev/null 2>&1 || exit 1"]
+      interval: 60s
+      timeout: 10s
+      start_period: 300s
+      retries: 3
 
 volumes:
   qzero-agent-models:
