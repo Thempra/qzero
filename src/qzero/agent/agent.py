@@ -213,6 +213,11 @@ class QZeroAgent:
                 if alerts:
                     self._emit_alerts(alerts)
 
+                # Heartbeat keeps the agent "online" in the hub even when the
+                # (improved) filter suppresses all alerts — otherwise the agent
+                # would only touch the hub on alerts and show offline.
+                self._heartbeat()
+
                 # Enforce interval pacing if capture returned early
                 elapsed = time.time() - window_start
                 if keep_running and elapsed < self.config.interval:
@@ -337,6 +342,32 @@ class QZeroAgent:
         else:
             self.stats["push_failures"] += 1
             self._spool_locally(alerts)
+
+    def _heartbeat(self) -> None:
+        """Report 'agent alive' to the hub even when there are no alerts."""
+        if not self.config.hub_url:
+            return
+        url = self.config.hub_url.rstrip("/") + (
+            "/api/v1/agents/{agent_id}/heartbeat".format(
+                agent_id=self.config.agent_id
+            )
+        )
+        payload = {
+            "agent_name": self.config.agent_name,
+            "interface": self.config.interface,
+        }
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                if 200 <= resp.status < 300:
+                    logger.debug("Heartbeat sent to %s", url)
+        except Exception as e:  # noqa: BLE001
+            logger.debug("Heartbeat failed: %s", e)
 
     def _push_with_retry(self, payload: Dict) -> bool:
         url = self.config.hub_url.rstrip("/") + DEFAULT_HUB_PATH.format(
