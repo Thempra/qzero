@@ -146,7 +146,7 @@ def kpi_card(label: str, value: str, sub: str = "", tone: str = ""):
 # ---------------------------------------------------------------------------
 # Hub API client (stdlib urllib)
 # ---------------------------------------------------------------------------
-def api_get(path: str, params: dict | None = None, timeout: float = 5.0):
+def api_get(path: str, params: dict | None = None, timeout: float = 15.0):
     url = f"{API}{path}"
     if params:
         url += "?" + urlencode({k: v for k, v in params.items() if v is not None})

@@ -62,6 +62,11 @@ class HubStore:
         with self._lock:
             self._conn.executescript(SCHEMA)
             self._conn.commit()
+        # Cache for summary(): the alerts table can grow very large (the false
+        # positive storm piled up ~1.9M rows), making COUNT/GROUP BY on every
+        # dashboard refresh slow. We recompute lazily and invalidate on ingest.
+        self._summary_cache: Optional[dict] = None
+        self._summary_cache_dirty = True
 
     # ------------------------------------------------------------------
     # Helpers
@@ -129,9 +134,27 @@ class HubStore:
                 (n, agent_id),
             )
             self._conn.commit()
+            # Summary is stale after any ingest (counts changed).
+            self._summary_cache_dirty = True
 
         logger.info("Hub ingested %d alert(s) from agent '%s'", n, agent_id)
         return {"received": n, "agent_id": agent_id}
+
+    def heartbeat(self, agent_id: str, agent_name: str = "", interface: str = "") -> Dict:
+        """
+        Lightweight contact from an agent with NO alerts (keeps last_seen fresh).
+
+        Agents are marked online by their last_seen. Before this endpoint, an
+        agent only touched the hub when it had alerts to push; once false
+        positives were suppressed the agent went silent and showed offline.
+        Heartbeats solve that: the agent reports 'alive' periodically even when
+        there is nothing to alert on.
+        """
+        with self._lock:
+            self._report_agent(agent_id, agent_name, interface)
+            # Only last_seen / agent presence changed; totals unchanged, so the
+            # cached summary stays valid. No need to dirty the cache.
+        return {"heartbeat": True, "agent_id": agent_id}
 
     # ------------------------------------------------------------------
     # Queries
@@ -166,6 +189,12 @@ class HubStore:
         return [dict(r) for r in rows]
 
     def summary(self) -> Dict:
+        # Serve from cache unless a ingest invalidated it. With ~1.9M alerts,
+        # a full COUNT + GROUP BY per dashboard refresh was ~6s and blew the
+        # dashboard's 5s timeout. Recompute once per ingest, then reuse.
+        if not self._summary_cache_dirty and self._summary_cache is not None:
+            return self._summary_cache
+
         with self._lock:
             total = self._conn.execute("SELECT COUNT(*) AS c FROM alerts").fetchone()["c"]
             by_sev = {
@@ -175,11 +204,15 @@ class HubStore:
                 ).fetchall()
             }
             n_agents = self._conn.execute("SELECT COUNT(*) AS c FROM agents").fetchone()["c"]
-        return {
+
+        result = {
             "total_alerts": total,
             "agents": n_agents,
             "by_severity": by_sev,
         }
+        self._summary_cache = result
+        self._summary_cache_dirty = False
+        return result
 
     def close(self) -> None:
         with self._lock:
