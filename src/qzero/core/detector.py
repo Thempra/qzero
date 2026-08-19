@@ -1,11 +1,13 @@
 """
 Network traffic analyzer for QZero.
-Extracts features from PCAP files and runs quantum anomaly detection.
+Extracts flow-level features from PCAP files and runs quantum anomaly detection.
 """
 
-import numpy as np
+import json
 from pathlib import Path
 from typing import Dict, List, Optional
+
+import numpy as np
 import pandas as pd
 import logging
 
@@ -15,7 +17,11 @@ logger = logging.getLogger(__name__)
 class NetworkTrafficAnalyzer:
     """
     Analyzes network traffic using QZero quantum models.
-    Extracts features from PCAP files and detects anomalies.
+
+    Extracts UGRansome-style FLOW features (not per-packet features) and
+    detects anomalies. Flow-level features keep training and inference in the
+    same feature space, which eliminates the out-of-distribution scoring that
+    caused the false positive storm.
 
     Usage:
         predictor = QZeroPredictor(...)
@@ -54,7 +60,6 @@ class NetworkTrafficAnalyzer:
             Analysis result dictionary.
         """
         from scapy.all import rdpcap
-        import json
 
         logger.info(f"Analyzing PCAP: {pcap_file}")
 
@@ -68,17 +73,20 @@ class NetworkTrafficAnalyzer:
 
         logger.info(f"  Packets read: {len(packets)}")
 
-        features = self._extract_features(packets)
+        features, flow_meta = self._extract_features(packets)
         if features is None or len(features) == 0:
             return {"status": "error", "message": "Could not extract features"}
 
         results = self._predict(features, method)
+        # Attach flow metadata (src/dst/ports/proto/bytes) aligned to each score
+        # so consumers (agent, postfilter) can reason per-flow instead of per-packet.
+        results["flow_meta"] = flow_meta if flow_meta else []
 
         analysis_result = {
             "status": "success",
             "filename": Path(pcap_file).name,
             "total_packets": len(packets),
-            "features_extracted": len(features),
+            "flows_extracted": len(features),
             "method": method,
             "results": results,
             "timestamp": pd.Timestamp.now().isoformat(),
@@ -94,66 +102,61 @@ class NetworkTrafficAnalyzer:
     def _extract_features(
         self,
         packets: List,
-        max_packets: int = 1000,
-    ) -> Optional[pd.DataFrame]:
+        max_packets: int = 100_000,
+    ) -> tuple:
         """
-        Extract numerical features from Scapy packets.
+        Extract FLOW features from Scapy packets using FlowExtractor.
 
         Args:
             packets: List of Scapy packets.
             max_packets: Maximum number of packets to process.
 
         Returns:
-            DataFrame with per-packet features, or None on failure.
+            (features_df, flow_meta) where features_df has the UGRansome flow
+            features (one row per flow) and flow_meta is a list of dicts, one
+            per flow, with 'src_ip','dst_ip','src_port','dst_port','proto',
+            'packets' and byte counts — aligned with DataFrame row order.
+            On failure returns (None, []).
         """
         try:
-            import scapy
-            from scapy.all import IP, TCP, UDP
+            from ..preprocessing.flow_extractor import FlowExtractor
 
-            features = []
-            for packet in packets[:max_packets]:
-                if not packet.haslayer(IP):
-                    continue
+            extractor = FlowExtractor()
+            features, flow_ids = extractor.extract_flows_with_ids(packets[:max_packets])
 
-                ip = packet[IP]
-                sport = dport = 0
+            if features is None or len(features) == 0:
+                return None, []
 
-                if packet.haslayer(TCP):
-                    sport = packet[TCP].sport
-                    dport = packet[TCP].dport
-                elif packet.haslayer(UDP):
-                    sport = packet[UDP].sport
-                    dport = packet[UDP].dport
-
-                src_ip_sum = sum(int(b) for b in ip.src.split("."))
-                dst_ip_sum = sum(int(b) for b in ip.dst.split("."))
-
-                features.append(
-                    {
-                        "src_ip_sum": src_ip_sum,
-                        "dst_ip_sum": dst_ip_sum,
-                        "protocol": ip.proto,
-                        "src_port": sport,
-                        "dst_port": dport,
-                        "packet_size": len(bytes(packet)),
-                    }
-                )
-
-            if not features:
-                return None
-
-            return pd.DataFrame(features)
+            flow_meta = [self._flow_meta(fid) for fid in flow_ids]
+            # Merge the computed features into each flow dict so downstream
+            # consumers (agent postfilter) can reason on bytes/packet counts.
+            for i, meta in enumerate(flow_meta):
+                if i < len(features):
+                    meta.update(features.iloc[i].to_dict())
+            return features, flow_meta
 
         except Exception as e:
-            logger.error(f"Feature extraction error: {e}")
-            return None
+            logger.error(f"Flow feature extraction error: {e}")
+            return None, []
+
+    @staticmethod
+    def _flow_meta(fid) -> Dict:
+        """Map a flow key (src, sport, dst, dport, proto) to an alertable dict."""
+        src_ip, sport, dst_ip, dport, proto = fid
+        return {
+            "src_ip": src_ip,
+            "dst_ip": dst_ip,
+            "src_port": sport,
+            "dst_port": dport,
+            "proto": proto,
+        }
 
     def _predict(self, features: pd.DataFrame, method: str = "best") -> Dict:
         """
-        Run anomaly detection on extracted features.
+        Run anomaly detection on extracted flow features.
 
         Args:
-            features: DataFrame with per-packet features.
+            features: DataFrame with UGRansome flow features (14 columns).
             method: 'qsvm', 'qivae', or 'best'.
 
         Returns:
@@ -173,19 +176,31 @@ class NetworkTrafficAnalyzer:
             }
 
         try:
+            from ..preprocessing.flow_extractor import FLOW_FEATURES
             from ..preprocessing.feature_engineering import FeatureEngineer
 
-            X = features.values.astype(float)
+            # Reindex to the exact training feature set (guaranteed order).
+            for col in FLOW_FEATURES:
+                if col not in features.columns:
+                    features[col] = 0.0
+            X = features[FLOW_FEATURES].values.astype(float)
 
-            # Scale with the predictor's fitted scaler, then reduce dims for quantum
+            # No padding/trimming hacks anymore: the FeatureEngineer already
+            # reduces to n_qubits via PCA, matching training exactly.
             if self.predictor.scaler is not None:
-                # Pad or trim columns to match training data dimensionality
-                n_train_features = self.predictor.scaler.n_features_in_
-                if X.shape[1] < n_train_features:
-                    padding = np.zeros((X.shape[0], n_train_features - X.shape[1]))
-                    X = np.hstack([X, padding])
-                elif X.shape[1] > n_train_features:
-                    X = X[:, :n_train_features]
+                expected = self.predictor.scaler.n_features_in_
+                if X.shape[1] != expected:
+                    logger.warning(
+                        "Feature dim mismatch: got %d, model expects %d. "
+                        "Re-train the model with the FlowExtractor first.",
+                        X.shape[1],
+                        expected,
+                    )
+                    if X.shape[1] < expected:
+                        padding = np.zeros((X.shape[0], expected - X.shape[1]))
+                        X = np.hstack([X, padding])
+                    else:
+                        X = X[:, :expected]
                 X = self.predictor.scaler.transform(X)
 
             predictions = self.predictor.predict(X, method=method)

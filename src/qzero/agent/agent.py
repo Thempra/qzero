@@ -226,7 +226,7 @@ class QZeroAgent:
             self._running = False
 
     def _analyze_window(self, packets, wrpcap) -> List[Dict]:
-        """Run detection on a captured window and return per-packet alerts."""
+        """Run detection on a captured window and return PER-FLOW alerts."""
         if self._analyzer is None:
             return []
 
@@ -239,15 +239,36 @@ class QZeroAgent:
             result = self._analyzer.analyze(tmp_path)
             res = result.get("results", {})
             scores = res.get("anomaly_scores", [])
+            predictions = res.get("predictions", [])
+            flow_meta = res.get("flow_meta", [])
+            if not flow_meta:
+                flow_meta = [{}] * len(scores)
 
             alerts = []
-            for i, pkt in enumerate(packets):
-                if i >= len(scores):
+            for i, score in enumerate(scores):
+                if len(alerts) >= self.config.max_alerts_per_batch:
                     break
-                score = float(scores[i])
-                if score < self.config.alert_threshold:
+                score = float(score)
+                flow = flow_meta[i] if i < len(flow_meta) else {}
+                is_anomaly = bool(predictions[i]) if i < len(predictions) else (
+                    score >= self.config.alert_threshold
+                )
+                if not is_anomaly:
                     continue
-                alerts.append(self._packet_alert(pkt, score))
+
+                # F5: classical post-filter — suppress benign normal behaviour.
+                from qzero.preprocessing.postfilter import PostFilter
+
+                suppress, reason = PostFilter().should_suppress(flow, score)
+                if suppress:
+                    logger.info(
+                        "Suppressed flow alert (%s) %s→%s proto=%s score=%s",
+                        reason, flow.get("src_ip"), flow.get("dst_ip"),
+                        flow.get("proto"), round(score, 2),
+                    )
+                    continue
+
+                alerts.append(self._flow_alert(flow, score))
                 if len(alerts) >= self.config.max_alerts_per_batch:
                     break
 
@@ -259,29 +280,14 @@ class QZeroAgent:
             if tmp_path:
                 Path(tmp_path).unlink(missing_ok=True)
 
-    def _packet_alert(self, pkt, score: float) -> Dict:
-        from scapy.all import IP, TCP, UDP
-
-        src = dst = "?"
-        sport = dport = 0
-        proto = 0
-        if pkt.haslayer(IP):
-            src = pkt[IP].src
-            dst = pkt[IP].dst
-            proto = pkt[IP].proto
-        if pkt.haslayer(TCP):
-            sport, dport = pkt[TCP].sport, pkt[TCP].dport
-        elif pkt.haslayer(UDP):
-            sport, dport = pkt[UDP].sport, pkt[UDP].dport
-
+    def _flow_alert(self, flow: Dict, score: float) -> Dict:
         return {
             "timestamp": datetime.now().isoformat(),
-            "src": src,
-            "dst": dst,
-            "protocol": proto,
-            "src_port": sport,
-            "dst_port": dport,
-            "size": len(bytes(pkt)),
+            "src": flow.get("src_ip", "?"),
+            "dst": flow.get("dst_ip", "?"),
+            "protocol": flow.get("proto", 0),
+            "src_port": flow.get("src_port", 0),
+            "dst_port": flow.get("dst_port", 0),
             "anomaly_score": round(score, 4),
             "severity": self._severity(score),
         }
