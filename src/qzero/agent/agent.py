@@ -1,5 +1,4 @@
-"""
-QZero Agent — real-time traffic monitor deployable on any server.
+"""QZero Agent — real-time traffic monitor deployable on any server.
 
 The agent continuously captures live network traffic, runs QZero's quantum
 anomaly detection on each capture window, and pushes any detected alerts to
@@ -286,15 +285,40 @@ class QZeroAgent:
                 Path(tmp_path).unlink(missing_ok=True)
 
     def _flow_alert(self, flow: Dict, score: float) -> Dict:
+        """Build a detailed per-flow alert from the detector's flow metadata."""
+        fwd_bytes = int(flow.get("total_length_fwd_packets", 0) or 0)
+        bwd_bytes = int(flow.get("total_length_bwd_packets", 0) or 0)
+        fwd_pkts = int(flow.get("total_fwd_packets", 0) or 0)
+        bwd_pkts = int(flow.get("total_bwd_packets", 0) or 0)
+
         return {
             "timestamp": datetime.now().isoformat(),
             "src": flow.get("src_ip", "?"),
             "dst": flow.get("dst_ip", "?"),
-            "protocol": flow.get("proto", 0),
-            "src_port": flow.get("src_port", 0),
-            "dst_port": flow.get("dst_port", 0),
+            "protocol": int(flow.get("proto", 0) or 0),
+            "src_port": int(flow.get("src_port", flow.get("sport", 0)) or 0),
+            "dst_port": int(flow.get("dst_port", flow.get("dport", 0)) or 0),
+            "size": fwd_bytes + bwd_bytes,
+            "packets": fwd_pkts + bwd_pkts,
             "anomaly_score": round(score, 4),
             "severity": self._severity(score),
+            # Rich flow detail for the SOC dashboard / forensics.
+            "detail": {
+                "duration_ms": flow.get("flow_duration", 0),
+                "bytes_per_sec": flow.get("flow_bytes_per_sec", 0),
+                "packets_per_sec": flow.get("flow_packets_per_sec", 0),
+                "fwd_packets": fwd_pkts,
+                "bwd_packets": bwd_pkts,
+                "fwd_bytes": fwd_bytes,
+                "bwd_bytes": bwd_bytes,
+                "fwd_packet_length_mean": flow.get("fwd_packet_length_mean", 0),
+                "bwd_packet_length_mean": flow.get("bwd_packet_length_mean", 0),
+                "fwd_iat_mean": flow.get("fwd_iat_mean", 0),
+                "bwd_iat_mean": flow.get("bwd_iat_mean", 0),
+                "fwd_psh_flags": flow.get("fwd_psh_flags", 0),
+                "bwd_psh_flags": flow.get("bwd_psh_flags", 0),
+                "fwd_urg_flags": flow.get("fwd_urg_flags", 0),
+            },
         }
 
     @staticmethod
@@ -317,9 +341,10 @@ class QZeroAgent:
         """Push alerts to the hub (with retry + local spool), and log them."""
         for a in alerts:
             logger.warning(
-                "⚠️  ALERT [%s] %s → %s proto=%s score=%s (%s)",
+                "⚠️  ALERT [%s] %s → %s proto=%s score=%s (%s) size=%sB pkts=%s",
                 a["severity"], a["src"], a["dst"], a.get("protocol"),
-                a["anomaly_score"], a["src_port"],
+                a["anomaly_score"], a.get("src_port"), a.get("size", 0),
+                a.get("packets", 0),
             )
 
         if not self.config.hub_url:
