@@ -110,6 +110,7 @@ SOC_CSS = """
   .soc-kpi .sub { font-size:.72rem; color:#5f6d82; margin-top:2px; }
   .soc-kpi.viol { border-left:3px solid #ef4444; }
   .soc-kpi.high { border-left:3px solid #f97316; }
+  .soc-kpi.med  { border-left:3px solid #f59e0b; }
   .soc-kpi.ok   { border-left:3px solid #34d399; }
 
   /* ---- severity badge ---- */
@@ -134,7 +135,7 @@ def sev_badge(sev: str) -> str:
 
 
 def kpi_card(label: str, value: str, sub: str = "", tone: str = ""):
-    tone_cls = {"viol": "viol", "high": "high", "ok": "ok"}.get(tone, "")
+    tone_cls = {"viol": "viol", "high": "high", "med": "med", "ok": "ok"}.get(tone, "")
     st.markdown(
         f'<div class="soc-kpi {tone_cls}">'
         f'<div class="label">{label}</div><div class="value">{value}</div>'
@@ -214,7 +215,6 @@ def render_topbar(agents_online: int, agents_total: int):
         f"""
         <div class="soc-topbar">
           <span class="soc-brand"><span class="dot">◈</span> QZero <span style="color:#7d8ba1;font-weight:600">· SOC</span></span>
-          <span class="soc-env">ENV · {ENV_LABEL}</span>
           <span class="soc-clock">🕐 {now}</span>
           <span class="soc-legend">Agentes: <b>{agents_online}</b>/<b>{agents_total}</b> online</span>
         </div>
@@ -272,7 +272,7 @@ def module_overview(online_window_min):
     with k3:
         kpi_card("Alta", f"{high:,}", "revisar", "high")
     with k4:
-        kpi_card("Media", f"{med:,}", "monitor", "")
+        kpi_card("Media", f"{med:,}", "monitor", "med")
     with k5:
         kpi_card("Agentes", f"{n_agents}", "registrados", "ok")
 
