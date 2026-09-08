@@ -1,7 +1,6 @@
-# QZero Docker Compose
-# Quantum-Enhanced Threat Detection Platform
-
-version: '3.8'
+# QZero Docker Compose — Coolify-ready
+# Quantum-Enhanced Threat Detection Platform v3.0.0
+# Deploy on Coolify server: Nuke
 
 services:
   # Main API service
@@ -11,57 +10,57 @@ services:
       dockerfile: Dockerfile
     container_name: qzero-api
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
     environment:
-      - QZERO_ENV=production
-      - PYTHONPATH=/app
-      - LOG_LEVEL=INFO
+      - QZERO_ENV=${QZERO_ENV:-production}
+      - PYTHONPATH=/app/src
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      # Model config
+      - QZERO_N_QUBITS=${QZERO_N_QUBITS:-4}
+      - QZERO_DEFAULT_THRESHOLD=${QZERO_DEFAULT_THRESHOLD:-0.7}
     volumes:
-      - ./data:/app/data:ro
-      - ./models:/app/models:ro
+      - qzero-models:/app/models
       - qzero-results:/app/results
+      - qzero-data:/app/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
+      start_period: 60s
       retries: 3
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '${QZERO_CPU_LIMIT:-4}'
+          memory: ${QZERO_MEM_LIMIT:-8G}
 
-  # Streamlit Dashboard
+  # Streamlit Dashboard (optional)
   qzero-dashboard:
     build:
       context: .
       dockerfile: Dockerfile.dashboard
     container_name: qzero-dashboard
     ports:
-      - "8501:8501"
+      - "${DASHBOARD_PORT:-8501}:8501"
     environment:
       - QZERO_API_URL=http://qzero-api:8000
       - STREAMLIT_SERVER_HEADLESS=true
     depends_on:
-      - qzero-api
-    restart: unless-stopped
-
-  # Jupyter for development/analysis
-  qzero-jupyter:
-    build:
-      context: .
-      dockerfile: Dockerfile.jupyter
-    container_name: qzero-jupyter
-    ports:
-      - "8888:8888"
-    environment:
-      - JUPYTER_TOKEN=qzero2026
-    volumes:
-      - ./notebooks:/app/notebooks
-      - ./data:/app/data
-      - ./results:/app/results
+      qzero-api:
+        condition: service_healthy
     profiles:
-      - dev
+      - dashboard
     restart: unless-stopped
 
 volumes:
+  qzero-models:
+    driver: local
   qzero-results:
+    driver: local
+  qzero-data:
     driver: local
 
 networks:

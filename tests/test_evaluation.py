@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from evaluation.metrics import (
+from qzero.evaluation.metrics import (
     evaluate_model,
     evaluate_zero_day_detection,
     calculate_quantum_advantage,

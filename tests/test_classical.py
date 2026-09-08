@@ -9,8 +9,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from preprocessing.data_loader import generate_synthetic_data, DataLoader
-from classical.baseline import ClassicalBaseline, run_all_baselines, ModelResult
+from qzero.preprocessing.data_loader import generate_synthetic_data, DataLoader
+from qzero.classical.baseline import ClassicalBaseline, run_all_baselines, ModelResult
 
 
 class TestClassicalBaseline:

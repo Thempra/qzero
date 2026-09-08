@@ -1,6 +1,6 @@
 
 import pytest
-from src.quantum.qivae import QIVAE, QIVAEConfig
+from qzero.quantum.qivae import QIVAE, QIVAEConfig
 
 def test_qivae_initialization():
     qivae = QIVAE(config=QIVAEConfig(n_qubits=4))
