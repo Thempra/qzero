@@ -608,11 +608,16 @@ class QZeroPredictor:
                 k: v.to_dict() for k, v in self.classical_results.items()
             }
 
-        with open(path / "results.json", "w") as f:
-            json.dump(results_to_save, f, indent=2)
+        # Atomic-ish write: write to temp then rename so a crash never leaves a
+        # truncated/corrupt results.json that breaks load() on the next boot.
+        def _atomic_json_write(target: Path, obj) -> None:
+            tmp = path.with_name(target.name + ".tmp")
+            with open(tmp, "w") as f:
+                json.dump(obj, f, indent=2)
+            tmp.replace(target)
 
-        with open(path / "training_info.json", "w") as f:
-            json.dump(self.training_info, f, indent=2)
+        _atomic_json_write(path / "results.json", results_to_save)
+        _atomic_json_write(path / "training_info.json", self.training_info)
 
         print(f"Models saved to {path}")
 
@@ -646,8 +651,12 @@ class QZeroPredictor:
 
         # Restore saved evaluation results (produced during save())
         if (path / "results.json").exists():
-            with open(path / "results.json") as f:
-                saved = json.load(f)
+            try:
+                with open(path / "results.json") as f:
+                    saved = json.load(f)
+            except Exception:
+                saved = {}
+                print("Warning: results.json corrupt — ignoring saved metrics.")
 
             if "qsvm" in saved and self.qsvm_model:
                 from ..quantum.qsvm import QSVMResult, QSVMConfig
