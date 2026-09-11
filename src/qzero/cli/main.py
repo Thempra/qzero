@@ -172,5 +172,38 @@ def monitor(interface, promiscuous, interval, model_dir, qubits):
         sys.exit(1)
 
 
+@cli.command()
+@click.option("--interface", "-i", default="eth0", show_default=True, help="Network interface (default from QZERO_INTERFACE).")
+@click.option("--promiscuous", "-p", is_flag=True, help="Enable promiscuous mode (requires root).")
+@click.option("--interval", default=5.0, show_default=True, help="Capture window in seconds.")
+@click.option("--hub-url", default=None, help="Central hub base URL, e.g. http://1.2.3.4:8000 (or QZERO_HUB_URL).")
+@click.option("--agent-id", default=None, help="Agent identifier (default: hostname-interface).")
+@click.option("--model-dir", default=None, help="Directory with pre-trained models.")
+@click.option("--threshold", default=0.5, show_default=True, help="Anomaly score threshold for alerts.")
+@click.option("--qubits", default=4, show_default=True, help="Number of qubits.")
+def agent(interface, promiscuous, interval, hub_url, agent_id, model_dir, threshold, qubits):
+    """Run real-time traffic monitoring as a deployable QZero agent (pushes alerts to a hub)."""
+    import os
+    from ..agent import QZeroAgent, AgentConfig
+
+    config = AgentConfig(
+        agent_id=agent_id or os.environ.get("QZERO_AGENT_ID", ""),
+        interface=interface,
+        promiscuous=promiscuous,
+        interval=interval,
+        hub_url=hub_url or os.environ.get("QZERO_HUB_URL", ""),
+        model_dir=model_dir,
+        n_qubits=qubits,
+        alert_threshold=threshold,
+    )
+
+    click.echo("Starting QZero Agent …")
+    if config.hub_url:
+        click.echo(f"  → pushing alerts to hub: {config.hub_url}")
+    else:
+        click.echo("  → no hub configured: alerts will be spooled locally to ./qzero-alerts-*.jsonl")
+    QZeroAgent(config).run()
+
+
 if __name__ == "__main__":
     cli()

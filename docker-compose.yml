@@ -3,7 +3,7 @@
 # Deploy on Coolify server: Nuke
 
 services:
-  # Main API service
+  # Main API + Hub (central alert aggregator)
   qzero-api:
     build:
       context: .
@@ -13,10 +13,12 @@ services:
       - "${API_PORT:-8000}:8000"
     environment:
       - QZERO_ENV=${QZERO_ENV:-production}
-      - PYTHONPATH=/app/src
+      - PYTHONPATH=${PYTHONPATH:-/app/src}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - API_HOST=0.0.0.0
       - API_PORT=8000
+      # Hub: central alert store (agent alerts)
+      - QZERO_HUB_DB=/app/data/hub/hub.db
       # Model config
       - QZERO_N_QUBITS=${QZERO_N_QUBITS:-4}
       - QZERO_DEFAULT_THRESHOLD=${QZERO_DEFAULT_THRESHOLD:-0.7}
@@ -24,6 +26,7 @@ services:
       - qzero-models:/app/models
       - qzero-results:/app/results
       - qzero-data:/app/data
+      - qzero-hub:/app/data/hub   # agent alert SQLite (hub.db)
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -61,6 +64,8 @@ volumes:
   qzero-results:
     driver: local
   qzero-data:
+    driver: local
+  qzero-hub:
     driver: local
 
 networks:

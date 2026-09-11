@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QZero Hub — Alerts</title>
+<style>
+  :root { --bg:#0b1020; --card:#141a2e; --border:#1f2740; --text:#e6e9f0; --muted:#8a93ad;
+          --crit:#ff4d4d; --high:#ff9f43; --med:#ffd93b; --low:#38d39f; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:'SF Mono',Consolas,Menlo,monospace; padding:24px; }
+  h1 { font-size:20px; margin-bottom:4px; }
+  .sub { color:var(--muted); font-size:12px; margin-bottom:20px; }
+  .stats { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:20px; }
+  .stat { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px 18px; min-width:120px; }
+  .stat .label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  .stat .value { font-size:26px; font-weight:700; margin-top:2px; }
+  .sev-row { display:flex; align-items:center; gap:8px; font-size:13px; margin-top:12px; }
+  .sev-row .bar { height:6px; border-radius:3px; }
+  .agent-list { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px; }
+  .agent { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:10px 14px; font-size:12px; }
+  .agent b { display:block; }
+  .agent span { color:var(--muted); }
+  table { width:100%; border-collapse:collapse; background:var(--card); border-radius:10px; overflow:hidden; }
+  th,td { text-align:left; padding:9px 12px; font-size:12px; border-bottom:1px solid var(--border); }
+  th { color:var(--muted); font-weight:600; text-transform:uppercase; font-size:10px; letter-spacing:.05em; }
+  .badge { padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700; }
+  .crit,.high,.med,.low { --c:var(--low); }
+  .badge.crit { background:color-mix(in srgb,var(--crit) 22%,transparent); color:var(--crit); }
+  .badge.high { background:color-mix(in srgb,var(--high) 22%,transparent); color:var(--high); }
+  .badge.med  { background:color-mix(in srgb,var(--med) 22%,transparent); color:var(--med); }
+  .badge.low  { background:color-mix(in srgb,var(--low) 22%,transparent); color:var(--low); }
+  .empty { color:var(--muted); padding:30px; text-align:center; }
+  .refresh { color:var(--muted); font-size:11px; margin-bottom:10px; }
+</style>
+</head>
+<body>
+  <h1>⚛️ QZero Hub — Centros de Alertas</h1>
+  <div class="sub">Agentes distribuidos · detección cuántica en tiempo real · actualiza cada 5s</div>
+  <div class="refresh" id="refresh"></div>
+
+  <div class="stats" id="stats"></div>
+
+  <h2 style="font-size:14px; margin-bottom:10px;">Agentes conectados</h2>
+  <div class="agent-list" id="agents"></div>
+
+  <table>
+    <thead><tr><th>Tiempo</th><th>Agente</th><th>Origen</th><th>Destino</th><th>Puertos</th><th>Score</th><th>Severidad</th></tr></thead>
+    <tbody id="alerts"></tbody>
+  </table>
+  <div class="empty" id="empty" style="display:none;">Sin alertas aún.</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const sevColor = {'CRITICAL':'crit','HIGH':'high','MEDIUM':'med','LOW':'low'};
+
+async function load(){
+  const [summary, agents, alerts] = await Promise.all([
+    fetch('/api/v1/hub/summary').then(r=>r.json()),
+    fetch('/api/v1/agents').then(r=>r.json()),
+    fetch('/api/v1/alerts?limit=100').then(r=>r.json()),
+  ]);
+
+  const stamp = new Date().toLocaleTimeString();
+  $('#refresh').textContent = 'Última actualización: ' + stamp;
+
+  // Stats
+  const s = summary;
+  $('#stats').innerHTML = `
+    <div class="stat"><div class="label">Alertas</div><div class="value">${s.total_alerts}</div></div>
+    <div class="stat"><div class="label">Agentes</div><div class="value">${s.agents}</div></div>
+    ${['CRITICAL','HIGH','MEDIUM','LOW'].map(sev=>`
+      <div class="stat"><div class="label">${sev}</div><div class="value" style="color:${
+        sev==='CRITICAL'?'var(--crit)':sev==='HIGH'?'var(--high)':sev==='MEDIUM'?'var(--med)':'var(--low)'
+      }">${s.by_severity?.[sev]||0}</div></div>
+    `).join('')}
+  `;
+
+  // Agents
+  $('#agents').innerHTML = agents.length ? agents.map(a=>`
+    <div class="agent"><b>${a.agent_name||a.agent_id}</b>
+      <span>${a.interface} · ${a.total_alerts} alertas</span></div>
+  `).join('') : '<div class="agent"><b>Sin agentes</b><span>ninguno ha reportado</span></div>';
+
+  // Alerts
+  $('#empty').style.display = alerts.length ? 'none' : 'block';
+  $('#alerts').innerHTML = alerts.length ? alerts.map(a=>{
+    const ports = (a.src_port||'') + (a.dst_port ? '→'+a.dst_port : '');
+    return `<tr>
+      <td>${(a.timestamp||'').slice(11,19)}</td>
+      <td>${a.agent_name||a.agent_id}</td>
+      <td>${a.src}</td><td>${a.dst}</td>
+      <td>${ports||'-'}</td>
+      <td>${(a.anomaly_score||0).toFixed(3)}</td>
+      <td><span class="badge ${sevColor[a.severity]||'low'}">${a.severity}</span></td>
+    </tr>`;
+  }).join('') : '';
+}
+load();
+setInterval(load, 5000);
+</script>
+</body>
+</html>

@@ -25,6 +25,7 @@ from pydantic import BaseModel
 
 from .schemas import StatusResponse, AnalyzeResponse
 from .monitor import monitor_service
+from .hub import hub_store
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +79,10 @@ async def root():
             "GET  /stats":          "Runtime statistics",
             "POST /monitor/start":  "Start live monitoring",
             "POST /monitor/stop":   "Stop live monitoring",
+            "GET  /api/v1/hub/summary": "Aggregate agent alert stats",
+            "GET  /api/v1/agents":      "List reporting agents",
+            "GET  /api/v1/alerts":      "Query stored alerts",
+            "POST /api/v1/agents/{id}/alerts": "Ingest agent alerts (internal)",
         },
     }
 
@@ -230,6 +235,76 @@ async def monitor_stop():
     """Stop the monitoring loop."""
     monitor_service.stop()
     return {"status": "stopped"}
+
+
+# ── Hub: distributed agent alert aggregation ─────────────────────────────────
+#
+# Deployable QZero Agents on ANY server push their alerts here, so they can be
+# reflected in one central place. The agent (qzero.agent) POSTs to:
+#     POST /api/v1/agents/{agent_id}/alerts
+
+
+def _hub_recent_since(minutes: int = 60) -> str:
+    from datetime import datetime, timedelta, timezone
+    return (datetime.now(timezone.utc) - timedelta(minutes=minutes)).isoformat()
+
+
+@app.get("/api/v1/hub/summary")
+async def hub_summary():
+    """Aggregate alert statistics across all agents."""
+    return hub_store.summary()
+
+
+@app.get("/api/v1/agents")
+async def hub_agents():
+    """List all agents that have reported alerts."""
+    return hub_store.list_agents()
+
+
+@app.get("/api/v1/alerts")
+async def hub_alerts(
+    limit: int = 100,
+    severity: Optional[str] = None,
+    agent_id: Optional[str] = None,
+):
+    """Query stored alerts (across all agents)."""
+    return hub_store.list_alerts(
+        limit=limit, severity=severity, agent_id=agent_id
+    )
+
+
+@app.get("/api/v1/alerts/recent")
+async def hub_alerts_recent(minutes: int = 60):
+    """Alerts from the last N minutes (for the live dashboard)."""
+    since = _hub_recent_since(minutes)
+    return hub_store.list_alerts(limit=500, since=since)
+
+
+_HUB_DASHBOARD_HTML: Optional[str] = None
+
+
+def _load_hub_dashboard_html() -> str:
+    global _HUB_DASHBOARD_HTML
+    if _HUB_DASHBOARD_HTML is None:
+        html_path = Path(__file__).parent / "hub_dashboard.html"
+        _HUB_DASHBOARD_HTML = html_path.read_text(encoding="utf-8")
+    return _HUB_DASHBOARD_HTML
+
+
+@app.get("/api/v1/hub", response_class=HTMLResponse)
+async def hub_dashboard():
+    """Central dashboard reflecting alerts from all deployed agents."""
+    return HTMLResponse(content=_load_hub_dashboard_html())
+
+
+@app.post("/api/v1/agents/{agent_id}/alerts")
+async def hub_ingest_agent_alerts(agent_id: str, payload: dict):
+    """Ingest an alert batch pushed by a QZero agent (internal API)."""
+    payload["agent_id"] = agent_id
+    result = hub_store.ingest_alert_batch(payload)
+    # Push the latest state out to any connected dashboard clients
+    await monitor_service._broadcast({"type": "hub_update", "summary": hub_store.summary()})
+    return result
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

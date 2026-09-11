@@ -211,6 +211,82 @@ Or via a YAML file at `~/.qzero/qzero.yaml`.
 
 ---
 
+## Distributed Agents + Central Hub (real-time, any server)
+
+QZero isn't limited to uploading PCAPs. It ships as a **lightweight agent**
+you can deploy on *any* server. The agent continuously captures live traffic,
+analyzes it in real-time with the quantum models, and pushes any detected
+alerts to a **central hub**, where alerts from all servers are reflected in one
+dashboard.
+
+```
+┌─ Server A ──────────┐        ┌─ Hub Central (Nuke) ─────────────┐
+│ qzero agent (daemon) │  HTTP  │ POST /api/v1/agents/<id>/alerts  │
+│  sniff → analyze →   │──────► │        ├─ SQLite persist         │
+│  push alerta         │        │        ├─ GET /api/v1/alerts     │
+└──────────────────────┘        │        ├─ GET /api/v1/agents     │
+┌─ Server B ──────────┐         │        └─ /api/v1/hub  (dashboard)│
+│ qzero agent         │────────►│                                  │
+└──────────────────────┘        └──────────────────────────────────┘
+```
+
+### Deploy the hub (central)
+
+The hub IS the existing QZero API — just run the FastAPI app (already
+deployable via `Dockerfile` / `docker-compose.yml` on Coolify).
+
+New hub endpoints:
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/v1/agents/{agent_id}/alerts` | Agents push alert batches here |
+| `GET  /api/v1/agents` | List every agent that has reported |
+| `GET  /api/v1/alerts` | Query alerts (filter by `severity`, `agent_id`, `limit`) |
+| `GET  /api/v1/alerts/recent` | Alerts from the last N minutes |
+| `GET  /api/v1/hub/summary` | Aggregated stats (totals, by severity, agent count) |
+| `GET  /api/v1/hub` | Live HTML dashboard reflecting all agents' alerts |
+
+### Deploy an agent on any server
+
+```bash
+# Install (scapy only — no FastAPI/quantum needed for capture)
+pip install "qzero[agent]"
+
+# Run it pointing at your hub
+qzero agent \
+  --interface eth0 \
+  --hub-url http://HUB_IP:8000 \
+  --interval 5 \
+  --threshold 0.5 \
+  # optional: --model-dir /path/to/trained/models
+```
+
+Or as a Docker container (see `Dockerfile.agent`):
+
+```bash
+docker run -d --rm \
+  --cap-add NET_RAW --cap-add NET_ADMIN \
+  --network host \
+  -e QZERO_HUB_URL=http://HUB_IP:8000 \
+  -e QZERO_INTERFACE=eth0 \
+  qzero-agent
+```
+
+> Requires `NET_RAW`/`NET_ADMIN` capabilities (or root) to capture traffic.
+> The `--model-dir` flag lets you ship pre-trained models so the agent doesn't
+> have to retrain on first boot. Without it, the agent trains once on synthetic
+> data (slow first start — allow the `start-period` in the healthcheck).
+
+### Where do alerts "get reflected"?
+
+1. **Persistence** — every pushed alert is stored in the hub's SQLite DB
+   (`data/hub.db`, override with `QZERO_HUB_DB` env var).
+2. **Dashboard** — open `http://HUB:8000/api/v1/hub` for a live view of all
+   agents' alerts (auto-refreshes every 5s).
+3. **API** — query programmatically via `/api/v1/alerts` and `/api/v1/agents`.
+
+---
+
 ## Development
 
 ```bash
