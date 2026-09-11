@@ -47,7 +47,7 @@ class AgentConfig:
     train_samples: int = 2000
     use_qsvm: bool = True   # QSVM is very slow to train on CPU — disable for fast boot
     use_qivae: bool = True  # Quantum-inspired VAE (torch) — faster, good default
-    alert_threshold: float = 0.5   # anomaly score above which an alert is raised
+    alert_threshold: float = 4.2  # QI-VAE score above which an alert is raised (normal ~3.0-3.7)
     max_alerts_per_batch: int = 20
     retry_backoff: float = 2.0     # seconds between hub push retries
     max_retries: int = 3
@@ -288,11 +288,13 @@ class QZeroAgent:
 
     @staticmethod
     def _severity(score: float) -> str:
-        if score >= 0.85:
+        # QI-VAE reconstruction-error scores: normal traffic ~3.0-3.7,
+        # p99 ~4.5, true outliers reach the double digits.
+        if score >= 5.0:
             return "CRITICAL"
-        if score >= 0.70:
+        if score >= 4.3:
             return "HIGH"
-        if score >= 0.55:
+        if score >= 3.9:
             return "MEDIUM"
         return "LOW"
 

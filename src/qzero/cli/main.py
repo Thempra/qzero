@@ -180,7 +180,7 @@ def monitor(interface, promiscuous, interval, model_dir, qubits):
 @click.option("--agent-id", default=None, help="Agent identifier (default: hostname-interface).")
 @click.option("--model-dir", default=None, help="Directory with pre-trained models.")
 @click.option("--no-qsvm", is_flag=True, help="Skip QSVM training (much faster boot; use pre-trained models for real QSVM detection).")
-@click.option("--threshold", default=0.5, show_default=True, help="Anomaly score threshold for alerts.")
+@click.option("--threshold", default=4.2, show_default=True, help="QI-VAE anomaly score threshold for alerts (normal traffic ~3.0-3.7).")
 @click.option("--qubits", default=4, show_default=True, help="Number of qubits.")
 def agent(interface, promiscuous, interval, hub_url, agent_id, model_dir, no_qsvm, threshold, qubits):
     """Run real-time traffic monitoring as a deployable QZero agent (pushes alerts to a hub)."""
