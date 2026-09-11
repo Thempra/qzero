@@ -16,8 +16,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml requirements.txt requirements-dev.txt ./
 COPY src/ ./src/
 
-# Install with the agent extra (scapy) — keep it lean, no FastAPI/uvicorn needed
-RUN pip install --no-cache-dir ".[agent]"
+# Install with full deps so the agent can train/load the quantum models locally
+# (QZeroPredictor needs numpy/pandas/sklearn + qiskit/torch for real detection).
+RUN pip install --no-cache-dir ".[all]"
 
 # libpcap runtime
 ENV PYTHONUNBUFFERED=1

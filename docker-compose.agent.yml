@@ -1,0 +1,32 @@
+# QZero Agent — deployable on ANY server to analyze its own live traffic
+# Uses host networking + NET_RAW/NET_ADMIN so it can capture the server's
+# real network traffic, then pushes alerts to the central QZero hub.
+
+services:
+  qzero-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    container_name: qzero-agent
+    network_mode: host          # capture the host's real interfaces
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    environment:
+      - QZERO_AGENT_ID=${QZERO_AGENT_ID:-}
+      - QZERO_INTERFACE=${QZERO_INTERFACE:-auto}
+      - QZERO_INTERVAL=${QZERO_INTERVAL:-5.0}
+      - QZERO_PROMISCUOUS=${QZERO_PROMISCUOUS:-0}
+      # Point at the central hub (the qzero API). On the same Nuke host:
+      - QZERO_HUB_URL=${QZERO_HUB_URL:-http://localhost:8000}
+      # Optional pre-trained models (bind-mounted)
+      - QZERO_MODEL_DIR=${QZERO_MODEL_DIR:-}
+      - QZERO_ALERT_THRESHOLD=${QZERO_ALERT_THRESHOLD:-0.5}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - qzero-agent-models:/app/models
+    restart: unless-stopped
+
+volumes:
+  qzero-agent-models:
+    driver: local

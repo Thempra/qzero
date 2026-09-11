@@ -56,6 +56,26 @@ class AgentConfig:
             self.agent_id = f"{host}-{self.interface}"
         if not self.agent_name:
             self.agent_name = platform.node() or self.agent_id
+        if self.interface == "auto":
+            self.interface = self._detect_interface()
+
+    @staticmethod
+    def _detect_interface() -> str:
+        """Pick the default outbound interface (best-effort)."""
+        try:
+            import subprocess
+            out = subprocess.run(
+                ["ip", "route", "get", "1.1.1.1"],
+                capture_output=True, text=True, timeout=5,
+            ).stdout
+            toks = out.split()
+            if "dev" in toks:
+                idx = toks.index("dev")
+                if idx + 1 < len(toks):
+                    return toks[idx + 1]
+        except Exception:
+            pass
+        return "eth0"
 
 
 class QZeroAgent:

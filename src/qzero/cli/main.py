@@ -173,7 +173,7 @@ def monitor(interface, promiscuous, interval, model_dir, qubits):
 
 
 @cli.command()
-@click.option("--interface", "-i", default="eth0", show_default=True, help="Network interface (default from QZERO_INTERFACE).")
+@click.option("--interface", "-i", default=None, show_default=False, help="Network interface to capture (default: QZERO_INTERFACE or 'auto' detects default).")
 @click.option("--promiscuous", "-p", is_flag=True, help="Enable promiscuous mode (requires root).")
 @click.option("--interval", default=5.0, show_default=True, help="Capture window in seconds.")
 @click.option("--hub-url", default=None, help="Central hub base URL, e.g. http://1.2.3.4:8000 (or QZERO_HUB_URL).")
@@ -188,7 +188,7 @@ def agent(interface, promiscuous, interval, hub_url, agent_id, model_dir, thresh
 
     config = AgentConfig(
         agent_id=agent_id or os.environ.get("QZERO_AGENT_ID", ""),
-        interface=interface,
+        interface=interface or os.environ.get("QZERO_INTERFACE", "auto"),
         promiscuous=promiscuous,
         interval=interval,
         hub_url=hub_url or os.environ.get("QZERO_HUB_URL", ""),
@@ -198,6 +198,7 @@ def agent(interface, promiscuous, interval, hub_url, agent_id, model_dir, thresh
     )
 
     click.echo("Starting QZero Agent …")
+    click.echo(f"  → interface: {config.interface}")
     if config.hub_url:
         click.echo(f"  → pushing alerts to hub: {config.hub_url}")
     else:
