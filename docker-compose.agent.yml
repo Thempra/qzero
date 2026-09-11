@@ -19,8 +19,11 @@ services:
       - QZERO_PROMISCUOUS=${QZERO_PROMISCUOUS:-0}
       # Point at the central hub (the qzero API). On the same Nuke host:
       - QZERO_HUB_URL=${QZERO_HUB_URL:-http://localhost:8000}
-      # Optional pre-trained models (bind-mounted)
-      - QZERO_MODEL_DIR=${QZERO_MODEL_DIR:-}
+      # Persist trained models in the volume so the agent trains only once
+      - QZERO_MODEL_DIR=${QZERO_MODEL_DIR:-/app/models}
+      - QZERO_TRAIN_SAMPLES=${QZERO_TRAIN_SAMPLES:-2000}
+      - QZERO_USE_QSWM=${QZERO_USE_QSWM:-1}
+      - QZERO_USE_QIVAE=${QZERO_USE_QIVAE:-1}
       - QZERO_ALERT_THRESHOLD=${QZERO_ALERT_THRESHOLD:-0.5}
       - PYTHONUNBUFFERED=1
     volumes:

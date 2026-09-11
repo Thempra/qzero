@@ -44,6 +44,9 @@ class AgentConfig:
     hub_url: str = ""              # base URL of the central QZero hub, e.g. http://1.2.3.4:8000
     model_dir: Optional[str] = None
     n_qubits: int = 4
+    train_samples: int = 2000
+    use_qsvm: bool = True   # QSVM is very slow to train on CPU — disable for fast boot
+    use_qivae: bool = True  # Quantum-inspired VAE (torch) — faster, good default
     alert_threshold: float = 0.5   # anomaly score above which an alert is raised
     max_alerts_per_batch: int = 20
     retry_backoff: float = 2.0     # seconds between hub push retries
@@ -117,13 +120,29 @@ class QZeroAgent:
         if self._predictor is not None:
             return
         logger.info("Loading / preparing QZero models …")
-        qzero = QZero(n_qubits=self.config.n_qubits)
+        qzero = QZero(
+            n_qubits=self.config.n_qubits,
+            use_qsvm=self.config.use_qsvm,
+            use_qivae=self.config.use_qivae,
+        )
         if self.config.model_dir and Path(self.config.model_dir).exists():
             qzero.load(self.config.model_dir)
             logger.info("Loaded pre-trained models from %s", self.config.model_dir)
         else:
-            logger.info("No model dir — training on synthetic data (this may take a while) …")
-            qzero.train(n_samples=2000)
+            logger.info(
+                "No model dir — training on synthetic data (qsvm=%s, qivae=%s, "
+                "samples=%s; may take a while) …",
+                self.config.use_qsvm, self.config.use_qivae, self.config.train_samples,
+            )
+            qzero.train(n_samples=self.config.train_samples)
+            # Persist trained models so the agent starts fast on next boot
+            # instead of re-training the quantum stack every time.
+            if self.config.model_dir:
+                try:
+                    qzero.save(self.config.model_dir)
+                    logger.info("Saved freshly trained models to %s", self.config.model_dir)
+                except Exception as e:  # noqa: BLE001
+                    logger.warning("Could not save models: %s", e)
         self._predictor = qzero.predictor
 
         from qzero.core.detector import NetworkTrafficAnalyzer
