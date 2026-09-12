@@ -11,6 +11,15 @@ services:
     container_name: qzero-api
     ports:
       - "${API_PORT:-8000}:8000"
+    networks:
+      - default
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.qzero.entrypoints=web,websecure"
+      - "traefik.http.routers.qzero.rule=Host(`qzero.thempra.net`)"
+      - "traefik.http.routers.qzero.tls=true"
+      - "traefik.http.routers.qzero.tls.certresolver=letsencrypt"
     environment:
       - QZERO_ENV=${QZERO_ENV:-production}
       - PYTHONPATH=${PYTHONPATH:-/app/src}
@@ -71,3 +80,7 @@ volumes:
 networks:
   default:
     name: qzero-network
+  # Main Traefik reverse proxy (routes qzero.thempra.net -> qzero-api)
+  traefik:
+    external:
+      name: traefik_webgateway
