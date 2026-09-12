@@ -34,6 +34,18 @@ except Exception:  # pragma: no cover
 
 API = os.environ.get("QZERO_API_URL", "http://qzero-api:8000").rstrip("/")
 
+try:
+    from intel import enrich_alert, classify_direction
+    _HAS_INTEL = True
+except Exception:  # pragma: no cover
+    _HAS_INTEL = False
+
+    def enrich_alert(a):  # noqa: F811
+        return a
+
+    def classify_direction(src: str, dst: str) -> str:  # noqa: F811
+        return "?"
+
 
 # ---------------------------------------------------------------------------
 # Hub API client (stdlib urllib only — no extra dependencies)
@@ -150,51 +162,95 @@ def render_live_ops(agents_online_window_min: int):
 
     st.divider()
 
-    # ----- Recent alerts -----
-    st.markdown("##### 🔔 Alertas recientes (últimas horas)")
+    # ----- Recent alerts (enriched) -----
+    st.markdown("##### 🔔 Alertas recientes (identificadas)")
     try:
         recent = hub_alerts_recent(minutes=max(60, agents_online_window_min * 4))
     except Exception:
         recent = []
 
+    # Enrich each alert (direction, destination org, threat type, explanation)
+    enriched = [enrich_alert(a) for a in recent] if (_HAS_INTEL and recent) else recent
+
+    # Counts by threat type (identification summary)
+    if _HAS_INTEL and enriched:
+        from collections import Counter
+        type_counts = Counter(a.get("threat_type", "?") for a in enriched)
+        st.markdown("**Distribución por tipo detectado:**")
+        tc = pd.DataFrame(type_counts.items(), columns=["Tipo", "N"])
+        c1, c2 = st.columns([1, 2])
+        with c1:
+            st.dataframe(tc.sort_values("N", ascending=False),
+                         use_container_width=True, hide_index=True)
+        with c2:
+            st.caption(
+                "Cada alerta se clasifica por dirección (IN/OUT) + puerto + contexto "
+                "para darle un *tipo* y una explicación accionable, en vez de solo un "
+                "número de anomalía."
+            )
+        st.divider()
+
     # Filters
     f1, f2 = st.columns([1, 1])
-    sev_opts = ["Todas"] + [s for s in SEV_ORDER if s in by_sev]
-    sev_filter = f1.selectbox("Severidad", sev_opts, index=0)
-    if recent:
-        agents_in_alerts = sorted({a.get("agent_name") or a.get("agent_id") for a in recent})
+    if _HAS_INTEL and enriched:
+        type_opts = ["Todos"] + sorted({a.get("threat_type", "?") for a in enriched})
+        sev_opts = ["Todas"] + [s for s in SEV_ORDER if s in by_sev]
+        sev_filter = f1.selectbox("Severidad", sev_opts, index=0)
+        type_filter = f2.selectbox("Tipo", type_opts, index=0)
     else:
-        agents_in_alerts = []
-    agent_filter = f2.selectbox("Agente", ["Todos"] + list(agents_in_alerts), index=0)
+        sev_opts = ["Todas"] + [s for s in SEV_ORDER if s in by_sev]
+        sev_filter = f1.selectbox("Severidad", sev_opts, index=0)
+        type_filter = None
 
-    df_recent = pd.DataFrame(recent) if recent else pd.DataFrame()
+    df_recent = pd.DataFrame(enriched) if enriched else pd.DataFrame()
     if not df_recent.empty:
         if sev_filter != "Todas":
             df_recent = df_recent[df_recent["severity"] == sev_filter]
-        if agent_filter != "Todos":
-            df_recent = df_recent[
-                (df_recent.get("agent_name", "") == agent_filter)
-                | (df_recent.get("agent_id", "") == agent_filter)
-            ]
+        if type_filter and type_filter != "Todos":
+            df_recent = df_recent[df_recent["threat_type"] == type_filter]
 
     if not df_recent.empty:
-        view = df_recent.head(100)[
-            ["timestamp", "agent_name", "severity", "src", "dst",
-             "dst_port", "protocol", "anomaly_score"]
-        ].copy()
-        view.columns = ["Timestamp", "Agente", "Severidad", "Src", "Dst",
-                        "Dst port", "Proto", "Score"]
+        if _HAS_INTEL:
+            view = df_recent.head(100)[
+                ["timestamp", "severity", "direction", "threat_type",
+                 "src", "dst", "dest_org", "dst_port", "anomaly_score"]
+            ].copy()
+            view.columns = ["Timestamp", "Sev", "Dir", "Tipo",
+                            "Src", "Dst", "Destino (org)", "Port", "Score"]
+            cols_to_style = ["Sev"]
+        else:
+            view = df_recent.head(100)[
+                ["timestamp", "agent_name", "severity", "src", "dst",
+                 "dst_port", "protocol", "anomaly_score"]
+            ].copy()
+            view.columns = ["Timestamp", "Agente", "Sev", "Src", "Dst",
+                            "Port", "Proto", "Score"]
+            cols_to_style = ["Sev"]
         if _HAS_PLOTLY:
             st.dataframe(
                 view.style.map(
                     lambda v: f"color: {SEV_COLOR.get(v, 'white')}",
-                    subset=["Severidad"],
+                    subset=cols_to_style,
                 ),
                 use_container_width=True, hide_index=True,
                 height=min(420, 30 + 35 * min(len(view), 8)),
             )
         else:
             st.dataframe(view, use_container_width=True, hide_index=True)
+
+        # Explanation of the types present in the filtered view
+        if _HAS_INTEL and "explanation" in df_recent.columns:
+            st.markdown("##### ❓ ¿Qué es y qué hacer?")
+            seen = []
+            for _, row in df_recent.head(50).iterrows():
+                key = (row.get("threat_type"), row.get("explanation"))
+                if key not in seen:
+                    seen.append(key)
+                    with st.expander(f"**{row['threat_type']}** — {row['direction']} · "
+                                     f"→ {row.get('dest_org','?')}", expanded=False):
+                        st.write(row["explanation"])
+        elif _HAS_INTEL:
+            st.caption("Sin coincidencias con los filtros seleccionados.")
     else:
         st.caption("Sin alertas recientes que coincidan con los filtros.")
 
