@@ -53,6 +53,10 @@ services:
       - traefik
     labels:
       - "traefik.enable=true"
+      # Pin the network + port so Traefik uses the traefik_webgateway IP
+      # (container is on multiple networks; without this Traefik picks the wrong one)
+      - "traefik.docker.network=traefik_webgateway"
+      - "traefik.http.services.qzero.loadbalancer.server.port=8501"
       - "traefik.http.routers.qzero.entrypoints=web,websecure"
       - "traefik.http.routers.qzero.rule=Host(`qzero.thempra.net`)"
       - "traefik.http.routers.qzero.tls=true"
