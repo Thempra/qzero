@@ -307,6 +307,15 @@ async def hub_ingest_agent_alerts(agent_id: str, payload: dict):
     return result
 
 
+@app.post("/api/v1/agents/{agent_id}/heartbeat")
+async def hub_agent_heartbeat(agent_id: str, payload: dict | None = None):
+    """Keep an agent's last_seen fresh even when it has NO alerts to push."""
+    payload = payload or {}
+    agent_name = payload.get("agent_name", "")
+    interface = payload.get("interface", "")
+    return hub_store.heartbeat(agent_id, agent_name, interface)
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def create_app() -> FastAPI:
