@@ -28,16 +28,16 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       - qzero-agent-models:/app/models
-    restart: unless-stopped
-    # Liveness probe for monitoring: the agent exposes no HTTP, so check the
-    # process is alive. [q] avoids pgrep -f matching this healthcheck itself.
-    # start_period covers the startup model training (TRAIN_SAMPLES captures).
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f '[q]zero agent' >/dev/null 2>&1 || exit 1"]
+      # Dependency-free process-liveness probe. python:3.11-slim has no pgrep,
+      # so scan /proc/*/cmdline with the interpreter already in the image.
+      # (Dockerfile pgrep HEALTHCHECK always failed -> Coolify showed unhealthy.)
+      test: ["CMD", "python", "-c", "import glob,sys; alive=any('qzero agent' in open(p,encoding='utf-8',errors='ignore').read() for p in glob.glob('/proc/*/cmdline')); sys.exit(0 if alive else 1)"]
       interval: 60s
-      timeout: 10s
-      start_period: 300s
+      timeout: 15s
+      start_period: 120s
       retries: 3
+    restart: unless-stopped
 
 volumes:
   qzero-agent-models:

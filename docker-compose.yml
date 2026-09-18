@@ -67,6 +67,13 @@ services:
     depends_on:
       qzero-api:
         condition: service_healthy
+    healthcheck:
+      # Streamlit readiness endpoint; makes Coolify show the stack as healthy
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
     restart: unless-stopped
 
 volumes:
