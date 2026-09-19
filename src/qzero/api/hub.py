@@ -40,12 +40,22 @@ CREATE TABLE IF NOT EXISTS alerts (
     src_port      INTEGER,
     dst_port      INTEGER,
     size          INTEGER,
+    packets       INTEGER DEFAULT 0,
+    detail        TEXT,
     anomaly_score REAL,
     severity      TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_alerts_ts ON alerts(timestamp);
 CREATE INDEX IF NOT EXISTS idx_alerts_sev ON alerts(severity);
 """
+
+# Optional columns added after the table was first created (pre-migration hubs
+# created the alerts table without these). Kept idempotent so existing volumes
+# are upgraded in place instead of being dropped.
+_SCHEMA_MIGRATIONS = [
+    ("alerts", "packets", "INTEGER DEFAULT 0"),
+    ("alerts", "detail", "TEXT"),
+]
 
 
 class HubStore:
@@ -61,6 +71,7 @@ class HubStore:
         self._conn.row_factory = sqlite3.Row
         with self._lock:
             self._conn.executescript(SCHEMA)
+            self._migrate()
             self._conn.commit()
         # Incremental counters for summary(): the alerts table grew to ~1.9M
         # rows (the false-positive storm), so a COUNT(*) + GROUP BY per request
@@ -68,6 +79,17 @@ class HubStore:
         # recompute. We seed the counters once (lazy), then update them
         # incrementally on each ingest — summary() is O(1) and never rescans.
         self._counts: Optional[dict] = None
+
+    def _migrate(self) -> None:
+        """Add any missing columns to existing tables (idempotent)."""
+        for table, col, decl in _SCHEMA_MIGRATIONS:
+            cols = {
+                r["name"]
+                for r in self._conn.execute(f"PRAGMA table_info({table})").fetchall()
+            }
+            if col not in cols:
+                logger.info("Hub migration: adding column %s.%s %s", table, col, decl)
+                self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
 
     # ------------------------------------------------------------------
     # Summary counters (incremental, O(1))
@@ -128,12 +150,16 @@ class HubStore:
             self._report_agent(agent_id, agent_name, interface)
             n = 0
             for a in alerts:
+                detail = a.get("detail")
+                detail_json = None
+                if detail is not None:
+                    detail_json = detail if isinstance(detail, str) else json.dumps(detail)
                 self._conn.execute(
                     """
                     INSERT INTO alerts
                         (agent_id, agent_name, timestamp, src, dst, protocol,
-                         src_port, dst_port, size, anomaly_score, severity)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         src_port, dst_port, size, packets, detail, anomaly_score, severity)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         agent_id,
@@ -145,6 +171,8 @@ class HubStore:
                         a.get("src_port", 0),
                         a.get("dst_port", 0),
                         a.get("size", 0),
+                        a.get("packets", 0),
+                        detail_json,
                         a.get("anomaly_score", 0.0),
                         a.get("severity", "LOW"),
                     ),
@@ -211,7 +239,15 @@ class HubStore:
         params.append(limit)
         with self._lock:
             rows = self._conn.execute(sql, params).fetchall()
-        return [dict(r) for r in rows]
+        alerts = [dict(r) for r in rows]
+        # Deserialize the detail JSON payload for API/dashboard consumers.
+        for a in alerts:
+            if a.get("detail"):
+                try:
+                    a["detail"] = json.loads(a["detail"])
+                except (json.JSONDecodeError, TypeError):
+                    pass
+        return alerts
 
     def summary(self) -> Dict:
         # O(1): serve from incremental counters (seeded once, updated per
