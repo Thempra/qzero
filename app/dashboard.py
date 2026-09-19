@@ -223,14 +223,28 @@ def render_topbar(agents_online: int, agents_total: int):
     )
 
 
-def render_nav(current: str):
+def render_nav(current: str) -> str:
+    """SOC module pills.
+
+    Uses Streamlit-native buttons (not raw <a> tags) so clicking navigates
+    within the SAME browser tab. Raw `<a href="?module=...">` anchors get
+    rewritten by Streamlit's markdown renderer with target="_blank", which
+    causes every pill to open a new tab — the reported bug.
+    """
     module_map = ["Overview", "Alerts", "Threats", "Network", "Agents", "Research"]
-    html = '<div class="soc-nav">'
-    for m in module_map:
-        cls = 'active' if m == current else ''
-        html += f'<a class="{cls}" href="?module={m}">{m}</a>'
-    html += "</div>"
-    st.markdown(html, unsafe_allow_html=True)
+    cols = st.columns(len(module_map), gap="small")
+    for col, m in zip(cols, module_map):
+        with col:
+            active = m == current
+            label = f"**{m}**" if active else m
+            if st.button(
+                label,
+                key=f"nav_{m}",
+                use_container_width=True,
+                type="primary" if active else "secondary",
+            ):
+                st.session_state["module"] = m
+                st.rerun()
     return current
 
 
@@ -238,7 +252,10 @@ def render_nav(current: str):
 # Overview module
 # ---------------------------------------------------------------------------
 def module_overview(online_window_min):
-    summary = hub_summary()
+    try:
+        summary = hub_summary()
+    except Exception:
+        summary = {}
     total = summary.get("total_alerts", 0)
     by_sev = summary.get("by_severity", {})
     n_agents = summary.get("agents", 0)
@@ -763,11 +780,16 @@ def main():
 
     render_topbar(n_online, len(agents or []))
 
-    # module selection from query param (SOC pills)
-    params = st.query_params
-    module = params.get("module", "Overview")
-    if module not in ["Overview", "Alerts", "Threats", "Network", "Agents", "Research"]:
-        module = "Overview"
+    # module selection: keep in session state, defaulting to the URL param
+    # (for deep-linking) only on first load.
+    valid_modules = ["Overview", "Alerts", "Threats", "Network", "Agents", "Research"]
+    if "module" not in st.session_state:
+        params = st.query_params
+        module = params.get("module", "Overview")
+        if module not in valid_modules:
+            module = "Overview"
+        st.session_state["module"] = module
+    module = st.session_state["module"]
     render_nav(module)
 
     # ---- render module ----
