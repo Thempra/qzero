@@ -139,3 +139,71 @@ def test_https_real_traffic_over_threshold_not_suppressed():
              total_length_bwd_packets=2400)
     sup, reason = PostFilter().should_suppress(f, 7.0)
     assert not sup, reason
+
+
+def test_single_packet_unicast_nmap_not_suppressed():
+    """A 1-packet UNICAST SYN (nmap -sS to a host) is real scan signal -> NOT suppressed."""
+    flows = [
+        dict(src_ip="192.168.50.5", dst_ip="203.0.113.10", src_port=42000,
+             dport=22, proto=6, total_length_fwd_packets=54,
+             total_length_bwd_packets=0, total_fwd_packets=1, total_bwd_packets=0),
+        dict(src_ip="192.168.50.5", dst_ip="1.1.1.1", src_port=42001,
+             dport=8080, proto=6, total_length_fwd_packets=54,
+             total_length_bwd_packets=0, total_fwd_packets=1, total_bwd_packets=0),
+    ]
+    pf_obj = PostFilter(PostFilterConfig())
+    for f in flows:
+        suppressed, reason = pf_obj.should_suppress(f, 24.0)
+        assert not suppressed, f"unicast 1-pkt scan {f} wrongly suppressed: {reason}"
+
+
+def test_single_packet_broadcast_ssdp_suppressed():
+    """SSDP/broadcast discovery (Chromecast etc.) 1-pkt -> suppressed (noise, not attack)."""
+    flows = [
+        dict(src_ip="192.168.50.10", dst_ip="192.168.50.255", src_port=0,
+             dport=32412, proto=17, total_length_fwd_packets=160,
+             total_length_bwd_packets=0, total_fwd_packets=1, total_bwd_packets=0),
+        dict(src_ip="192.168.50.10", dst_ip="224.0.0.251", src_port=0,
+             dport=5353, proto=17, total_length_fwd_packets=160,
+             total_length_bwd_packets=0, total_fwd_packets=1, total_bwd_packets=0),
+    ]
+    pf_obj = PostFilter(PostFilterConfig())
+    for f in flows:
+        suppressed, reason = pf_obj.should_suppress(f, 24.0)
+        assert suppressed, f"broadcast 1-pkt {f} should be suppressed, got {reason}"
+
+
+def test_multi_packet_broadcast_not_suppressed_by_min_packets():
+    """A broadcast flow with >1 packet is NOT blocked by the single-packet rule
+    (other checks still apply, but min_flow_packets alone must not drop it)."""
+    f = dict(src_ip="192.168.50.10", dst_ip="192.168.50.255", src_port=0,
+             dport=32412, proto=17, total_length_fwd_packets=400,
+             total_length_bwd_packets=0, total_fwd_packets=5, total_bwd_packets=0)
+    pf_obj = PostFilter(PostFilterConfig())
+    suppressed, reason = pf_obj.should_suppress(f, 24.0)
+    assert reason != "single_packet_broadcast", f"multi-pkt broadcast wrongly dropped: {reason}"
+
+
+def test_https_volume_capped_below_critical():
+    """High-volume HTTPS (legit web/CDN) must NEVER be CRITICAL regardless of score."""
+    obj = PostFilter(PostFilterConfig())
+    for score in (5.0, 6.0, 100.0, 50000.0, 835737.4):
+        sev = obj.severity_for({"dst_port": 443}, score)
+        assert sev in ("HIGH", "MEDIUM", "LOW"), f"https score={score} -> {sev} must be capped"
+        assert sev != "CRITICAL", f"https score={score} wrongly CRITICAL"
+
+
+def test_non_https_high_score_still_critical():
+    """Real scan signal (non-HTTPS, high score) must remain CRITICAL."""
+    obj = PostFilter(PostFilterConfig())
+    for score in (5.0, 24.0, 1000.0):
+        sev = obj.severity_for({"dst_port": 8080}, score)
+        assert sev == "CRITICAL", f"non-https score={score} -> {sev}"
+
+
+def test_https_small_score_ranges():
+    """HTTPS with modest scores maps to LOW/MEDIUM normally."""
+    obj = PostFilter(PostFilterConfig())
+    assert obj.severity_for({"dst_port":443}, 3.0) == "LOW"
+    assert obj.severity_for({"dst_port":443}, 3.5) == "LOW"
+    assert obj.severity_for({"dst_port":443}, 4.0) == "MEDIUM"

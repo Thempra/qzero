@@ -269,7 +269,8 @@ class QZeroAgent:
                 from qzero.preprocessing.postfilter import PostFilter, PostFilterConfig
 
                 pf_cfg = PostFilterConfig(whitelist_private=self.config.whitelist_private)
-                suppress, reason = PostFilter(pf_cfg).should_suppress(flow, score)
+                self._postfilter = PostFilter(pf_cfg)
+                suppress, reason = self._postfilter.should_suppress(flow, score)
                 if suppress:
                     logger.info(
                         "Suppressed flow alert (%s) %s→%s proto=%s score=%s",
@@ -307,7 +308,7 @@ class QZeroAgent:
             "size": fwd_bytes + bwd_bytes,
             "packets": fwd_pkts + bwd_pkts,
             "anomaly_score": round(score, 4),
-            "severity": self._severity(score),
+            "severity": self._severity_for_flow(flow, score),
             # Rich flow detail for the SOC dashboard / forensics.
             "detail": {
                 "duration_ms": flow.get("flow_duration", 0),
@@ -331,13 +332,14 @@ class QZeroAgent:
     def _severity(score: float) -> str:
         # QI-VAE reconstruction-error scores: normal traffic ~3.0-3.7,
         # p99 ~4.5, true outliers reach the double digits.
-        if score >= 5.0:
-            return "CRITICAL"
-        if score >= 4.3:
-            return "HIGH"
-        if score >= 3.9:
-            return "MEDIUM"
-        return "LOW"
+        return PostFilter(PostFilterConfig()).severity_for({}, score)
+
+    def _severity_for_flow(self, flow: Dict, score: float) -> str:
+        """Severity with HTTPS-volume capping applied (uses the shared postfilter)."""
+        if getattr(self, "_postfilter", None) is None:
+            self._postfilter = PostFilter(PostFilterConfig(
+                whitelist_private=self.config.whitelist_private))
+        return self._postfilter.severity_for(flow, score)
 
     # ------------------------------------------------------------------
     # Alert delivery

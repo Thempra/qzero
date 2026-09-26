@@ -30,7 +30,12 @@ class PostFilterConfig:
         whitelist_local: bool = True,
         whitelist_private: bool = False,
         min_flow_bytes: int = 128,
+        min_flow_packets: int = 2,
         suppress_below_score: float = 0.0,
+        # Cap CRITICAL severity for high-volume TLS/HTTPS flows (default 5.0).
+        # Score correlates with flow size; big legit web/CDN flows shouldn't
+        # be CRITICAL. Set to None to keep CRITICAL for all HTTPS.
+        https_volume_cap_score: float = 5.0,
     ) -> None:
         # DNS (UDP/TCP 53) is overwhelmingly benign resolution traffic.
         self.whitelist_dns = whitelist_dns
@@ -50,6 +55,9 @@ class PostFilterConfig:
         self.whitelist_private = whitelist_private
         # Flows with total bytes below this are considered "no payload".
         self.min_flow_bytes = min_flow_bytes
+        # Broadcast/multicast flows with <= this many packets are suppressed.
+        self.min_flow_packets = min_flow_packets
+        self.https_volume_cap_score = https_volume_cap_score
         # Optional hard floor: never alert on scores below this value.
         self.suppress_below_score = suppress_below_score
 
@@ -91,6 +99,9 @@ class PostFilter:
         fwd_bytes = int(flow.get("total_length_fwd_packets", 0))
         bwd_bytes = int(flow.get("total_length_bwd_packets", 0))
         total_bytes = fwd_bytes + bwd_bytes
+        fwd_pkts = int(flow.get("total_fwd_packets", 0))
+        bwd_pkts = int(flow.get("total_bwd_packets", 0))
+        total_pkts = fwd_pkts + bwd_pkts
 
         # DNS is almost always benign resolution.
         if cfg.whitelist_dns and (dport == 53 or sport == 53):
@@ -101,6 +112,21 @@ class PostFilter:
             self._is_local(dst_ip) or self._is_local(src_ip)
         ):
             return True, "local_or_multicast"
+
+        # Ultra-short broadcast/multicast flows (SSDP discovery, mDNS, ARP-ish
+        # chatter) show up as CRITICAL because a 1-packet flow has duration~0 so
+        # its rate features saturate the cap. These are network-discovery
+        # background noise, not attacks. Real port scans (nmap -sS) are UNICAST
+        # and are NOT suppressed here.
+        try:
+            _dst = ipaddress.ip_address(dst_ip)
+            is_bcast_or_mcast = _dst.is_multicast or (
+                _dst.is_private and str(_dst).rsplit(".", 1)[-1] == "255"
+            )
+        except ValueError:
+            is_bcast_or_mcast = False
+        if is_bcast_or_mcast and cfg.min_flow_packets and total_pkts <= cfg.min_flow_packets:
+            return True, "single_packet_broadcast"
 
         # Private RFC1918 traffic.
         if cfg.whitelist_private and (
@@ -134,6 +160,37 @@ class PostFilter:
         except ValueError:
             return False
         return a.is_private
+
+    def severity_for(self, flow: Dict, base_score: float) -> str:
+        """Map a flow+score to a severity, capping high-volume TLS/HTTPS flows
+        below CRITICAL (legit web/CDN traffic that the QI-VAE scores high purely
+        by packet volume)."""
+        if self.config.https_volume_cap_score is None:
+            return "CRITICAL" if base_score >= 5.0 else (
+                "HIGH" if base_score >= 4.3 else (
+                    "MEDIUM" if base_score >= 3.9 else "LOW"))
+
+        # Is this a TLS/HTTPS flow?
+        sport = int(flow.get("src_port", flow.get("sport", 0)))
+        dport = int(flow.get("dst_port", flow.get("dport", 0)))
+        if dport == 443 or sport == 443:
+            # High-volume TLS -> cap to HIGH (max) so it's watched, not screamed.
+            if base_score >= self.config.https_volume_cap_score:
+                return "HIGH"
+            if base_score >= 4.3:
+                return "MEDIUM"
+            if base_score >= 3.9:
+                return "MEDIUM"
+            return "LOW"
+
+        # Non-HTTPS: normal severity mapping.
+        if base_score >= 5.0:
+            return "CRITICAL"
+        if base_score >= 4.3:
+            return "HIGH"
+        if base_score >= 3.9:
+            return "MEDIUM"
+        return "LOW"
 
     def annotate(self, flow: Dict, score: float, default_suppress: bool = False) -> Dict:
         """Return the flow dict with suppression decision attached."""
