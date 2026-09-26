@@ -47,6 +47,16 @@ FLOW_FEATURES = [
 
 # Guaranteed column order / count for training/inference consistency
 FLOW_FEATURE_COUNT = len(FLOW_FEATURES)
+# ----------------------------------------------------------------------
+# Hard caps for rate-derived features.
+# A short flow (e.g. a single nmap SYN, duration~0) can otherwise yield
+# astronomically large bytes_per_sec / packets_per_sec that blow up the
+# QI-VAE reconstruction error to ~1.9e9 and flood the hub with bogus
+# CRITICAL alerts. These caps bound the rate features to physically
+# meaningful maxima: 1 GiB/s bytes and 100k pkt/s.
+MAX_FLOW_BYTES_PER_SEC = 1_073_741_824  # 1 GiB/s
+MAX_FLOW_PACKETS_PER_SEC = 100_000      # 100k pkt/s
+
 
 # Direction buckets
 _FWD = "fwd"
@@ -240,8 +250,8 @@ class FlowExtractor:
                     "total_bwd_packets": a["bwd_packets"],
                     "total_length_fwd_packets": a["fwd_bytes"],
                     "total_length_bwd_packets": a["bwd_bytes"],
-                    "flow_bytes_per_sec": round(total_bytes / duration, 3),
-                    "flow_packets_per_sec": round(total_pkts / duration, 3),
+                    "flow_bytes_per_sec": round(min(total_bytes / duration, MAX_FLOW_BYTES_PER_SEC), 3),
+                    "flow_packets_per_sec": round(min(total_pkts / duration, MAX_FLOW_PACKETS_PER_SEC), 3),
                     "fwd_packet_length_mean": round(fwd_len_mean, 3),
                     "bwd_packet_length_mean": round(bwd_len_mean, 3),
                     "fwd_iat_mean": round(fwd_iat_mean, 3),

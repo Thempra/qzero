@@ -29,7 +29,7 @@ class PostFilterConfig:
         whitelist_https_no_payload: bool = True,
         whitelist_local: bool = True,
         whitelist_private: bool = False,
-        min_flow_bytes: int = 64,
+        min_flow_bytes: int = 128,
         suppress_below_score: float = 0.0,
     ) -> None:
         # DNS (UDP/TCP 53) is overwhelmingly benign resolution traffic.

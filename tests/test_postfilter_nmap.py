@@ -97,3 +97,45 @@ def test_private_opt_in_restores_old_behavior():
     flow, score = NMAP_SCANS[0][1], NMAP_SCANS[0][2]
     suppress, reason = p.should_suppress(flow, score)
     assert suppress and reason == "private_rfc1918"
+
+
+# --- Rate-cap / feature-scale regression (2026-09) --------------------------
+# A 1-packet flow yields duration~1e-9s, so bytes_per_sec / packets_per_sec
+# become astronomically large (up to 1e11) and blow the QI-VAE score to ~1.9e9,
+# flooding the hub with bogus CRITICALs. The extractor now caps the rate
+# features; this pins the constants and the clamping behaviour.
+
+
+def test_rate_cap_constants_are_reasonable():
+    import re
+    fe_src = (Path(__file__).resolve().parents[1]
+              / "src" / "qzero" / "preprocessing" / "flow_extractor.py").read_text()
+    cb = int(re.search(r"MAX_FLOW_BYTES_PER_SEC = ([\d_]+)", fe_src).group(1).replace("_", ""))
+    cp = int(re.search(r"MAX_FLOW_PACKETS_PER_SEC = ([\d_]+)", fe_src).group(1).replace("_", ""))
+    # Bounded to physically meaningful maxima (not 1e9+)
+    assert cb <= 2_000_000_000, f"bytes/s cap too high: {cb}"
+    assert cp <= 500_000, f"pkts/s cap too high: {cp}"
+    assert "min(total_bytes / duration, MAX_FLOW_BYTES_PER_SEC)" in fe_src
+    assert "min(total_pkts / duration, MAX_FLOW_PACKETS_PER_SEC)" in fe_src
+
+
+def test_min_flow_bytes_default_raised_to_128():
+    assert PostFilterConfig().min_flow_bytes >= 128
+
+
+def test_https_keepalive_under_threshold_still_suppressed():
+    # A tiny 443 keepalive (total 30 bytes < 128) is suppressed as no-payload.
+    f = dict(src_ip="192.168.50.5", dst_ip="172.64.153.51", src_port=50000,
+             dport=443, proto=6, total_length_fwd_packets=20,
+             total_length_bwd_packets=10)
+    sup, reason = PostFilter().should_suppress(f, 6.0)
+    assert sup and reason == "https_no_payload", (sup, reason)
+
+
+def test_https_real_traffic_over_threshold_not_suppressed():
+    # A real TLS flow with payload (>128) on 443 must NOT be suppressed.
+    f = dict(src_ip="192.168.50.5", dst_ip="172.64.153.51", src_port=50001,
+             dport=443, proto=6, total_length_fwd_packets=1800,
+             total_length_bwd_packets=2400)
+    sup, reason = PostFilter().should_suppress(f, 7.0)
+    assert not sup, reason
