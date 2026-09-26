@@ -47,6 +47,11 @@ class AgentConfig:
     use_qsvm: bool = True   # QSVM is very slow to train on CPU — disable for fast boot
     use_qivae: bool = True  # Quantum-inspired VAE (torch) — faster, good default
     alert_threshold: float = 4.2  # QI-VAE score above which an alert is raised (normal ~3.0-3.7)
+    # RFC1918 suppression. Default False: on a LAN-monitoring agent the
+    # source IP is always private, and internal LAN scans are the very
+    # threat this sensor must catch — whitelisting private traffic hid
+    # 100% of alerts (see fix/postfilter-*).
+    whitelist_private: bool = False
     max_alerts_per_batch: int = 20
     retry_backoff: float = 2.0     # seconds between hub push retries
     max_retries: int = 3
@@ -261,9 +266,10 @@ class QZeroAgent:
                     continue
 
                 # F5: classical post-filter — suppress benign normal behaviour.
-                from qzero.preprocessing.postfilter import PostFilter
+                from qzero.preprocessing.postfilter import PostFilter, PostFilterConfig
 
-                suppress, reason = PostFilter().should_suppress(flow, score)
+                pf_cfg = PostFilterConfig(whitelist_private=self.config.whitelist_private)
+                suppress, reason = PostFilter(pf_cfg).should_suppress(flow, score)
                 if suppress:
                     logger.info(
                         "Suppressed flow alert (%s) %s→%s proto=%s score=%s",
@@ -453,7 +459,9 @@ def main() -> None:
     parser.add_argument("--model-dir", default=os.environ.get("QZERO_MODEL_DIR"))
     parser.add_argument("--n-qubits", type=int, default=int(os.environ.get("QZERO_N_QUBITS", "4")))
     parser.add_argument("--threshold", type=float,
-                        default=float(os.environ.get("QZERO_ALERT_THRESHOLD", "0.5")))
+                        default=float(os.environ.get("QZERO_ALERT_THRESHOLD", "4.2")))
+    parser.add_argument("--whitelist-private", action="store_true",
+                        help="Suppress alerts whose src/dst are RFC1918 (default: off)")
     parser.add_argument("--buffer-dir", default=os.environ.get("QZERO_BUFFER_DIR"))
     parser.add_argument("--verbose", "-v", action="store_true")
 
@@ -472,6 +480,7 @@ def main() -> None:
         model_dir=args.model_dir,
         n_qubits=args.n_qubits,
         alert_threshold=args.threshold,
+        whitelist_private=args.whitelist_private,
         buffer_dir=args.buffer_dir,
     )
     QZeroAgent(config).run()

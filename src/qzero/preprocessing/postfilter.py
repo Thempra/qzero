@@ -28,7 +28,7 @@ class PostFilterConfig:
         whitelist_dns: bool = True,
         whitelist_https_no_payload: bool = True,
         whitelist_local: bool = True,
-        whitelist_private: bool = True,
+        whitelist_private: bool = False,
         min_flow_bytes: int = 64,
         suppress_below_score: float = 0.0,
     ) -> None:
@@ -40,6 +40,13 @@ class PostFilterConfig:
         # Link-local / multicast / loopback / documentation ranges.
         self.whitelist_local = whitelist_local
         # RFC1918 private ranges (10/8, 172.16/12, 192.168/16).
+        # NOTE(2026-09): default is now False. Private-range is NOT a
+        # benign signal in a network-monitoring context: an agent deployed
+        # ON the LAN has a private source IP, and internal LAN scans (the
+        # real threat an NDR sensor hunts) have private src AND dst.
+        # Whitelisting private traffic suppressed 100%% of alerts and made
+        # the hub report 0 detections. Disabled by default; opt in only in
+        # a DMZ where the host has a public IP. See fix/postfilter-*
         self.whitelist_private = whitelist_private
         # Flows with total bytes below this are considered "no payload".
         self.min_flow_bytes = min_flow_bytes
