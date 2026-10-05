@@ -218,7 +218,11 @@ class FlowExtractor:
                 sport = int(pkt[UDP].sport)
                 dport = int(pkt[UDP].dport)
 
-            iplen = max(int(ip.len), len(bytes(pkt)))
+            # ip.len es None en paquetes recién construidos (sin serializar):
+            # usar el tamaño serializado como fallback en ese caso.
+            iplen = len(bytes(pkt))
+            if ip.len is not None:
+                iplen = max(int(ip.len), iplen)
             ts = float(getattr(pkt, "time", 0.0))
 
             return (src_ip, dst_ip, sport, dport, proto, ts, iplen, psh, urg)

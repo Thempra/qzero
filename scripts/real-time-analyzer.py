@@ -448,7 +448,7 @@ async def analyze_flows_periodically():
 
         except asyncio.CancelledError:
             logger.info("Analizador detenido por el usuario")
-            break
+            raise  # S7497: re-lanzar para respetar la semántica de cancelación
         except Exception as e:
             logger.error(f"Error en ciclo de análisis: {e}")
 

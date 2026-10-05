@@ -64,7 +64,7 @@ def generate_synthetic_data(
     Returns:
         Tuple of (features DataFrame, labels Series)
     """
-    np.random.seed(random_state)
+    rng = np.random.default_rng(random_state)
     
     # Difficulty settings
     # Higher overlap_factor = more class overlap = harder classification
@@ -102,15 +102,15 @@ def generate_synthetic_data(
     normal_std = normal_mean * base_std_ratio
     
     # Generate normal traffic
-    X_normal = np.random.normal(normal_mean, normal_std, (n_normal, n_features))
+    X_normal = rng.normal(normal_mean, normal_std, (n_normal, n_features))
     
     # Anomaly traffic - subtle shifts for harder detection
     # The anomaly_shift is reduced with higher difficulty (more overlap with normal)
     shift_magnitude = 2.0 - settings["overlap"] * 1.5  # Less shift = harder
-    anomaly_shifts = np.random.uniform(0.5, 1 + shift_magnitude, n_features)
+    anomaly_shifts = rng.uniform(0.5, 1 + shift_magnitude, n_features)
     anomaly_std = np.maximum(normal_std * (1.5 - settings["overlap"] * 0.5), 0.01)
     
-    X_anomaly = np.random.normal(
+    X_anomaly = rng.normal(
         normal_mean * anomaly_shifts,
         anomaly_std,
         (n_anomaly, n_features)
@@ -118,8 +118,8 @@ def generate_synthetic_data(
     
     # Add some outliers (fewer in harder mode - anomalies blend in more)
     n_outliers = max(1, int(n_anomaly * settings["outlier_frac"]))
-    outlier_idx = np.random.choice(n_anomaly, size=n_outliers, replace=False)
-    outlier_scale = np.random.uniform(2, 5 - settings["overlap"] * 2, (n_outliers, n_features))
+    outlier_idx = rng.choice(n_anomaly, size=n_outliers, replace=False)
+    outlier_scale = rng.uniform(2, 5 - settings["overlap"] * 2, (n_outliers, n_features))
     X_anomaly[outlier_idx] *= outlier_scale
     
     # Signature traffic - known attack patterns
@@ -147,7 +147,7 @@ def generate_synthetic_data(
         center = np.maximum(center, 0.1)  # Ensure positive centers
         cluster_std = np.abs(center) * (0.15 + settings["overlap"] * 0.2)
         cluster_std = np.maximum(cluster_std, 0.01)  # Ensure positive std
-        cluster_samples = np.random.normal(center, cluster_std, (n_cluster, n_features))
+        cluster_samples = rng.normal(center, cluster_std, (n_cluster, n_features))
         X_signature.append(cluster_samples)
     
     X_signature = np.vstack(X_signature)
@@ -155,7 +155,7 @@ def generate_synthetic_data(
     # Add global noise proportional to difficulty
     noise_scale = settings["noise"]
     for X in [X_normal, X_anomaly, X_signature]:
-        noise = np.random.normal(0, normal_mean * noise_scale, X.shape)
+        noise = rng.normal(0, normal_mean * noise_scale, X.shape)
         X += noise
     
     # Ensure no negative values
@@ -172,7 +172,7 @@ def generate_synthetic_data(
     )
     
     # Shuffle
-    shuffle_idx = np.random.permutation(len(X))
+    shuffle_idx = rng.permutation(len(X))
     X = X[shuffle_idx]
     y = y[shuffle_idx]
     

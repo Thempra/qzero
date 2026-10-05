@@ -143,7 +143,8 @@ class QSVM:
         # Limit samples for quantum
         limit = sample_limit or self.config.max_samples_quantum
         if len(X_train) > limit:
-            indices = np.random.choice(len(X_train), limit, replace=False)
+            rng = np.random.default_rng(len(X_train))
+            indices = rng.choice(len(X_train), limit, replace=False)
             X_train = X_train[indices]
             y_train = y_train[indices]
         

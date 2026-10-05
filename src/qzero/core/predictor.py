@@ -90,6 +90,8 @@ class QZeroPredictor:
         # Model storage
         self.qsvm_model: Optional[QSVM] = None
         self.qivae_model: Optional[QIVAE] = None
+        self.qsvm_result = None
+        self.qivae_result = None
         self.classical_models_dict: Dict[str, ClassicalBaseline] = {}
 
         # Training metadata
@@ -448,11 +450,9 @@ class QZeroPredictor:
             # Use probability of class 1 (anomaly)
             try:
                 proba = self.qsvm_model.model.predict_proba(X)
-                if proba.shape[1] == 2:
-                    return proba[:, 1]
-                else:
-                    return proba[:, 1]  # Anomaly class
-            except:
+                # proba[:, 1] es la clase anomalía en clasificación binaria
+                return proba[:, 1]
+            except Exception:
                 # Fallback to predictions
                 return self.qsvm_model.predict(X).astype(float)
         else:
@@ -557,10 +557,11 @@ class QZeroPredictor:
 
         # Classical
         for name, result in self.classical_results.items():
+            # ModelResult usa .f1 (no .f1_score como los cuánticos)
             zd_pct = (
                 result.zero_day_detection_rate * 100
                 if hasattr(result, "zero_day_detection_rate")
-                else result.f1_score * 100
+                else result.f1 * 100
             )
             comparison.append(
                 f"{'Classical':<25} {result.accuracy:>12.4f} {result.precision:>12.4f} {result.recall:>12.4f} {result.f1:>12.4f} {zd_pct:>11.1f}%"
@@ -688,6 +689,17 @@ class QZeroPredictor:
 
         # Restore classical model results
         self.classical_results = {}
+
+        # Load classical baselines persisted by save() — sin esto, un
+        # predictor cargado no tenía ningún modelo y predict() lanzaba
+        # "No models available for prediction".
+        for pkl in sorted(path.glob("classical_*.pkl")):
+            name = pkl.stem[len("classical_"):]
+            try:
+                self.classical_models_dict[name] = pickle.load(
+                    open(pkl, "rb"))
+            except Exception:
+                print(f"Warning: could not load classical model {name}.")
 
         if (path / "training_info.json").exists():
             with open(path / "training_info.json") as f:

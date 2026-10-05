@@ -15,13 +15,13 @@ from qzero.preprocessing.feature_engineering import FeatureEngineer
 # Conditional imports - tests skip if Qiskit not available
 try:
     from qiskit import QuantumCircuit
-    from quantum.feature_maps import (
+    from qzero.quantum.feature_maps import (
         create_feature_map,
         get_feature_map_info,
         FeatureMapType,
         QISKIT_AVAILABLE,
     )
-    from quantum.qsvm import QSVM, QSVMConfig, QSVMResult, QISKIT_ML_AVAILABLE
+    from qzero.quantum.qsvm import QSVM, QSVMConfig, QSVMResult, QISKIT_ML_AVAILABLE
 except ImportError:
     QISKIT_AVAILABLE = False
     QISKIT_ML_AVAILABLE = False

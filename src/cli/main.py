@@ -4,6 +4,8 @@ CLI Principal para QZero
 """
 
 import argparse
+
+VERBOSE_HELP = 'Modo detallado'
 import sys
 import logging
 from pathlib import Path
@@ -51,7 +53,7 @@ def pcap_command(args):
     analyzer = PCAPAnalyzer(args.file)
     results = analyzer.analyze()
     
-    print(f"📊 Análisis completado:")
+    print("📊 Análisis completado:")
     print(f"   - Total paquetes: {results['total_packets']}")
     print(f"   - Anomalías detectadas: {results['anomalies']}")
     print(f"   - Amenazas: {results['threats']}")
@@ -70,7 +72,7 @@ def detect_command(args):
     
     results = detector.run()
     
-    print(f"🔍 Detección completada:")
+    print("🔍 Detección completada:")
     print(f"   - Modo: {results['mode']}")
     print(f"   - Umbral: {results['threshold']}")
     print(f"   - Anomalías: {results['anomalies']}")
@@ -116,13 +118,13 @@ def main():
     monitor_parser.add_argument('--interface', required=True, help='Interfaz de red')
     monitor_parser.add_argument('--promiscuous', action='store_true', help='Modo promiscuo')
     monitor_parser.add_argument('--output', default='reports', help='Directorio de salida')
-    monitor_parser.add_argument('--verbose', '-v', action='store_true', help='Modo detallado')
+    monitor_parser.add_argument('--verbose', '-v', action='store_true', help=VERBOSE_HELP)
     monitor_parser.set_defaults(func=monitor_command)
     
     # PCAP command
     pcap_parser = subparsers.add_parser('pcap', help='Analizar archivo PCAP')
     pcap_parser.add_argument('--file', required=True, help='Archivo PCAP')
-    pcap_parser.add_argument('--verbose', '-v', action='store_true', help='Modo detallado')
+    pcap_parser.add_argument('--verbose', '-v', action='store_true', help=VERBOSE_HELP)
     pcap_parser.set_defaults(func=pcap_command)
     
     # Detect command
@@ -131,7 +133,7 @@ def main():
                               default='real-time', help='Modo de detección')
     detect_parser.add_argument('--threshold', type=float, default=0.7, 
                               help='Umbral de detección')
-    detect_parser.add_argument('--verbose', '-v', action='store_true', help='Modo detallado')
+    detect_parser.add_argument('--verbose', '-v', action='store_true', help=VERBOSE_HELP)
     detect_parser.set_defaults(func=detect_command)
     
     # Interface command
@@ -139,7 +141,7 @@ def main():
     interface_parser.add_argument('--interface', required=True, help='Interfaz de red')
     interface_parser.add_argument('--activate', action='store_true', help='Activar promiscuo')
     interface_parser.add_argument('--deactivate', action='store_true', help='Desactivar')
-    interface_parser.add_argument('--verbose', '-v', action='store_true', help='Modo detallado')
+    interface_parser.add_argument('--verbose', '-v', action='store_true', help=VERBOSE_HELP)
     interface_parser.set_defaults(func=interface_command)
     
     args = parser.parse_args()

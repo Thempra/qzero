@@ -242,15 +242,15 @@ def calculate_quantum_advantage(
 
 if __name__ == "__main__":
     # Test evaluation
-    np.random.seed(42)
+    rng = np.random.default_rng(42)
     
     # Simulate predictions
     n = 1000
-    y_true = np.random.choice([0, 1, 2], n, p=[0.6, 0.15, 0.25])
+    y_true = rng.choice([0, 1, 2], n, p=[0.6, 0.15, 0.25])
     y_pred = y_true.copy()
     # Add some errors
-    errors = np.random.choice(n, int(n * 0.1), replace=False)
-    y_pred[errors] = np.random.choice([0, 1, 2], len(errors))
+    errors = rng.choice(n, int(n * 0.1), replace=False)
+    y_pred[errors] = rng.choice([0, 1, 2], len(errors))
     
     y_proba = np.zeros((n, 3))
     for i in range(n):

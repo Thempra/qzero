@@ -37,6 +37,7 @@ except Exception:  # pragma: no cover
     _HAS_PLOTLY = False
 
 API = os.environ.get("QZERO_API_URL", "http://qzero-api:8000").rstrip("/")
+DIR_COL = "Dirección"
 ENV_LABEL = os.environ.get("QZERO_ENV", "PRODUCTION")
 
 try:
@@ -178,8 +179,8 @@ def _dark_layout(fig, height: int = 300):
     fig.update_layout(
         height=height, paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(16,22,34,1)", font_color="#d7dee8",
-        margin=dict(l=10, r=10, t=30, b=10), showlegend=True,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
+        margin={"l": 10, "r": 10, "t": 30, "b": 10}, showlegend=True,
+        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "x": 0},
     )
     fig.update_xaxes(gridcolor="#1c2434", zeroline=False)
     fig.update_yaxes(gridcolor="#1c2434", zeroline=False)
@@ -307,10 +308,6 @@ def module_overview(online_window_min):
                 tc = tc.sort_values("N", ascending=False).reset_index(drop=True)
             except Exception:
                 pass
-            # color type column by severity signal
-            def tone(t):
-                return "viol" if "Brute" in t or "Listener" in t else (
-                    "high" if "ICMP" in t else "")
             fig = threat_type_bar(tc.head(8))
             if fig is not None:
                 st.plotly_chart(fig, use_container_width=True)
@@ -362,7 +359,7 @@ def module_overview(online_window_min):
         if _HAS_PLOTLY and not tl_df.empty:
             fig = go.Figure(go.Scatter(x=tl_df["Minuto"], y=tl_df["Alertas"],
                                        mode="lines+markers",
-                                       line=dict(color="#6366f1", width=2),
+                                       line={"color": "#6366f1", "width": 2},
                                        fill="tozeroy", fillcolor="rgba(99,102,241,.15)"))
             fig.update_xaxes(title_text="Hora")
             fig.update_yaxes(title_text="Alertas/min")
@@ -388,7 +385,7 @@ def module_alerts(enriched):
     f1, f2, f3, f4 = st.columns([1, 1, 1, 1.5])
     sev_filter = f1.selectbox("Severidad", sev_opts)
     type_filter = f2.selectbox("Tipo", type_opts)
-    dir_filter = f3.selectbox("Dirección", dir_opts)
+    dir_filter = f3.selectbox(DIR_COL, dir_opts)
     search = f4.text_input("🔍 Buscar (IP / org / puerto)", "").strip().lower()
 
     dfr = pd.DataFrame(enriched)
@@ -486,14 +483,14 @@ def module_network(enriched):
     # direction breakdown
     if "direction" in dfr:
         dir_df = dfr["direction"].value_counts().reset_index()
-        dir_df.columns = ["Dirección", "N"]
+        dir_df.columns = [DIR_COL, "N"]
         c1, c2 = st.columns([1, 1])
         with c1:
             st.markdown("##### Dirección del tráfico")
             if _HAS_PLOTLY:
-                fig = px.pie(dir_df, names="Dirección", values="N", hole=0.55)
-                fig.update_traces(marker=dict(colors=["#38bdf8", "#6366f1",
-                                                      "#8b5cf6", "#a78bfa"]))
+                fig = px.pie(dir_df, names=DIR_COL, values="N", hole=0.55)
+                fig.update_traces(marker={"colors": ["#38bdf8", "#6366f1",
+                                                     "#8b5cf6", "#a78bfa"]})
                 st.plotly_chart(_dark_layout(fig, 280), use_container_width=True)
             else:
                 st.dataframe(dir_df, use_container_width=True, hide_index=True)
@@ -609,7 +606,7 @@ def module_research():
     # inline settings (previously sidebar)
     rc1, rc2, rc3 = st.columns(3)
     n_qubits = rc1.slider("Número de qubits", 2, 8, 4)
-    feature_map = rc2.selectbox("Feature map", ["ZZ", "ZZZ", "Pauli", "Z"])
+    rc2.selectbox("Feature map", ["ZZ", "ZZZ", "Pauli", "Z"])
     reps = rc3.slider("Repeticiones", 1, 4, 2)
 
     data_dir = Path(__file__).parent.parent / "data" / "raw"
@@ -666,10 +663,10 @@ def module_research():
             if st.button("Train Classical Models", type="primary", key="r_tr_cls"):
                 with st.spinner("Entrenando modelos..."):
                     engineer = FeatureEngineer(n_qubits=n_qubits, reduction_method="pca")
-                    Xr = engineer.fit_transform(st.session_state.R_X)
-                    Xt, Xv, yt, yv = train_test_split(Xr, st.session_state.R_y,
+                    reduced_x = engineer.fit_transform(st.session_state.R_X)
+                    x_train, x_val, yt, yv = train_test_split(reduced_x, st.session_state.R_y,
                                                       test_size=0.2, random_state=42)
-                    st.session_state.R_classical_results = run_all_baselines(Xt, yt, Xv, yv)
+                    st.session_state.R_classical_results = run_all_baselines(x_train, yt, x_val, yv)
                 st.success("Modelos clásicos entrenados.")
             if st.session_state.R_classical_results:
                 dfr = pd.DataFrame([{
@@ -692,15 +689,15 @@ def module_research():
                         from qzero.quantum.qsvm import QSVM, QSVMConfig
                         from sklearn.metrics import accuracy_score, f1_score
                         engineer = FeatureEngineer(n_qubits=n_qubits, reduction_method="pca")
-                        Xr = engineer.fit_transform(st.session_state.R_X)[:max_samples]
+                        reduced_x = engineer.fit_transform(st.session_state.R_X)[:max_samples]
                         yq = st.session_state.R_y[:max_samples]
-                        Xt, Xv, yt, yv = train_test_split(Xr, yq, test_size=0.2, random_state=42)
+                        x_train, x_val, yt, yv = train_test_split(reduced_x, yq, test_size=0.2, random_state=42)
                         qsvm = QSVM(config=QSVMConfig(n_qubits=n_qubits,
                                                       feature_map_reps=reps,
                                                       use_classical_fallback=True))
                         start = time.time()
-                        qsvm.fit(Xt, yt)
-                        yp = qsvm.predict(Xv)
+                        qsvm.fit(x_train, yt)
+                        yp = qsvm.predict(x_val)
                         st.session_state.R_quantum_results = {
                             "accuracy": accuracy_score(yv, yp),
                             "f1": f1_score(yv, yp, average="weighted"),

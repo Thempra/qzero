@@ -71,3 +71,6 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 qzero = ["*.yaml", "*.json", "*.txt"]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

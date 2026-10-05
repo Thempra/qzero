@@ -24,8 +24,8 @@ COPY src/ ./src/
 # wasted on this CPU-only VM and makes builds slow/unreliable. Install the
 # CPU-only wheel first so `pip install .[all]` treats torch as already satisfied
 # and never pulls the CUDA packages.
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-RUN pip install --no-cache-dir "./[all]"
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir "./[all]"
 
 # libpcap runtime
 ENV PYTHONUNBUFFERED=1

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>QZero — Quantum Threat Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
   <style>
     :root {
       --bg:        #0b0e1a;
@@ -374,11 +374,11 @@
   <!-- Controls -->
   <div class="card controls-card">
     <div class="form-group">
-      <label>Interface</label>
+      <label for="inputIface">Interface</label>
       <input type="text" id="inputIface" value="eth0" />
     </div>
     <div class="form-group">
-      <label>Interval (s)</label>
+      <label for="inputInterval">Interval (s)</label>
       <input type="number" id="inputInterval" value="5" min="1" max="60" />
     </div>
     <div class="checkbox-group">

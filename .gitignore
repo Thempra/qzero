@@ -85,3 +85,7 @@ models/
 *.h5
 data/*.db
 data/hub/
+
+# coverage artifacts
+.coverage
+coverage.xml

@@ -26,6 +26,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from qzero.preprocessing.postfilter import PostFilter, PostFilterConfig
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_HUB_PATH = "/api/v1/agents/{agent_id}/alerts"
@@ -72,7 +74,7 @@ class AgentConfig:
         try:
             import subprocess
             out = subprocess.run(
-                ["ip", "route", "get", "1.1.1.1"],
+                ["ip", "route", "get", "1.1.1.1"],  # NOSONAR S1313: sondeo de ruta, sin conexión real
                 capture_output=True, text=True, timeout=5,
             ).stdout
             toks = out.split()
@@ -285,7 +287,7 @@ class QZeroAgent:
 
             return alerts
         except Exception as e:  # noqa: BLE001
-            logger.error("Analysis error: %s", e)
+            logger.exception("Analysis error")
             return []
         finally:
             if tmp_path:

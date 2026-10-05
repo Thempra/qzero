@@ -59,13 +59,14 @@ class QZeroConfig:
             "daemon_interval": 60,
             "log_level": "INFO",
 
-            # Paths absolutos
+            # Paths absolutos (strings: los objetos Path no serializan en YAML
+            # seguro — save()+reload perdía toda la configuración personalizada)
             "paths": {
-                "output_dir": Path.cwd() / "reports",
-                "log_dir": self.config_dir / "logs",
-                "data_dir": self.config_dir / "data",
-                "model_dir": self.config_dir / "models",
-                "pcap_dir": self.config_dir / "pcaps"
+                "output_dir": str(Path.cwd() / "reports"),
+                "log_dir": str(self.config_dir / "logs"),
+                "data_dir": str(self.config_dir / "data"),
+                "model_dir": str(self.config_dir / "models"),
+                "pcap_dir": str(self.config_dir / "pcaps")
             }
         }
 

@@ -136,7 +136,7 @@ class NetworkTrafficAnalyzer:
             return features, flow_meta
 
         except Exception as e:
-            logger.error(f"Flow feature extraction error: {e}")
+            logger.exception("Flow feature extraction error")
             return None, []
 
     @staticmethod
@@ -222,7 +222,7 @@ class NetworkTrafficAnalyzer:
             }
 
         except Exception as e:
-            logger.error(f"Prediction error: {e}")
+            logger.exception("Prediction error")
             return {
                 "status": "error",
                 "message": str(e),

@@ -60,7 +60,9 @@ def asn_lookup(ip: str) -> dict:
     if is_private_ip(ip):
         return {"org": "LAN", "asn": "PRIVATE", "country": "", "anycast": False}
     # Primary: ipinfo.io (HTTPS, free tier 50k/month). Fallback: ip-api.com (HTTP only).
-    for base in ("https://ipinfo.io/{ip}/json", "http://ip-api.com/json/{ip}?fields=status,country,org,as"):
+    # NOSONAR S5332: ip-api.com solo ofrece HTTPS en plan de pago; es fallback de
+    # solo lectura (enriquecimiento ASN/org, sin credenciales ni datos sensibles).
+    for base in ("https://ipinfo.io/{ip}/json", "http://ip-api.com/json/{ip}?fields=status,country,org,as"):  # NOSONAR
         try:
             url = base.format(ip=ip)
             req = urllib.request.Request(url, headers={"User-Agent": "qzero-dashboard"})
@@ -83,10 +85,11 @@ def enrich_destination(src: str, dst: str, direction: str) -> dict:
     """Best-effort human label for the remote end of the flow."""
     if direction == "INTERNAL":
         return {"org": "LAN internal", "asn": "", "country": "", "anycast": False}
+    # El extremo remoto es dst en salientes y src en entrantes.
     if direction == "OUTBOUND":
-        return asn_lookup(dst)          # remote = dst
+        return asn_lookup(dst)
     if direction == "INBOUND":
-        return asn_lookup(src)          # remote = src
+        return asn_lookup(src)
     return {"org": "?", "asn": "", "country": "", "anycast": False}
 
 
@@ -95,10 +98,11 @@ def enrich_destination(src: str, dst: str, direction: str) -> dict:
 # ---------------------------------------------------------------------------
 SSH_PORTS = {22, 2222, 22222}
 WEB_EGRESS_PORTS = {443, 80}
+THREAT_EGRESS = "Egress TLS/HTTPS"
 MALWARE_PORTS = {4444, 5555, 6667, 31337, 1234}
 
 
-def classify_threat(src, dst, src_port, dst_port, protocol, size, direction,
+def classify_threat(src, dst, _src_port, dst_port, protocol, size, direction,
                     score) -> tuple[str, str]:
     """Return (threat_type, explanation). Seeded by ports + direction + score."""
     proto = {6: "TCP", 17: "UDP", 1: "ICMP"}.get(protocol, f"proto{protocol}")
@@ -126,7 +130,7 @@ def classify_threat(src, dst, src_port, dst_port, protocol, size, direction,
     # 3) Egress TLS/HTTPS to a CDN — the dominant (usually benign) case
     if direction == "OUTBOUND" and dst_port in WEB_EGRESS_PORTS:
         return (
-            "Egress TLS/HTTPS",
+            THREAT_EGRESS,
             f"Conexión {proto} cifrada saliente hacia {dst}:{dst_port}. El score "
             f"({score:.1f}) refleja 'novedad' frente al baseline del modelo "
             "(el TLS cifrado es opaco), no necesariamente una amenaza. Acción: "
@@ -185,9 +189,9 @@ def classify_threat(src, dst, src_port, dst_port, protocol, size, direction,
 # ---------------------------------------------------------------------------
 # Console convenience
 # ---------------------------------------------------------------------------
-def suggest_severity(direction: str, threat_type: str) -> str:
+def suggest_severity(_direction: str, threat_type: str) -> str:
     """Downgrade likely-benign egress noise so the console is actionable."""
-    if threat_type == "Egress TLS/HTTPS":
+    if threat_type == THREAT_EGRESS:
         return "INFO/revisar"
     if threat_type == "Brute-force / recon SSH":
         return "CRITICAL/actuar"
@@ -211,7 +215,7 @@ def enrich_alert(a: dict) -> dict:
     out["dest_anycast"] = remote.get("anycast", False)
     out["threat_type"] = threat_type
     # Note when the remote is an anycast CDN (extra confidence it's benign egress)
-    if remote.get("anycast") and threat_type == "Egress TLS/HTTPS":
+    if remote.get("anycast") and threat_type == THREAT_EGRESS:
         explanation += " Destino anycast (CDN) — muy probablemente tráfico legítimo."
     out["explanation"] = explanation
     out["action"] = suggest_severity(direction, threat_type)

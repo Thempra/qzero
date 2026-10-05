@@ -177,9 +177,11 @@ class MonitorService:
                         None, self._analyze_and_update, packets
                     )
             except asyncio.CancelledError:
-                break
+                # S7497: re-lanzar tras la limpieza para no romper la semántica
+                # de cancelación de asyncio (stop() también pone _running=False).
+                raise
             except Exception as e:
-                logger.error(f"Monitor loop error: {e}")
+                logger.exception("Monitor loop error")
                 await asyncio.sleep(1)
 
             # Update uptime and broadcast
@@ -198,7 +200,7 @@ class MonitorService:
                 store=True,
             )
         except Exception as e:
-            logger.error(f"Capture error: {e}")
+            logger.exception("Capture error")
             return []
 
     def _analyze_and_update(self, packets: list) -> None:
@@ -232,7 +234,7 @@ class MonitorService:
                 anomaly_scores = res.get("anomaly_scores", [])
 
             except Exception as e:
-                logger.error(f"Analysis error: {e}")
+                logger.exception("Analysis error")
             finally:
                 if tmp_path:
                     Path(tmp_path).unlink(missing_ok=True)
