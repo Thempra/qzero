@@ -74,3 +74,9 @@ qzero = ["*.yaml", "*.json", "*.txt"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.coverage.run]
+relative_files = true
+
+[tool.coverage.report]
+show_missing = false
