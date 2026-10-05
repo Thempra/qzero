@@ -13,6 +13,7 @@ Endpoints:
   POST /monitor/stop     — Stop monitoring
 """
 
+import asyncio
 import tempfile
 import logging
 from pathlib import Path
@@ -128,26 +129,31 @@ async def analyze_pcap(
     method: Optional[str] = "best",
 ):
     """Upload and analyze a PCAP file."""
-    tmp_path = None
+
+    def _run_sync() -> AnalyzeResponse:
+        # Trabajo bloqueante (pcap en disco + análisis) fuera del event
+        # loop: se ejecuta vía asyncio.to_thread (S7493).
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pcap") as tmp:
+                tmp_path = tmp.name
+                tmp.write(file.file.read())
+
+            predictor = _get_predictor()
+            from ..core.detector import NetworkTrafficAnalyzer
+            analyzer = NetworkTrafficAnalyzer(predictor=predictor)
+            return analyzer.analyze(tmp_path, method=method)
+        finally:
+            if tmp_path:
+                Path(tmp_path).unlink(missing_ok=True)
+
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pcap") as tmp:
-            tmp_path = tmp.name
-            tmp.write(await file.read())
-
-        predictor = _get_predictor()
-        from ..core.detector import NetworkTrafficAnalyzer
-        analyzer = NetworkTrafficAnalyzer(predictor=predictor)
-        result = analyzer.analyze(tmp_path, method=method)
-        return result
-
+        return await asyncio.to_thread(_run_sync)
     except HTTPException:
         raise
     except Exception as e:
         logger.exception("Error analyzing PCAP")
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if tmp_path:
-            Path(tmp_path).unlink(missing_ok=True)
 
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
