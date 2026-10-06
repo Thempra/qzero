@@ -56,7 +56,7 @@ class ClassicalBaseline:
     """
     
     MODELS = {
-        "svm_linear": lambda: SVC(kernel="linear", probability=True, random_state=42, C=1.0),
+        "svm_linear": lambda: SVC(kernel="linear", probability=True, random_state=42, C=1.0, gamma="scale"),
         "svm_rbf": lambda: SVC(kernel="rbf", probability=True, random_state=42, C=1.0, gamma="scale"),
         "random_forest": lambda: RandomForestClassifier(
             n_estimators=100, max_depth=10, random_state=42, n_jobs=-1,
