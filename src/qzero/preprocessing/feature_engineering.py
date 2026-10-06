@@ -58,7 +58,7 @@ class FeatureEngineer:
         # Step 1: Dimensionality reduction
         if X.shape[1] > self.n_qubits:
             if self.reduction_method == "pca":
-                self.reducer = PCA(n_components=self.n_qubits)
+                self.reducer = PCA(n_components=self.n_qubits, random_state=42)
                 X_reduced = self.reducer.fit_transform(X)
             elif self.reduction_method == "mutual_info":
                 if y is None:

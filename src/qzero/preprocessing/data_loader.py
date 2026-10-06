@@ -368,7 +368,7 @@ class DataLoader:
         """
         if method == "pca":
             from sklearn.decomposition import PCA
-            reducer = PCA(n_components=n_components)
+            reducer = PCA(n_components=n_components, random_state=42)
             return reducer.fit_transform(X)
         elif method == "select_best":
             from sklearn.feature_selection import SelectKBest, f_classif

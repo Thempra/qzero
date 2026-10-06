@@ -57,7 +57,7 @@ save_fig('01_feature_distributions')
 
 # 3. PCA visualization
 print("Creating PCA visualization...")
-pca = PCA(n_components=2)
+pca = PCA(n_components=2, random_state=42)
 X_pca = pca.fit_transform(X)
 
 fig, ax = plt.subplots(figsize=(10, 8))

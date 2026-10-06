@@ -33,7 +33,7 @@ def generate_test_traffic(num_packets: int = 50) -> List[scapy.Packet]:
         # IP de destino (puede ser localhost o IP externa)
         dst_ip = f"10.{i % 100}.{i % 255}.{i % 254 + 1}"
         if i % 3 == 0:
-            dst_ip = "8.8.8.8"  # DNS
+            dst_ip = "8.8.8.8"  # NOSONAR python:S1313 — IP de ejemplo en tráfico sintético de demo, no se conecta a ninguna parte
 
         # Crear paquete ICMP
         packet = scapy.IP(src=src_ip, dst=dst_ip) / scapy.ICMP()
