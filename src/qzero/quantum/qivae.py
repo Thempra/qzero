@@ -427,6 +427,7 @@ class QIVAE:
         self.optimizer = torch.optim.Adam(
             self.model.parameters(),
             lr=self.config.learning_rate,
+            weight_decay=0.0,
         )
     
     def fit(
@@ -457,6 +458,7 @@ class QIVAE:
             dataset,
             batch_size=self.config.batch_size,
             shuffle=True,
+            num_workers=0,
         )
         
         if X_val is not None:

@@ -136,7 +136,7 @@ class QuantumAnalyzer:
         self.qsvm = None
         self.qivae = None
 
-    async def initialize(self):
+    def initialize(self):
         """Inicializa el predictor cuántico de QZero"""
         try:
             logger.info("Inicializando predictor cuántico de QZero...")
@@ -168,7 +168,7 @@ class QuantumAnalyzer:
             logger.error(f"Error inicializando predictor cuántico: {e}")
             logger.warning("Usando modo de simulación cuántica")
 
-    async def analyze_flows(self, flows: List[Dict]) -> Dict:
+    def analyze_flows(self, flows: List[Dict]) -> Dict:
         """
         Analiza flujos usando modelos cuánticos de QZero
         """
@@ -396,7 +396,7 @@ async def analyze_flows_periodically():
     analyzer = QuantumAnalyzer(CONFIG['api_url'])
     alert_manager = AlertManager(CONFIG['incident_file'], CONFIG['alert_mode'], CONFIG['save_incidents'])
 
-    await analyzer.initialize()
+    analyzer.initialize()
 
     logger.info(f"Iniciando análisis de flujos cada {CONFIG['analyze_interval']} segundos")
     logger.info(f"Umbral CRITICAL: {CONFIG['threshold_critical']}")
@@ -426,7 +426,7 @@ async def analyze_flows_periodically():
             logger.info(f"Analizando {len(current_flows)} flujos con análisis CUÁNTICO...")
 
             # Analizar con QZero (módulo cuántico)
-            analysis_result = await analyzer.analyze_flows(current_flows)
+            analysis_result = analyzer.analyze_flows(current_flows)
 
             # Generar alertas si hay anomalías
             if analysis_result.get('status') == 'success' and analysis_result.get('anomalies_detected', 0) > 0:
@@ -453,7 +453,7 @@ async def analyze_flows_periodically():
             logger.error(f"Error en ciclo de análisis: {e}")
 
 
-async def main():
+def main():
     """Función principal del analizador en tiempo real"""
     global system_status
 
@@ -462,8 +462,6 @@ async def main():
     Path('/home/thempra/projects/qzero/insights').mkdir(exist_ok=True)
 
     # Configurar señales para graceful shutdown
-    loop = asyncio.get_event_loop()
-
     def signal_handler():
         logger.info("Deteniendo analizador cuántico...")
         system_status['mode'] = 'STOPPED'
@@ -488,7 +486,7 @@ async def main():
 
 if __name__ == '__main__':
     try:
-        asyncio.run(main())
+        main()
     except KeyboardInterrupt:
         logger.info("Analizador detenido por teclado")
     except Exception as e:

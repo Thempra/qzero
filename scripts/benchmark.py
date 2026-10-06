@@ -125,7 +125,7 @@ def benchmark_random_forest(X_train: np.ndarray, y_train: np.ndarray,
     """Benchmark Random Forest (supervised)."""
     from sklearn.ensemble import RandomForestClassifier
     
-    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    model = RandomForestClassifier(n_estimators=100, random_state=42, max_features="sqrt", min_samples_leaf=1)
     
     start = time.time()
     model.fit(X_train, y_train)

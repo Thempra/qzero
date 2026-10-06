@@ -405,7 +405,7 @@ class QZeroPredictor:
             ):
                 return self.qsvm_model.predict(X)
             elif self.classical_models_dict:
-                return list(self.classical_models_dict.values())[0].predict(X)
+                return next(iter(self.classical_models_dict.values())).predict(X)
             else:
                 raise RuntimeError("No models available for prediction")
         else:

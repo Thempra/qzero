@@ -47,7 +47,7 @@ def generate_test_traffic(num_packets: int = 50) -> List[scapy.Packet]:
     return packets
 
 
-async def test_quantum_analyzer():
+def test_quantum_analyzer():
     """Prueba el analizador cuántico con modelos cuánticos de QZero"""
 
     print("=" * 70)
@@ -215,7 +215,7 @@ async def test_quantum_analyzer():
 
 if __name__ == '__main__':
     try:
-        asyncio.run(test_quantum_analyzer())
+        test_quantum_analyzer()
     except Exception as e:
         print(f"❌ Error en la prueba cuántica: {e}")
         import traceback

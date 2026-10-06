@@ -56,13 +56,14 @@ class ClassicalBaseline:
     """
     
     MODELS = {
-        "svm_linear": lambda: SVC(kernel="linear", probability=True, random_state=42),
-        "svm_rbf": lambda: SVC(kernel="rbf", probability=True, random_state=42),
+        "svm_linear": lambda: SVC(kernel="linear", probability=True, random_state=42, C=1.0),
+        "svm_rbf": lambda: SVC(kernel="rbf", probability=True, random_state=42, C=1.0, gamma="scale"),
         "random_forest": lambda: RandomForestClassifier(
-            n_estimators=100, max_depth=10, random_state=42, n_jobs=-1
+            n_estimators=100, max_depth=10, random_state=42, n_jobs=-1,
+            max_features="sqrt", min_samples_leaf=1
         ),
         "gradient_boosting": lambda: GradientBoostingClassifier(
-            n_estimators=100, max_depth=5, random_state=42
+            n_estimators=100, max_depth=5, random_state=42, learning_rate=0.1
         ),
         "logistic_regression": lambda: LogisticRegression(
             max_iter=1000, random_state=42

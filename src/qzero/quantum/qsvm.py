@@ -113,6 +113,8 @@ class QSVM:
             kernel="rbf",
             probability=True,
             random_state=self.config.random_state,
+            C=1.0,
+            gamma="scale",
         )
         self._used_quantum = False
     
