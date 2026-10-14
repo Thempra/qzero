@@ -62,5 +62,5 @@ Contexto (lo último landed): post-filtro anti-FP (−73 % CRITICALs), caps de r
 
 ## Reglas de ejecución
 - Construir estrictamente en orden A1→A10 (o B por hitos, 1→9); si la realidad fuerza un cambio, actualizar el doc afectado **en el mismo commit**.
-- Desplegar solo desde `main` (auto-deploy); nunca fusionar dev→main sin pedirlo.
+- **Flujo de ramas:** todo desarrollo nuevo se pushea a `dev`. `main` solo se actualiza al hacer el deploy verificado (merge `dev`→`main` en el momento del pase a producción, nunca antes sin pedirlo). El auto-deploy de Coolify escucha `main`.
 - Toda "mejora de detección" se valida con el workflow QA del skill `qzero-ndr`: baseline → trigger nmap → comparar antes/después con datos reales.
