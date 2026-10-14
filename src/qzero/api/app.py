@@ -62,6 +62,79 @@ app.add_middleware(
 )
 
 
+# ── Auth a nivel de app (Hito 3.7) ──────────────────────────────────────────
+# Protege rutas de CONSULTA del hub y la API clásica. NO protege /health
+# (healthcheck del contenedor) ni el ingest de agentes (usa X-Agent-Token
+# opcional). Fail-closed: sin ADMIN_PASSWORD, las rutas protegidas dan 503.
+
+from . import auth as _auth  # noqa: E402
+from fastapi import Request  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
+
+# Prefijos/rutas exentos de token SPA (data-plane de agentes + salud + login).
+_AUTH_EXEMPT_PREFIXES = (
+    "/health",
+    "/api/v1/auth/",
+    "/metrics",
+)
+_AUTH_EXEMPT_EXACT = {"/", "/dashboard", "/hub", "/api/v1/hub", "/ws"}
+_AUTH_EXEMPT_INGEST_SUFFIXES = ("/alerts", "/heartbeat")
+
+
+def _is_exempt(path: str) -> bool:
+    if any(path.startswith(p) for p in _AUTH_EXEMPT_PREFIXES):
+        return True
+    if path in _AUTH_EXEMPT_EXACT:
+        return True
+    # ingest/heartbeat de agentes: LAN data-plane, token opcional aparte
+    if path.startswith("/api/v1/agents/") and path.endswith(
+            _AUTH_EXEMPT_INGEST_SUFFIXES):
+        return True
+    return False
+
+
+@app.middleware("http")
+async def spa_auth_middleware(request: Request, call_next):
+    if not _auth.auth_enabled() and not _auth.agent_token_required():
+        return await call_next(request)
+    path = request.url.path
+    # ingest de agentes: exigir X-Agent-Token solo si está activo
+    if path.startswith("/api/v1/agents/") and path.endswith(
+            _AUTH_EXEMPT_INGEST_SUFFIXES) and request.method == "POST":
+        if _auth.agent_token_required():
+            if not _auth.check_agent_token(request.headers.get("x-agent-token")):
+                return JSONResponse({"detail": "invalid agent token"}, 401)
+        return await call_next(request)
+    if _is_exempt(path):
+        return await call_next(request)
+    if not _auth.auth_enabled():
+        # fail-closed: algo activo la auth (agent token) pero falta password
+        return JSONResponse({"detail": "auth not configured"}, 503)
+    header = request.headers.get("authorization", "")
+    token = header[7:] if header.lower().startswith("bearer ") else None
+    if not _auth.verify_token(token):
+        return JSONResponse({"detail": "unauthorized"}, 401)
+    return await call_next(request)
+
+
+@app.get("/api/v1/auth/status")
+async def auth_status():
+    """Si el cliente (dashboard/SPA) necesita loguearse."""
+    return _auth.auth_status()
+
+
+@app.post("/api/v1/auth/login")
+async def auth_login(payload: dict):
+    """Login SPA: {password} -> token bearer con exp + token_version."""
+    if not _auth.auth_enabled():
+        raise HTTPException(status_code=503,
+                            detail="AUTH_NOT_CONFIGURED: set ADMIN_PASSWORD")
+    result = _auth.login(payload.get("password", ""))
+    if result is None:
+        raise HTTPException(status_code=401, detail="invalid credentials")
+    return result
+
+
 # ── Root ─────────────────────────────────────────────────────────────────────
 
 @app.get("/")
