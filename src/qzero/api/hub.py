@@ -14,7 +14,7 @@ import logging
 import os
 import sqlite3
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -47,6 +47,20 @@ CREATE TABLE IF NOT EXISTS alerts (
 );
 CREATE INDEX IF NOT EXISTS idx_alerts_ts ON alerts(timestamp);
 CREATE INDEX IF NOT EXISTS idx_alerts_sev ON alerts(severity);
+CREATE TABLE IF NOT EXISTS agent_config (
+    agent_id        TEXT PRIMARY KEY,
+    alert_threshold REAL,               -- per-agent override (Hito 1/6)
+    whitelist_private INTEGER,          -- 0/1; DMZ agents may differ from LAN
+    updated_at      TEXT
+);
+CREATE TABLE IF NOT EXISTS ip_intel (
+    ip          TEXT PRIMARY KEY,
+    org         TEXT,
+    asn         TEXT,
+    country     TEXT,
+    anycast     INTEGER DEFAULT 0,
+    fetched_at  TEXT                    -- ISO8601; stale rows re-fetched (Hito 3.8)
+);
 """
 
 # Optional columns added after the table was first created (pre-migration hubs
@@ -55,6 +69,7 @@ CREATE INDEX IF NOT EXISTS idx_alerts_sev ON alerts(severity);
 _SCHEMA_MIGRATIONS = [
     ("alerts", "packets", "INTEGER DEFAULT 0"),
     ("alerts", "detail", "TEXT"),
+    ("alerts", "notified_telegram", "INTEGER DEFAULT 0"),
 ]
 
 
@@ -208,6 +223,139 @@ class HubStore:
             self._report_agent(agent_id, agent_name, interface)
             # Only last_seen / agent presence changed; totals unchanged.
         return {"heartbeat": True, "agent_id": agent_id}
+
+    # ------------------------------------------------------------------
+    # Per-agent config (Hito 2.6): threshold / whitelist overrides
+    # ------------------------------------------------------------------
+
+    def set_agent_config(self, agent_id, alert_threshold=None,
+                         whitelist_private=None) -> Dict:
+        """Upsert a per-agent override; NULL column = use agent default."""
+        current = self.get_agent_config(agent_id)
+        threshold = (alert_threshold if alert_threshold is not None
+                     else current.get("alert_threshold"))
+        if whitelist_private is not None:
+            whitelist = int(bool(whitelist_private))
+        else:
+            whitelist = current.get("whitelist_private")
+        with self._lock:
+            self._conn.execute(
+                """
+                INSERT INTO agent_config (agent_id, alert_threshold,
+                                          whitelist_private, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(agent_id) DO UPDATE SET
+                    alert_threshold   = excluded.alert_threshold,
+                    whitelist_private = excluded.whitelist_private,
+                    updated_at        = excluded.updated_at
+                """,
+                (agent_id, threshold, whitelist,
+                 datetime.now().isoformat()),
+            )
+            self._conn.commit()
+        # outside the lock: get_agent_config takes it itself
+        return self.get_agent_config(agent_id)
+
+    def get_agent_config(self, agent_id: str) -> Dict:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM agent_config WHERE agent_id = ?", (agent_id,)
+            ).fetchone()
+        return dict(row) if row else {}
+
+    # ------------------------------------------------------------------
+    # IP intel cache (Hito 3.8)
+    # ------------------------------------------------------------------
+
+    def get_ip_intel(self, ip: str) -> Dict:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM ip_intel WHERE ip = ?", (ip,)
+            ).fetchone()
+        if not row:
+            return {}
+        d = dict(row)
+        d["anycast"] = bool(d.get("anycast"))
+        return d
+
+    def put_ip_intel(self, ip: str, org="", asn="", country="",
+                     anycast=False) -> None:
+        with self._lock:
+            self._conn.execute(
+                """
+                INSERT INTO ip_intel (ip, org, asn, country, anycast, fetched_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(ip) DO UPDATE SET
+                    org = excluded.org, asn = excluded.asn,
+                    country = excluded.country, anycast = excluded.anycast,
+                    fetched_at = excluded.fetched_at
+                """,
+                (ip, org, asn, country, int(bool(anycast)),
+                 datetime.now().isoformat()),
+            )
+            self._conn.commit()
+
+    # ------------------------------------------------------------------
+    # Retention (Hito 1.1)
+    # ------------------------------------------------------------------
+
+    def purge_old_alerts(self, retention_days: int) -> int:
+        """Delete alerts older than retention_days in batches. Returns deleted.
+
+        The alert volume on Nuke (~1.9M rows historically) makes an unbounded
+        SQLite file a real operational risk. Rows are deleted in batches so a
+        first purge over years of history cannot lock the DB for long, and the
+        O(1) counters stay truthful because deleted rows are subtracted here
+        (ingest only ever adds).
+        """
+        if retention_days <= 0:  # 0/negative disables retention (keep all)
+            return 0
+        cutoff = datetime.now() - timedelta(days=retention_days)
+        deleted = 0
+        batch = 5000
+        with self._lock:
+            while True:
+                cur = self._conn.execute(
+                    "DELETE FROM alerts WHERE id IN ("
+                    " SELECT id FROM alerts WHERE timestamp < ? LIMIT ?)",
+                    (cutoff.isoformat(), batch),
+                )
+                deleted += cur.rowcount
+                self._conn.commit()
+                if cur.rowcount < batch:
+                    break
+        if deleted:
+            # Purges are rare; afford a full recount so by_severity is truthful
+            # too (the incremental counters only know about inserts).
+            with self._lock:
+                self._counts = None
+            self._ensure_counts()
+            logger.info("Retention: purged %d alert(s) older than %d days",
+                        deleted, retention_days)
+        return deleted
+
+    # ------------------------------------------------------------------
+    # Telegram CRITICAL digest (Hito 1.2) — queue side
+    # ------------------------------------------------------------------
+
+    def pop_pending_criticals(self) -> list:
+        """Return critical alerts not yet digested (max 50). Not marked yet —
+        call mark_criticals_notified() only after a successful send."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT agent_name, src, dst, dst_port, protocol, severity "
+                "FROM alerts WHERE severity = 'CRITICAL' "
+                "AND notified_telegram = 0 ORDER BY id DESC LIMIT 50"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def mark_criticals_notified(self) -> None:
+        with self._lock:
+            self._conn.execute(
+                "UPDATE alerts SET notified_telegram = 1 "
+                "WHERE severity = 'CRITICAL' AND notified_telegram = 0"
+            )
+            self._conn.commit()
 
     # ------------------------------------------------------------------
     # Queries

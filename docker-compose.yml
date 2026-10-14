@@ -19,6 +19,18 @@ services:
       - API_PORT=8000
       # Hub: central alert store (agent alerts)
       - QZERO_HUB_DB=/app/data/hub/hub.db
+      # Hito 1 — operación confiable
+      - QZERO_ALERT_RETENTION_DAYS=${QZERO_ALERT_RETENTION_DAYS:-90}
+      - QZERO_TELEGRAM_BOT_TOKEN=${QZERO_TELEGRAM_BOT_TOKEN:-}
+      - QZERO_TELEGRAM_CHAT_ID=${QZERO_TELEGRAM_CHAT_ID:-}
+      - QZERO_AGENT_OFFLINE_MIN=${QZERO_AGENT_OFFLINE_MIN:-10}
+      # Auth app-level (Hito 3.7): sin ADMIN_PASSWORD la auth queda desactivada;
+      # si se define, las rutas de consulta exigen token SPA (fail-closed).
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - QZERO_AUTH_SECRET=${QZERO_AUTH_SECRET:-}
+      - QZERO_AUTH_TOKEN_VERSION=${QZERO_AUTH_TOKEN_VERSION:-1}
+      - QZERO_REQUIRE_AGENT_TOKEN=${QZERO_REQUIRE_AGENT_TOKEN:-0}
+      - QZERO_AGENT_TOKEN=${QZERO_AGENT_TOKEN:-}
       # Model config
       - QZERO_N_QUBITS=${QZERO_N_QUBITS:-4}
       - QZERO_DEFAULT_THRESHOLD=${QZERO_DEFAULT_THRESHOLD:-0.7}

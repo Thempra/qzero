@@ -35,9 +35,9 @@ Contexto (lo último landed): post-filtro anti-FP (−73 % CRITICALs), caps de r
 ### Hito 1 — Operación confiable (semanas 1–2)
 | # | Tarea | Estado/Notas | Aceptación |
 |---|---|---|---|
-| 1 | Rotación/retención de `alerts` (`QZERO_ALERT_RETENTION_DAYS`, borrado por lotes en heartbeat) — bloquea el riesgo de BD SQLite infinita en el volumen Nuke | pendiente | BD < umbral tras config; test con BD falsa antigua |
-| 2 | Notificación de CRITICALs a Telegram (rate-limited, resumen no por-alerta) | **parcial**: `logger.send_telegram_alert` ya existe; falta cablearlo desde el hub + anti-spam | Mensaje real al trigger nmap; sin spam en tormenta de FP |
-| 3 | Supervisión del agente: systemd/healthcheck con reinicio + alerta si heartbeat cesa > N min | pendiente | Agente matado a mano → online de nuevo solo + nota en Agents |
+| 1 | Rotación/retención de `alerts` (`QZERO_ALERT_RETENTION_DAYS`, purge por lotes en loop de mantenimiento del hub, re-count de contadores tras purge) — test con BD antigua falsa | **landed en dev** (`api/maintenance.py` + `hub.purge_old_alerts`) | BD < umbral tras config; test con BD falsa antigua ✔ |
+| 2 | Notificación de CRITICALs a Telegram **digest** desde el hub (no por-alerta; cooldown `QZERO_TELEGRAM_MIN_INTERVAL_MIN`; marcado `notified_telegram` solo tras envío OK) | **landed en dev** | Mensaje real al trigger nmap; sin spam en tormenta de FP |
+| 3 | Supervisión: agente now heartbeatea también en ventanas sin paquetes; el hub avisa (Telegram + log) si un agente lleva > `QZERO_AGENT_OFFLINE_MIN` min sin heartbeat y de vuelta al recuperar; contenedor ya tenía healthcheck + `restart: unless-stopped` | **landed en dev** (falta QA en prod: matar agente → auto-recupera + nota) | Agente matado a mano → online de nuevo solo + nota en Agents |
 
 ### Hito 2 — Credibilidad del modelo (semanas 3–5)
 | # | Tarea | Notas | Aceptación |
@@ -62,5 +62,5 @@ Contexto (lo último landed): post-filtro anti-FP (−73 % CRITICALs), caps de r
 
 ## Reglas de ejecución
 - Construir estrictamente en orden A1→A10 (o B por hitos, 1→9); si la realidad fuerza un cambio, actualizar el doc afectado **en el mismo commit**.
-- Desplegar solo desde `main` (auto-deploy); nunca fusionar dev→main sin pedirlo.
+- **Flujo de ramas:** todo desarrollo nuevo se pushea a `dev`. `main` solo se actualiza al hacer el deploy verificado (merge `dev`→`main` en el momento del pase a producción, nunca antes sin pedirlo). El auto-deploy de Coolify escucha `main`.
 - Toda "mejora de detección" se valida con el workflow QA del skill `qzero-ndr`: baseline → trigger nmap → comparar antes/después con datos reales.

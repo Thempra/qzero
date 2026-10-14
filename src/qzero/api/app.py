@@ -62,6 +62,79 @@ app.add_middleware(
 )
 
 
+# ── Auth a nivel de app (Hito 3.7) ──────────────────────────────────────────
+# Protege rutas de CONSULTA del hub y la API clásica. NO protege /health
+# (healthcheck del contenedor) ni el ingest de agentes (usa X-Agent-Token
+# opcional). Fail-closed: sin ADMIN_PASSWORD, las rutas protegidas dan 503.
+
+from . import auth as _auth  # noqa: E402
+from fastapi import Request  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
+
+# Prefijos/rutas exentos de token SPA (data-plane de agentes + salud + login).
+_AUTH_EXEMPT_PREFIXES = (
+    "/health",
+    "/api/v1/auth/",
+    "/metrics",
+)
+_AUTH_EXEMPT_EXACT = {"/", "/dashboard", "/hub", "/api/v1/hub", "/ws"}
+_AUTH_EXEMPT_INGEST_SUFFIXES = ("/alerts", "/heartbeat")
+
+
+def _is_exempt(path: str) -> bool:
+    if any(path.startswith(p) for p in _AUTH_EXEMPT_PREFIXES):
+        return True
+    if path in _AUTH_EXEMPT_EXACT:
+        return True
+    # ingest/heartbeat de agentes: LAN data-plane, token opcional aparte
+    if path.startswith("/api/v1/agents/") and path.endswith(
+            _AUTH_EXEMPT_INGEST_SUFFIXES):
+        return True
+    return False
+
+
+@app.middleware("http")
+async def spa_auth_middleware(request: Request, call_next):
+    if not _auth.auth_enabled() and not _auth.agent_token_required():
+        return await call_next(request)
+    path = request.url.path
+    # ingest de agentes: exigir X-Agent-Token solo si está activo
+    if path.startswith("/api/v1/agents/") and path.endswith(
+            _AUTH_EXEMPT_INGEST_SUFFIXES) and request.method == "POST":
+        if _auth.agent_token_required():
+            if not _auth.check_agent_token(request.headers.get("x-agent-token")):
+                return JSONResponse({"detail": "invalid agent token"}, 401)
+        return await call_next(request)
+    if _is_exempt(path):
+        return await call_next(request)
+    if not _auth.auth_enabled():
+        # fail-closed: algo activo la auth (agent token) pero falta password
+        return JSONResponse({"detail": "auth not configured"}, 503)
+    header = request.headers.get("authorization", "")
+    token = header[7:] if header.lower().startswith("bearer ") else None
+    if not _auth.verify_token(token):
+        return JSONResponse({"detail": "unauthorized"}, 401)
+    return await call_next(request)
+
+
+@app.get("/api/v1/auth/status")
+async def auth_status():
+    """Si el cliente (dashboard/SPA) necesita loguearse."""
+    return _auth.auth_status()
+
+
+@app.post("/api/v1/auth/login")
+async def auth_login(payload: dict):
+    """Login SPA: {password} -> token bearer con exp + token_version."""
+    if not _auth.auth_enabled():
+        raise HTTPException(status_code=503,
+                            detail="AUTH_NOT_CONFIGURED: set ADMIN_PASSWORD")
+    result = _auth.login(payload.get("password", ""))
+    if result is None:
+        raise HTTPException(status_code=401, detail="invalid credentials")
+    return result
+
+
 # ── Root ─────────────────────────────────────────────────────────────────────
 
 @app.get("/")
@@ -315,11 +388,48 @@ async def hub_ingest_agent_alerts(agent_id: str, payload: dict):
 
 @app.post("/api/v1/agents/{agent_id}/heartbeat")
 async def hub_agent_heartbeat(agent_id: str, payload: dict | None = None):
-    """Keep an agent's last_seen fresh even when it has NO alerts to push."""
+    """Keep an agent's last_seen fresh even when it has NO alerts to push.
+
+    The response carries the agent's per-agent config overrides (Hito 2.6)
+    so the agent picks up threshold/whitelist changes without restart.
+    """
     payload = payload or {}
     agent_name = payload.get("agent_name", "")
     interface = payload.get("interface", "")
-    return hub_store.heartbeat(agent_id, agent_name, interface)
+    result = hub_store.heartbeat(agent_id, agent_name, interface)
+    result["config"] = hub_store.get_agent_config(agent_id)
+    return result
+
+
+@app.get("/api/v1/agents/{agent_id}/config")
+async def hub_get_agent_config(agent_id: str):
+    """Per-agent detection config overrides."""
+    return hub_store.get_agent_config(agent_id)
+
+
+@app.get("/api/v1/intel/{ip}")
+async def hub_ip_intel(ip: str):
+    """ASN/org enrichment for an IP, served from the hub's ip_intel cache
+    (Hito 3.8). Network hit only on cache miss/stale; private IPs → LAN stub."""
+    from .intel import enrich_ip
+    return enrich_ip(hub_store, ip)
+
+
+@app.put("/api/v1/agents/{agent_id}/config")
+async def hub_set_agent_config(agent_id: str, payload: dict):
+    """Set per-agent overrides: {alert_threshold?: float, whitelist_private?: bool}."""
+    return hub_store.set_agent_config(
+        agent_id,
+        alert_threshold=payload.get("alert_threshold"),
+        whitelist_private=payload.get("whitelist_private"),
+    )
+
+
+@app.on_event("startup")
+async def _start_hub_maintenance():
+    """Hito 1: background retention + Telegram digest + agent liveness."""
+    from .maintenance import maintenance_loop
+    asyncio.create_task(maintenance_loop(hub_store))
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

@@ -21,6 +21,7 @@ explanation) by the intel module.
 import json
 import os
 import time
+import urllib.error
 import urllib.request
 from collections import Counter
 from datetime import datetime, timezone
@@ -146,15 +147,64 @@ def kpi_card(label: str, value: str, sub: str = "", tone: str = ""):
 
 
 # ---------------------------------------------------------------------------
-# Hub API client (stdlib urllib)
+# Hub API client (stdlib urllib) + login SPA (Hito 3.7)
 # ---------------------------------------------------------------------------
+def _auth_status():
+    try:
+        req = urllib.request.Request(f"{API}/api/v1/auth/status",
+                                     headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return {"auth_required": False}
+
+
+def _auth_headers() -> dict:
+    tok = st.session_state.get("qzero_token")
+    return {"Authorization": f"Bearer {tok}"} if tok else {}
+
+
+def do_login(password: str) -> bool:
+    req = urllib.request.Request(
+        f"{API}/api/v1/auth/login",
+        data=json.dumps({"password": password}).encode(),
+        headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            st.session_state["qzero_token"] = json.loads(
+                resp.read().decode())["access_token"]
+        return True
+    except Exception:
+        return False
+
+
+if _auth_status().get("auth_required") and not st.session_state.get("qzero_token"):
+    with st.sidebar.form("login_form"):
+        pw = st.text_input("Contraseña del hub", type="password")
+        if st.form_submit_button("Entrar"):
+            if do_login(pw):
+                st.session_state.pop("_login_fail", None)
+                st.rerun()
+            else:
+                st.error("Contraseña incorrecta")
+    st.info("Introduce la contraseña del hub en la barra lateral.")
+    st.stop()
+
+
 def api_get(path: str, params: dict | None = None, timeout: float = 15.0):
     url = f"{API}{path}"
     if params:
         url += "?" + urlencode({k: v for k, v in params.items() if v is not None})
-    req = urllib.request.Request(url, headers={"Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    headers = {"Accept": "application/json", **_auth_headers()}
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        if e.code == 401:  # token caducado/revocado → reloguear
+            st.session_state.pop("qzero_token", None)
+            st.rerun()
+        raise
 
 
 @st.cache_data(ttl=3, show_spinner=False)
