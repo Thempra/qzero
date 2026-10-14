@@ -51,7 +51,14 @@ Se propaga **sin reiniciar**: la respuesta del heartbeat incluye `config`, y el 
 
 ## 2. Autenticación
 
-**v3 actual: sin auth en el data-plane.** Confianza de red: agentes → hub dentro de la LAN/VPN Thempra; dashboard expuesto por Traefik con TLS (protección de perímetro). El hub **no** valida `agent_id`: cualquiera que alcance la API puede ingestar (riesgo aceptado en LAN, documentado).
+**Hito 3.7 implementado (rama `dev`): auth a nivel de app, sin Basic Auth nginx.** `src/qzero/api/auth.py` + middleware en `app.py`:
+- `POST /api/v1/auth/login` `{password}` → token SPA "JWT-lite" (HMAC-SHA256, `exp` 12h, `ver`=token_version). `GET /api/v1/auth/status` dice si hay que loguearse.
+- **Fail-closed**: `ADMIN_PASSWORD` (env docker-compose, nunca hardcodeada) vacío → rutas protegidas responden 503, nunca abiertas.
+- Revocación global: cambiar `QZERO_AUTH_TOKEN_VERSION` invalida todos los tokens emitidos.
+- Protegido: `/api/v1/*` de consulta y API clásica de control. Exentos: `/health`, `/dashboard`, `/api/v1/hub` (HTML), ingest de agentes (`POST …/alerts|heartbeat`).
+- Ingest opcionalmente blindado: `QZERO_REQUIRE_AGENT_TOKEN=1` + `QZERO_AGENT_TOKEN` → exige `X-Agent-Token` a los agentes (fail-closed también).
+- Firma: `QZERO_AUTH_SECRET` (si no, secreta aleatoria por proceso → tokens mueren al reiniciar).
+- Dashboard Streamlit: formulario de login en sidebar, Bearer en `api_get`, 401 → relogin automático.
 
 **Fluxo de identidad de agente (pseudo-auth):**
 1. Agente arranca con `QZERO_AGENT_ID` (persistente).
