@@ -191,7 +191,8 @@ def qivae_fit_predict(Xtr_normal, Xte, dim):
     return pred, errors, train_time, infer_time
 
 
-def run_fold(X, y_bin, train_mask, test_mask, multiclass_train, multiclass_test):
+def run_fold(X, y_bin, train_mask, test_mask, multiclass_train, multiclass_test,
+             y_multi=None):
     """Entrena/evalúa todos los modelos en un fold binario dado."""
     Xtr_raw, Xte_raw = X[train_mask], X[test_mask]
     ytr, yte = y_bin[train_mask], y_bin[test_mask]
@@ -239,19 +240,20 @@ def run_fold(X, y_bin, train_mask, test_mask, multiclass_train, multiclass_test)
     multi = {}
     if multiclass_train is not None:
         mc_tr, mc_te = multiclass_train, multiclass_test
+        y_mc_tr = y_multi[train_mask][mc_tr]
+        y_mc_te = y_multi[test_mask][mc_te]
         for name in ["random_forest", "svm_rbf"]:
             baseline = ClassicalBaseline(name)
-            baseline.fit(Xtr[mc_tr], multiclass_train_labels[mc_tr])
+            baseline.fit(Xtr[mc_tr], y_mc_tr)
             pred = baseline.predict(Xte[mc_te])
-            acc = accuracy_score(multiclass_train_labels[mc_te], pred)
-            f1 = f1_score(multiclass_train_labels[mc_te], pred, average="macro")
+            acc = accuracy_score(y_mc_te, pred)
+            f1 = f1_score(y_mc_te, pred, average="macro")
             multi[name] = {"accuracy": acc, "f1_macro": f1}
 
     return rows, multi
 
 
 # ---------------------------------------------------------------- main
-multiclass_train_labels = None  # set en el experimento de split
 
 
 def fmt(x, nd=4):
@@ -259,7 +261,6 @@ def fmt(x, nd=4):
 
 
 def main():
-    global multiclass_train_labels
     t_start = time.time()
     print("=" * 70)
     print("QZero — Benchmark QSVM vs QI-VAE vs clásicos sobre pcaps propios")
@@ -310,8 +311,8 @@ def main():
     test_mask = ~train_mask
     mc_tr = np.ones(train_mask.sum(), bool)
     mc_te = np.ones(test_mask.sum(), bool)
-    multiclass_train_labels = y_multi
-    rows, multi = run_fold(X, y_bin, train_mask, test_mask, mc_tr, mc_te)
+    rows, multi = run_fold(X, y_bin, train_mask, test_mask, mc_tr, mc_te,
+                       y_multi=y_multi)
     results["split"]["strat_80_20"] = rows
     results["multiclass"] = multi
     print(f"  split: mejor={max(rows, key=lambda k: rows[k]['f1'])}; "

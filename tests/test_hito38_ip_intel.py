@@ -4,7 +4,7 @@ import os
 import tempfile
 
 _tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False).name
-os.environ["QZERO_HUB_DB_PATH"] = _tmp
+os.environ["QZERO_HUB_DB"] = _tmp  # variable real leída por HubStore
 
 import pytest
 from fastapi.testclient import TestClient

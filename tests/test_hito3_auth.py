@@ -4,7 +4,7 @@ import os
 import tempfile
 
 _tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False).name
-os.environ.setdefault("QZERO_HUB_DB_PATH", _tmp)
+os.environ.setdefault("QZERO_HUB_DB", _tmp)
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
