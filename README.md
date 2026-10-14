@@ -300,6 +300,25 @@ pytest tests/ -v
 flake8 src/qzero/
 ```
 
+### Estructura del repo
+
+```
+src/qzero/        ← paquete instalable (librería: quantum, preprocessing, core, hub/API, agente, CLI)
+app/              ← consola SOC (Streamlit; la construye Dockerfile.dashboard)
+scripts/          ← herramientas operativas vivas (pcaps sintéticos, descarga de datos)
+tests/            ← pytest (unit + API)
+docs/             ← índice en docs/README.md (fuente única por tema) + docs/legacy/ (histórico v1-v2)
+notebooks/        ← exploración
+data/             ← solo datos versionados (synthetic-pcaps etiquetados); el resto es descargable
+legacy/           ← código/scripts v1-v2 huérfanos (excluidos de Sonar, no usar como referencia)
+Dockerfile*       ← imágenes (anclas de Coolify: no mover)
+docker-compose*.yml
+```
+
+**No versionados (generados, ver `.gitignore`):** `reports/`, `training-status/`, `training-health/`,
+`model-performance-reports/`, `security-trend-reports/`, `integrity-reports/`, `knowledge-graph/`,
+`screenshots/`, `results/`, `coverage.xml`, `.claude/`. Se regeneran con los scripts correspondientes.
+
 ---
 
 ## References

@@ -133,7 +133,7 @@ def main():
 
     args = parser.parse_args()
 
-    output_dir = Path('/home/thempra/projects/qzero/data/synthetic-pcaps')
+    output_dir = Path(__file__).resolve().parent.parent / 'data' / 'synthetic-pcaps'
     output_dir.mkdir(parents=True, exist_ok=True)
 
     if args.all:

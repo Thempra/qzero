@@ -89,3 +89,22 @@ data/hub/
 # coverage artifacts
 .coverage
 coverage.xml
+
+# generated outputs (no versionar; ver README "Estructura del repo")
+training-status/
+training-health/
+model-performance-reports/
+security-trend-reports/
+integrity-reports/
+integrity-timeline/
+knowledge-graph/
+screenshots/
+results/
+data/raw/
+installed-packages.txt
+health-check.log
+*.log
+scripts/insights/
+scripts/reports/
+legacy/
+.claude/

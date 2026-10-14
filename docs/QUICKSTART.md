@@ -5,8 +5,8 @@
 ## 🚀 One-Command Setup
 
 ```bash
-chmod +x quickstart.sh
-./quickstart.sh
+chmod +x scripts/quickstart.sh
+./scripts/quickstart.sh
 ```
 
 This script will:

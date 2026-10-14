@@ -1,7 +1,0 @@
-QZero Dependency Update Report
-==================================================
-
-Timestamp: 2026-02-06_17-31-53
-Health Score: 0/100 (ERROR)
-
-Analysis:
