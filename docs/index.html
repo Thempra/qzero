@@ -124,6 +124,16 @@ footer a{color:var(--text-lo);text-decoration:none} footer a:hover{color:var(--t
 /* lang toggling */
 html[lang="es"] .en{display:none}
 html[lang="en"] .es{display:none}
+/* ===== Gallery ===== */
+.shot{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--bg2);transition:transform .25s,border-color .25s;cursor:zoom-in}
+.shot:hover{transform:translateY(-4px);border-color:#2E3F5F}
+.shot img{display:block;width:100%;height:auto}
+.shot .cap{padding:12px 18px;border-top:1px solid var(--border);font-size:13.5px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+@media(max-width:820px){.grid2{grid-template-columns:1fr}}
+.lb{position:fixed;inset:0;background:rgba(5,7,12,.92);display:none;align-items:center;justify-content:center;z-index:99;padding:4vh 4vw}
+.lb.on{display:flex}
+.lb img{max-width:100%;max-height:92vh;border-radius:12px;border:1px solid var(--border)}
 </style>
 </head>
 <body>
@@ -135,6 +145,7 @@ html[lang="en"] .es{display:none}
     <div class="links">
       <a class="nl" href="#how"><span class="en">How it works</span><span class="es">Cómo funciona</span></a>
       <a class="nl" href="#features"><span class="en">Features</span><span class="es">Características</span></a>
+      <a class="nl" href="#screens"><span class="en">Screens</span><span class="es">Pantallas</span></a>
       <a class="nl" href="#why"><span class="en">Why QZero</span><span class="es">Por qué QZero</span></a>
       <a class="nl" href="#install"><span class="en">Install</span><span class="es">Instalación</span></a>
       <a class="nl" href="https://github.com/Thempra/qzero" target="_blank">GitHub ↗</a>
@@ -176,6 +187,33 @@ html[lang="en"] .es{display:none}
     <div><b class="hi">24/7</b><span class="en">agent heartbeat &amp; alerts</span><span class="es">heartbeat y alertas</span></div>
   </div>
 </div>
+
+<section id="screens">
+  <div class="wrap">
+    <div class="eyebrow"><span class="en">Product tour</span><span class="es">Recorrido</span></div>
+    <h2><span class="en">See it running on real traffic</span><span class="es">Míralo en marcha con tráfico real</span></h2>
+    <p class="sec-sub">
+      <span class="en">Live screenshots from the production console at qzero.thempra.net — the same instance watching a real network right now.</span>
+      <span class="es">Capturas reales de la consola de producción en qzero.thempra.net: la misma instancia que vigila una red real ahora mismo.</span>
+    </p>
+    <div class="grid2">
+      <div class="shot rv" onclick="zoom(this)"><img src="assets/overview.webp" alt="QZero SOC overview dashboard with KPIs, severity distribution and threat types" loading="lazy">
+        <div class="cap"><span class="en"><b>Overview</b> — KPIs, severity mix, threat breakdown and agent health at a glance.</span><span class="es"><b>Overview</b> — KPIs, mezcla de severidades, desglose de amenazas y salud de agentes de un vistazo.</span></div></div>
+      <div class="shot rv" onclick="zoom(this)"><img src="assets/alerts.webp" alt="QZero live alert feed with severity chips, IPs and organizations" loading="lazy">
+        <div class="cap"><span class="en"><b>Alerts</b> — live feed with severity, 5-tuple, destination org and anomaly score.</span><span class="es"><b>Alerts</b> — flujo en vivo con severidad, 5-tupla, organización de destino y score de anomalía.</span></div></div>
+      <div class="shot rv" onclick="zoom(this)"><img src="assets/threats.webp" alt="QZero threat intelligence view" loading="lazy">
+        <div class="cap"><span class="en"><b>Threats</b> — detected threats grouped and explained in plain language.</span><span class="es"><b>Threats</b> — amenazas detectadas agrupadas y explicadas en lenguaje claro.</span></div></div>
+      <div class="shot rv" onclick="zoom(this)"><img src="assets/network.webp" alt="QZero network traffic view" loading="lazy">
+        <div class="cap"><span class="en"><b>Network</b> — flows, protocols and top talkers across your segments.</span><span class="es"><b>Network</b> — flujos, protocolos y top talkers entre tus segmentos.</span></div></div>
+      <div class="shot rv" onclick="zoom(this)"><img src="assets/agents.webp" alt="QZero agent fleet with heartbeat status" loading="lazy">
+        <div class="cap"><span class="en"><b>Agents</b> — sensor fleet with heartbeat, per-agent config and alert counts.</span><span class="es"><b>Agents</b> — flota de sensores con heartbeat, configuración por agente y conteo de alertas.</span></div></div>
+      <div class="shot rv" onclick="zoom(this)"><img src="assets/research.webp" alt="QZero research and model performance view" loading="lazy">
+        <div class="cap"><span class="en"><b>Research</b> — model performance, benchmarks and retraining insights.</span><span class="es"><b>Research</b> — rendimiento de modelos, benchmarks e insights de reentrenamiento.</span></div></div>
+    </div>
+  </div>
+</section>
+
+<div class="lb" id="lb" onclick="this.classList.remove('on')"><img id="lbimg" src="" alt="screenshot ampliada"></div>
 
 <section id="how">
   <div class="wrap">
@@ -289,6 +327,7 @@ const saved=localStorage.getItem('qzero-lang');
 if(saved) setLang(saved);
 else if(navigator.language.startsWith('es')) setLang('es');
 
+function zoom(el){document.getElementById('lbimg').src=el.querySelector('img').src;document.getElementById('lb').classList.add('on')}
 function cp(btn){
   const pre=btn.closest('.code').querySelector('pre');
   navigator.clipboard.writeText(pre.innerText.replace(/#.*/g,'').trim());

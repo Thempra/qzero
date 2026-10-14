@@ -8,6 +8,14 @@
 
 > 🌐 **Try it → [thempra.github.io/qzero](https://thempra.github.io/qzero/)** · product page with demo, features and install guides.
 
+<table>
+<tr>
+<td><img src="docs/assets/overview.webp" width="340" alt="SOC overview"></td>
+<td><img src="docs/assets/alerts.webp" width="340" alt="Live alert feed"></td>
+<td><img src="docs/assets/threats.webp" width="340" alt="Threat view"></td>
+</tr>
+</table>
+
 ---
 
 ## Overview
