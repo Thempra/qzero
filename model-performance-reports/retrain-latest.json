@@ -1,0 +1,16 @@
+{
+  "production": {},
+  "candidate": {
+    "qsvm": 0.847,
+    "qivae": 0.1399,
+    "random_forest": 0.9425,
+    "svm_rbf": 0.9574,
+    "gradient_boosting": 0.9496
+  },
+  "meta": {
+    "timestamp": "2026-10-14T22:51:21",
+    "n_samples": 5000,
+    "real": false,
+    "elapsed_s": 1987.7
+  }
+}
