@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QZero — Quantum-Inspired Network Threat Detection</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%233B82F6'/><text x='16' y='23' font-family='monospace' font-size='18' font-weight='bold' fill='white' text-anchor='middle'>Q</text></svg>">
+<meta name="description" content="QZero detects zero-day network threats in real time with Quantum SVM and Quantum-Inspired VAEs. Self-hosted, agent-based, no signatures, no cloud.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-0:#0B0E14; --bg-1:#11151F; --bg-2:#1A2030; --border:#232A3B;
+  --text-hi:#E6EAF2; --text-lo:#8B94A7; --accent:#3B82F6;
+  --sev-critical:#EF4444; --sev-high:#F97316; --sev-medium:#EAB308; --ok:#22C55E;
+  --grad-accent:linear-gradient(135deg,#3B82F6,#8B5CF6);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg-0);color:var(--text-hi);font-family:'Inter',system-ui,sans-serif;font-size:16px;line-height:1.6;overflow-x:hidden}
+.mono{font-family:'JetBrains Mono',monospace}
+::selection{background:rgba(59,130,246,.35)}
+
+/* mesh gradient backdrop */
+.mesh{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+.mesh i{position:absolute;border-radius:50%;filter:blur(120px);opacity:.16;animation:drift 24s ease-in-out infinite alternate}
+.mesh i:nth-child(1){width:560px;height:560px;background:#3B82F6;top:-160px;left:-120px}
+.mesh i:nth-child(2){width:480px;height:480px;background:#8B5CF6;top:30%;right:-180px;animation-delay:-8s}
+.mesh i:nth-child(3){width:520px;height:520px;background:#0EA5E9;bottom:-200px;left:30%;animation-delay:-16s}
+@keyframes drift{from{transform:translate(0,0) scale(1)}to{transform:translate(60px,40px) scale(1.15)}}
+
+.wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+
+/* nav */
+nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);background:rgba(11,14,20,.72);border-bottom:1px solid var(--border)}
+nav .wrap{display:flex;align-items:center;gap:28px;height:60px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px;letter-spacing:-.02em;color:var(--text-hi);text-decoration:none}
+.logo .q{width:30px;height:30px;border-radius:8px;background:var(--grad-accent);display:grid;place-items:center;font-family:'JetBrains Mono';font-size:15px;color:#fff}
+nav a.nl{color:var(--text-lo);text-decoration:none;font-size:14px;font-weight:500;transition:color .2s}
+nav a.nl:hover{color:var(--text-hi)}
+nav .links{display:flex;gap:24px;margin-left:auto}
+.lang-sw{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.lang-sw button{background:none;border:none;color:var(--text-lo);font:600 13px 'Inter';padding:6px 12px;cursor:pointer;transition:.2s}
+.lang-sw button.on{background:var(--accent);color:#fff}
+.btn{display:inline-flex;align-items:center;gap:8px;background:var(--grad-accent);color:#fff;font:600 15px 'Inter';padding:12px 24px;border-radius:10px;text-decoration:none;transition:transform .15s,box-shadow .2s;border:none;cursor:pointer}
+.btn:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(59,130,246,.35)}
+.btn.ghost{background:var(--bg-2);border:1px solid var(--border);box-shadow:none}
+.btn.ghost:hover{border-color:var(--accent);box-shadow:none}
+
+/* hero */
+hero,section{display:block}
+.hero{padding:110px 0 80px;text-align:center}
+.pill{display:inline-flex;align-items:center;gap:8px;font:500 13px 'Inter';color:var(--text-lo);border:1px solid var(--border);background:var(--bg-1);padding:6px 14px;border-radius:999px;margin-bottom:26px}
+.pill b{color:var(--accent)}
+h1{font-size:clamp(38px,6vw,64px);font-weight:800;letter-spacing:-.03em;line-height:1.08;margin-bottom:22px}
+h1 .g{background:var(--grad-accent);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{max-width:640px;margin:0 auto 36px;color:var(--text-lo);font-size:19px}
+.cta{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-bottom:56px}
+.term{max-width:760px;margin:0 auto;background:var(--bg-1);border:1px solid var(--border);border-radius:14px;text-align:left;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.term .bar{display:flex;gap:7px;padding:13px 16px;border-bottom:1px solid var(--border)}
+.term .bar i{width:11px;height:11px;border-radius:50%;background:var(--bg-2)}
+.term pre{padding:22px;font:13.5px/1.9 'JetBrains Mono';color:var(--text-lo);overflow-x:auto}
+.term .p{color:var(--accent)} .term .ok{color:var(--ok)} .term .crit{color:var(--sev-critical)} .term .hi{color:var(--sev-high)} .term .b{color:var(--text-hi)}
+.type{border-right:2px solid var(--accent);animation:blink 1s step-end infinite}
+@keyframes blink{50%{border-color:transparent}}
+
+/* stats band */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin:80px 0}
+.stats div{background:linear-gradient(180deg,var(--bg-1),#0E1220);padding:28px 20px;text-align:center}
+.stats b{display:block;font:700 32px 'JetBrains Mono';letter-spacing:-.02em}
+.stats span{font-size:13px;color:var(--text-lo);font-weight:500}
+.stats .acc{color:var(--accent)} .stats .gr{color:var(--ok)}
+
+/* sections */
+section{padding:72px 0}
+.eyebrow{font:600 12px 'Inter';letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:12px}
+h2{font-size:clamp(26px,3.6vw,38px);font-weight:800;letter-spacing:-.02em;margin-bottom:14px}
+.sec-sub{color:var(--text-lo);max-width:620px;font-size:17px;margin-bottom:48px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+.card{background:linear-gradient(180deg,var(--bg-1),#0E1220);border:1px solid var(--border);border-radius:14px;padding:26px;transition:transform .2s,border-color .2s}
+.card:hover{transform:translateY(-4px);border-color:#2E3F5F}
+.card .ic{width:42px;height:42px;border-radius:10px;background:var(--bg-2);display:grid;place-items:center;font-size:20px;margin-bottom:18px}
+.card h3{font-size:17px;font-weight:700;margin-bottom:8px;letter-spacing:-.01em}
+.card p{color:var(--text-lo);font-size:14.5px}
+
+/* how it works */
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px;counter-reset:st}
+.step{position:relative;background:linear-gradient(180deg,var(--bg-1),#0E1220);border:1px solid var(--border);border-radius:14px;padding:26px}
+.step::before{counter-increment:st;content:"0" counter(st);font:700 13px 'JetBrains Mono';color:var(--accent);background:rgba(59,130,246,.12);padding:4px 10px;border-radius:6px;display:inline-block;margin-bottom:16px}
+.step h3{font-size:16px;margin-bottom:8px}
+.step p{color:var(--text-lo);font-size:14px}
+
+/* compare table */
+table{width:100%;border-collapse:collapse;font-size:14.5px;background:var(--bg-1);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+th,td{padding:14px 18px;text-align:left;border-bottom:1px solid var(--border)}
+th{background:var(--bg-2);font:600 12px 'Inter';letter-spacing:.08em;text-transform:uppercase;color:var(--text-lo)}
+td:first-child{font-weight:600}
+.yes{color:var(--ok);font-weight:700} .no{color:var(--sev-critical);font-weight:700} .part{color:var(--sev-medium);font-weight:700}
+tr:last-child td{border-bottom:none}
+
+/* install */
+.install{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:760px){.install{grid-template-columns:1fr}}
+.code{background:var(--bg-1);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.code .hd{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--border);font:600 13px 'Inter';color:var(--text-lo)}
+.code .hd button{background:var(--bg-2);border:1px solid var(--border);color:var(--text-lo);font:500 12px 'Inter';padding:4px 12px;border-radius:6px;cursor:pointer;transition:.2s}
+.code .hd button:hover{color:var(--text-hi);border-color:var(--accent)}
+.code pre{padding:18px;font:13px/1.8 'JetBrains Mono';color:#B8C4D8;overflow-x:auto}
+.code .c{color:#5B6478}
+
+/* final cta */
+.final{text-align:center;padding:96px 0 110px}
+.final h2{margin-bottom:16px}
+.final p{color:var(--text-lo);font-size:18px;margin-bottom:36px}
+footer{border-top:1px solid var(--border);padding:34px 0;color:var(--text-lo);font-size:13.5px}
+footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+footer a{color:var(--text-lo);text-decoration:none} footer a:hover{color:var(--text-hi)}
+
+/* reveal on scroll */
+.rv{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease}
+.rv.in{opacity:1;transform:none}
+
+/* lang toggling */
+html[lang="es"] .en{display:none}
+html[lang="en"] .es{display:none}
+</style>
+</head>
+<body>
+<div class="mesh"><i></i><i></i><i></i></div>
+
+<nav>
+  <div class="wrap">
+    <a class="logo" href="#"><span class="q">Q</span>QZero</a>
+    <div class="links">
+      <a class="nl" href="#how"><span class="en">How it works</span><span class="es">Cómo funciona</span></a>
+      <a class="nl" href="#features"><span class="en">Features</span><span class="es">Características</span></a>
+      <a class="nl" href="#why"><span class="en">Why QZero</span><span class="es">Por qué QZero</span></a>
+      <a class="nl" href="#install"><span class="en">Install</span><span class="es">Instalación</span></a>
+      <a class="nl" href="https://github.com/Thempra/qzero" target="_blank">GitHub ↗</a>
+    </div>
+    <div class="lang-sw">
+      <button id="b-en" class="on" onclick="setLang('en')">EN</button>
+      <button id="b-es" onclick="setLang('es')">ES</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero wrap">
+  <div class="pill"><b>●</b><span class="en">Open source · Self-hosted · MIT license</span><span class="es">Open source · Autoalojado · Licencia MIT</span></div>
+  <h1>
+    <span class="en">See the attack <span class="g">before it has a signature</span></span>
+    <span class="es">Detecta el ataque <span class="g">antes de que tenga firma</span></span>
+  </h1>
+  <p>
+    <span class="en">QZero is a network detection &amp; response platform powered by Quantum SVM and Quantum-Inspired Variational Autoencoders. It learns what <em>normal</em> looks like on your network — and flags everything that doesn't. Zero-day included.</span>
+    <span class="es">QZero es una plataforma de detección y respuesta de red impulsada por QSVM y autoencoders variacionales inspirados en computación cuántica. Aprende qué es <em>normal</em> en tu red y marca todo lo que no lo es. Incluidos los zero-day.</span>
+  </p>
+  <div class="cta">
+    <a class="btn" href="https://github.com/Thempra/qzero"><span class="en">Get QZero free</span><span class="es">Descargar QZero gratis</span> ↗</a>
+    <a class="btn ghost" href="#install"><span class="en">Try the 60-second demo</span><span class="es">Prueba la demo de 60 segundos</span></a>
+  </div>
+  <div class="term rv">
+    <div class="bar"><i></i><i></i><i></i></div>
+    <pre><span class="p">$</span> qzero analyze suspicious.pcap
+<span id="typed"></span><span class="type">&nbsp;</span></pre>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="stats rv">
+    <div><b class="acc">&lt;1ms</b><span class="en">inference per packet</span><span class="es">inferencia por paquete</span></div>
+    <div><b class="gr">0</b><span class="en">signatures needed</span><span class="es">firmas necesarias</span></div>
+    <div><b>100%</b><span class="en">self-hosted, no cloud</span><span class="es">autoalojado, sin nube</span></div>
+    <div><b class="acc">QSVM</b><span class="en">+ QI-VAE engines</span><span class="es">+ motores QI-VAE</span></div>
+    <div><b class="hi">24/7</b><span class="en">agent heartbeat &amp; alerts</span><span class="es">heartbeat y alertas</span></div>
+  </div>
+</div>
+
+<section id="how">
+  <div class="wrap">
+    <div class="eyebrow"><span class="en">How it works</span><span class="es">Cómo funciona</span></div>
+    <h2><span class="en">From raw traffic to actionable alert</span><span class="es">Del tráfico en bruto a la alerta accionable</span></h2>
+    <p class="sec-sub">
+      <span class="en">Two quantum-inspired engines score every flow. An unsupervised VAE catches what nobody has ever seen; a quantum-kernel SVM separates threat from noise in a Hilbert space.</span>
+      <span class="es">Dos motores inspirados en cuántica puntúan cada flujo. Un VAE no supervisado detecta lo que nadie ha visto nunca; una SVM con kernel cuántico separa amenaza de ruido en un espacio de Hilbert.</span>
+    </p>
+    <div class="steps">
+      <div class="step rv"><h3><span class="en">Capture</span><span class="es">Captura</span></h3>
+        <p><span class="en">A lightweight agent taps your interface (or replays a PCAP) and extracts flow-level features in real time.</span><span class="es">Un agente ligero escucha tu interfaz (o reproduce un PCAP) y extrae características de flujo en tiempo real.</span></p></div>
+      <div class="step rv"><h3><span class="en">Quantum scoring</span><span class="es">Puntuación cuántica</span></h3>
+        <p><span class="en">Features are angle-encoded into a ZZ feature map. QSVM classifies; the QI-VAE scores reconstruction error — high error = anomaly.</span><span class="es">Las características se codifican en un mapa de características ZZ. El QSVM clasifica; el QI-VAE puntúa error de reconstrucción: más error, más anomalía.</span></p></div>
+      <div class="step rv"><h3><span class="en">Hub &amp; explain</span><span class="es">Hub y explicación</span></h3>
+        <p><span class="en">Agents push alerts to a central hub with severity, 5-tuple, human-readable explanation and suggested action.</span><span class="es">Los agentes envían alertas a un hub central con severidad, 5-tupla, explicación legible y acción sugerida.</span></p></div>
+      <div class="step rv"><h3><span class="en">React</span><span class="es">Reacciona</span></h3>
+        <p><span class="en">Dark SOC dashboard, critical-alert digest to Telegram, retention &amp; retraining automation.</span><span class="es">Dashboard SOC oscuro, digesto de alertas críticas por Telegram, retención y reentrenamiento automatizados.</span></p></div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <div class="eyebrow"><span class="en">Features</span><span class="es">Características</span></div>
+    <h2><span class="en">Everything a small SOC needs. Nothing it can't afford.</span><span class="es">Todo lo que un SOC pequeño necesita. Nada que no puedas pagar.</span></h2>
+    <p class="sec-sub"><span class="en">Deploy with docker compose in minutes. No agents to buy, no data leaving your network, no vendor lock-in.</span><span class="es">Despliega con docker compose en minutos. Sin licencias por agente, sin datos saliendo de tu red, sin dependencias de proveedor.</span></p>
+    <div class="grid">
+      <div class="card rv"><div class="ic">⚛️</div><h3><span class="en">Quantum-inspired engines</span><span class="es">Motores inspirados en cuántica</span></h3>
+        <p><span class="en">QSVM with ZZ/Pauli feature maps (Qiskit) and a Quantum-Inspired VAE (PyTorch). Classical fallback keeps it running everywhere — CPU only.</span><span class="es">QSVM con mapas ZZ/Pauli (Qiskit) y un QI-VAE (PyTorch). El fallback clásico lo hace funcionar en cualquier sitio: solo CPU.</span></p></div>
+      <div class="card rv"><div class="ic">🕵️</div><h3><span class="en">Zero-day by design</span><span class="es">Zero-day por diseño</span></h3>
+        <p><span class="en">The VAE never saw an attack during training. It models normality — so novel attacks score high from day one, no signature updates ever.</span><span class="es">El VAE nunca vio un ataque al entrenar. Modela la normalidad: los ataques nuevos puntúan alto desde el primer día, sin actualizar firmas.</span></p></div>
+      <div class="card rv"><div class="ic">🛰️</div><h3><span class="en">Hub + agents</span><span class="es">Hub + agentes</span></h3>
+        <p><span class="en">One hub, many sensors. Heartbeat monitoring, per-agent config overrides and optional agent auth tokens.</span><span class="es">Un hub, muchos sensores. Monitorización de heartbeat, configuración por agente y tokens de autenticación opcionales.</span></p></div>
+      <div class="card rv"><div class="ic">🖥️</div><h3><span class="en">Dark SOC dashboard</span><span class="es">Dashboard SOC oscuro</span></h3>
+        <p><span class="en">Severity chips, KPIs, live alert stream with expandable explanations, per-IP intelligence cache. Password-protected, app-level auth.</span><span class="es">Chips de severidad, KPIs, flujo de alertas en vivo con explicaciones, inteligencia por IP cacheada. Protegido con contraseña a nivel de app.</span></p></div>
+      <div class="card rv"><div class="ic">📲</div><h3><span class="en">Telegram digest</span><span class="es">Digesto por Telegram</span></h3>
+        <p><span class="en">Critical alerts batched to your phone. Retention purges and retrain reports run on schedule.</span><span class="es">Alertas críticas agrupadas en tu móvil. Purgas de retención e informes de reentrenamiento programados.</span></p></div>
+      <div class="card rv"><div class="ic">🔁</div><h3><span class="en">Continuous retraining</span><span class="es">Reentrenamiento continuo</span></h3>
+        <p><span class="en">Scheduled retrain reports compare F1 against production; promotion is an explicit one-flag decision, never automatic.</span><span class="es">Informes programados comparan F1 con producción; promocionar un modelo es una decisión explícita, nunca automática.</span></p></div>
+    </div>
+  </div>
+</section>
+
+<section id="why">
+  <div class="wrap">
+    <div class="eyebrow"><span class="en">Why QZero</span><span class="es">Por qué QZero</span></div>
+    <h2><span class="en">Vs. signature IDS and paid NDR</span><span class="es">Frente a IDS de firmas y NDR de pago</span></h2>
+    <p class="sec-sub"><span class="en">Snort catches what's known. Enterprise NDR catches what's affordable. QZero catches what's new.</span><span class="es">Snort detecta lo conocido. El NDR corporativo detecta lo que puedes pagar. QZero detecta lo nuevo.</span></p>
+    <div class="rv" style="overflow-x:auto">
+    <table>
+      <tr><th></th><th>QZero</th><th><span class="en">Signature IDS</span><span class="es">IDS de firmas</span></th><th>Enterprise NDR</th></tr>
+      <tr><td><span class="en">Zero-day detection</span><span class="es">Detección zero-day</span></td><td class="yes">●✓</td><td class="no">✕</td><td class="part">◐</td></tr>
+      <tr><td><span class="en">Self-hosted, data stays home</span><span class="es">Autoalojado, datos en casa</span></td><td class="yes">✓</td><td class="yes">✓</td><td class="no">✕</td></tr>
+      <tr><td><span class="en">Cost per sensor</span><span class="es">Coste por sensor</span></td><td class="yes"><span class="en">Free · MIT</span><span class="es">Gratis · MIT</span></td><td><span class="en">Free / paid rules</span><span class="es">Gratis / reglas de pago</span></td><td class="no">$$$ / GB</td></tr>
+      <tr><td><span class="en">Explainable alerts</span><span class="es">Alertas explicables</span></td><td class="yes">✓</td><td class="part">◐</td><td class="part">◐</td></tr>
+      <tr><td><span class="en">Time to first alert</span><span class="es">Tiempo hasta la 1ª alerta</span></td><td class="yes">~<span class="en">5 min</span><span class="es">5 min</span></td><td class="part"><span class="en">hours</span><span class="es">horas</span></td><td class="no"><span class="en">weeks (procurement)</span><span class="es">semanas (compras)</span></td></tr>
+      <tr><td><span class="en">GPU required</span><span class="es">Requiere GPU</span></td><td class="yes">✕ <span class="en">CPU only</span><span class="es">solo CPU</span></td><td class="yes">✕</td><td class="no">?</td></tr>
+    </table>
+    </div>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <div class="eyebrow"><span class="en">Install</span><span class="es">Instalación</span></div>
+    <h2><span class="en">Running before your coffee</span><span class="es">Funcionando antes del café</span></h2>
+    <p class="sec-sub"><span class="en">Python 3.10+. Or the full hub + dashboard + agents stack with docker compose.</span><span class="es">Python 3.10+. O la pila completa hub + dashboard + agentes con docker compose.</span></p>
+    <div class="install">
+      <div class="code rv">
+        <div class="hd">pip <button onclick="cp(this)"><span class="en">Copy</span><span class="es">Copiar</span></button></div>
+        <pre>git clone https://github.com/Thempra/qzero
+cd qzero && pip install -e .
+qzero analyze traffic.pcap
+qzero server  <span class="c"># FastAPI + dashboard</span></pre>
+      </div>
+      <div class="code rv">
+        <div class="hd">docker compose <button onclick="cp(this)"><span class="en">Copy</span><span class="es">Copiar</span></button></div>
+        <pre>git clone https://github.com/Thempra/qzero
+cd qzero
+docker compose up -d   <span class="c"># hub :8000 + SOC</span></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="final wrap">
+  <h2><span class="en">Your network has zero-days right now.</span><span class="es">Tu red tiene zero-days ahora mismo.</span></h2>
+  <p><span class="en">Find out which ones. Free, open source, self-hosted.</span><span class="es">Descubre cuáles. Gratis, open source, autoalojado.</span></p>
+  <a class="btn" href="https://github.com/Thempra/qzero"><span class="en">Star QZero on GitHub</span><span class="es">Danos una estrella en GitHub</span> ★</a>
+</div>
+
+<footer>
+  <div class="wrap">
+    <span>QZero · MIT License · Thempra</span>
+    <span><a href="https://github.com/Thempra/qzero">GitHub</a> · <a href="https://github.com/Thempra/qzero/blob/main/docs/QUICKSTART.md"><span class="en">Quickstart</span><span class="es">Inicio rápido</span></a> · <a href="https://github.com/Thempra/qzero/blob/main/docs/API.md">API</a></span>
+  </div>
+</footer>
+
+<script>
+function setLang(l){
+  document.documentElement.lang=l;
+  document.getElementById('b-en').classList.toggle('on',l==='en');
+  document.getElementById('b-es').classList.toggle('on',l==='es');
+  localStorage.setItem('qzero-lang',l);
+  document.title = l==='es'
+    ? 'QZero — Detección de amenazas de red inspirada en cuántica'
+    : 'QZero — Quantum-Inspired Network Threat Detection';
+}
+const saved=localStorage.getItem('qzero-lang');
+if(saved) setLang(saved);
+else if(navigator.language.startsWith('es')) setLang('es');
+
+function cp(btn){
+  const pre=btn.closest('.code').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText.replace(/#.*/g,'').trim());
+  const o=btn.innerHTML; btn.innerHTML='✓'; setTimeout(()=>btn.innerHTML=o,1500);
+}
+
+// typewriter terminal
+const lines=[
+ '<span class="p">$</span> qzero analyze suspicious.pcap',
+ '<span class="b">[+]</span> 12,481 packets → 3,204 flows',
+ '<span class="b">[+]</span> QI-VAE scoring (reconstruction error)…',
+ '<span class="crit">[!]</span> CRITICAL 10.0.4.17:22 → 203.0.113.9:44417  score 0.97',
+ '     <span class="hi">possible C2 beacon — periodicity 0.98, entropy 7.9</span>',
+ '<span class="ok">[ok]</span> 3,203 flows normal · 1 alert · 0.8ms/flow',
+];
+const typed=document.getElementById('typed');
+let li=0,ch=0,buf='';
+(function next(){
+  if(li>=lines.length){return}
+  const raw=lines[li];
+  // reveal char-by-char only for plain text; render whole tags at once
+  const plain=raw.replace(/<[^>]*>/g,'');
+  if(ch<plain.length){
+    ch++;
+    let out=raw.slice(0,0); // rebuild partial
+    let seen=0, i=0, res='';
+    while(i<raw.length && seen<ch){
+      if(raw[i]==='<'){ const j=raw.indexOf('>',i); res+=raw.slice(i,j+1); i=j+1; continue; }
+      res+=raw[i]; i++; seen++;
+    }
+    // close open tags naively by appending remainder of tags
+    typed.innerHTML=buf+res;
+    setTimeout(next, 14+Math.random()*22);
+  } else {
+    buf+=raw+'\n'; li++; ch=0;
+    typed.innerHTML=buf;
+    setTimeout(next, li===1?400:600);
+  }
+})();
+
+// scroll reveal
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
+document.querySelectorAll('.rv').forEach(el=>io.observe(el));
+</script>
+</body>
+</html>
