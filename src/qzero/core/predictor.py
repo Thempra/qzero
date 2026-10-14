@@ -611,10 +611,23 @@ class QZeroPredictor:
 
         # Atomic-ish write: write to temp then rename so a crash never leaves a
         # truncated/corrupt results.json that breaks load() on the next boot.
+        def _json_default(o):
+            # numpy scalars (int32/float64/bool_) leak in via sklearn metrics
+            import numpy as _np
+            if isinstance(o, _np.integer):
+                return int(o)
+            if isinstance(o, _np.floating):
+                return float(o)
+            if isinstance(o, _np.bool_):
+                return bool(o)
+            if isinstance(o, _np.ndarray):
+                return o.tolist()
+            raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+
         def _atomic_json_write(target: Path, obj) -> None:
             tmp = path.with_name(target.name + ".tmp")
             with open(tmp, "w") as f:
-                json.dump(obj, f, indent=2)
+                json.dump(obj, f, indent=2, default=_json_default)
             tmp.replace(target)
 
         _atomic_json_write(path / "results.json", results_to_save)

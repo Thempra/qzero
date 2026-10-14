@@ -6,7 +6,15 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Live demo](https://img.shields.io/badge/%E2%96%B6%20Live%20demo-thempra.github.io%2Fqzero-3B82F6?style=flat-square)](https://thempra.github.io/qzero/)
 
-> 🌐 **Try it → [thempra.github.io/qzero](https://thempra.github.io/qzero/)** · product page (EN/ES) with demo, features and install guides.
+> 🌐 **Try it → [thempra.github.io/qzero](https://thempra.github.io/qzero/)** · product page with demo, features and install guides.
+
+<table>
+<tr>
+<td><img src="docs/assets/overview.webp" width="340" alt="SOC overview"></td>
+<td><img src="docs/assets/alerts.webp" width="340" alt="Live alert feed"></td>
+<td><img src="docs/assets/threats.webp" width="340" alt="Threat view"></td>
+</tr>
+</table>
 
 ---
 
