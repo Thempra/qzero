@@ -4,6 +4,9 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Live demo](https://img.shields.io/badge/%E2%96%B6%20Live%20demo-thempra.github.io%2Fqzero-3B82F6?style=flat-square)](https://thempra.github.io/qzero/)
+
+> 🌐 **Try it → [thempra.github.io/qzero](https://thempra.github.io/qzero/)** · product page (EN/ES) with demo, features and install guides.
 
 ---
 
