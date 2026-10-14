@@ -33,10 +33,11 @@ agents 1 ──── * alerts        (relación lógica por agent_id; sin FK f�
 | detail | TEXT JSON | extras: `bytes_per_sec`, `packets_per_sec`, proto nombre, meta del flujo |
 | anomaly_score | REAL | score QI-VAE/QSVM post-caps |
 | severity | TEXT | `LOW`/`MEDIUM`/`HIGH`/`CRITICAL` (post `severity_for`) |
+| notified_telegram | INTEGER DEFAULT 0 | 1 = ya incluida en un digest Telegram enviado (Hito 1) |
 
 Índices: `idx_alerts_ts(timestamp)`, `idx_alerts_sev(severity)`.
 
-**Nota de esquema:** no hay FK ni normalización de agente a propósito (cero JOINs, ingest barato). Rotación no implementada → `alerts` crece sin límite (ver PRD Q3).
+**Nota de esquema:** no hay FK ni normalización de agente a propósito (cero JOINs, ingest barato). Rotación **sí implementada** (Hito 1): `hub.purge_old_alerts()` borra por lotes lo anterior a `QZERO_ALERT_RETENTION_DAYS` (0 = desactivado) desde el loop de mantenimiento del hub.
 
 ## 2. Autenticación
 

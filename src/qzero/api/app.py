@@ -322,6 +322,13 @@ async def hub_agent_heartbeat(agent_id: str, payload: dict | None = None):
     return hub_store.heartbeat(agent_id, agent_name, interface)
 
 
+@app.on_event("startup")
+async def _start_hub_maintenance():
+    """Hito 1: background retention + Telegram digest + agent liveness."""
+    from .maintenance import maintenance_loop
+    asyncio.create_task(maintenance_loop(hub_store))
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def create_app() -> FastAPI:

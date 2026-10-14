@@ -213,6 +213,7 @@ class QZeroAgent:
                 self.stats["packets_seen"] += len(packets)
 
                 if not packets:
+                    self._heartbeat()
                     continue
 
                 alerts = self._analyze_window(packets, wrpcap)
