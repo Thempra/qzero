@@ -1,3 +1,6 @@
+> ⚠️ **LEGADO (v1–v2).** Documento histórico; puede contradecir la documentación actual.
+> Fuente de verdad: `docs/README.md` → `prd.md`, `trd.md`, `backend-schema.md`.
+
 # Roadmap QZero: De Scripts a Solución Enterprise
 
 ## 📋 Resumen

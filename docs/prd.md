@@ -14,14 +14,13 @@ QZero es un **NDR (Network Detection and Response)** que detecta amenazas de dí
 
 ### F1 — Agente de sniffing distribuido
 - Captura paquetes en una interfaz (Scapy, modo promiscuo opcional) en ventanas de ~5 s (`QZERO_INTERVAL`).
-- Extrae flujos agregados con el modelo de 14 features UGRansome (`FlowExtractor`), con límites físicos a las features de tasa (1 GiB/s, 100 k pkt/s) para evitar explosión de scores.
-- Puntúa cada flujo con el modelo cargado (`--model-dir`, QI-VAE por defecto; QSVM opcional) y aplica umbral (`QZERO_ALERT_THRESHOLD`, por defecto 4.2).
-- Post-filtro clásico (`PostFilter`): suppression de DNS, multicast/broadcast de 1–2 paquetes, locales/link-local, HTTPS sin payload; **no** suppressa RFC1918 por defecto (`whitelist_private=False`).
-- Severidad con tope: flujos 443 de alto volumen nunca suben de HIGH (`https_volume_cap_score`).
+- Extrae flujos agregados con el modelo de 14 features UGRansome (`FlowExtractor`), con límites a las features de tasa para evitar explosión de scores (valores: TRD §5).
+- Puntúa cada flujo con el modelo cargado (QI-VAE por defecto; QSVM opcional) y aplica umbral de score (valor por defecto: TRD §4).
+- Post-filtro clásico (`PostFilter`): suprime ruido conocido (DNS, multicast/broadcast mínimo, locales, HTTPS sin payload) **sin** suprimir RFC1918 por defecto, y topa la severidad del HTTPS legítimo de alto volumen (knobs y justificación: fuente única en TRD §5).
 - Envío de alertas en lote + heartbeat al hub; buffer local en disco si el hub está caído.
 
 ### F2 — Hub central de alertas
-- API REST FastAPI: ingestión por agente (`POST /api/v1/agents/{id}/alerts`, `.../heartbeat`), consulta (`GET /api/v1/alerts`, `/alerts/recent?minutes=N`, `/agents`), y resumen O(1) (`GET /api/v1/hub/summary`, totales por severidad).
+- API REST FastAPI: ingestión por agente, heartbeat, consulta de alertas/agentes y resumen O(1) por severidad. **Contrato exacto de endpoints: fuente única en `backend-schema.md §3`.**
 - Persistencia SQLite (stdlib, sin deps externas) con migraciones idempotentes de esquema.
 - Registro de agentes (`first_seen`/`last_seen`) → agentes online/offline.
 
@@ -30,7 +29,7 @@ QZero es un **NDR (Network Detection and Response)** que detecta amenazas de dí
 - Módulos como pills superiores: Overview, Alerts, Threats, Network, Agents, Research.
 - Enriquecimiento de cada alerta (`intel.py`): dirección (in/out), organización de destino (IP→ASN/owner), tipo de amenaza estimado y explicación accionable.
 - Jerarquía risk-first: KPIs, distribución por severidad, timelines, salud de agentes.
-- API clásica adicional: `/health`, `/models`, `/analyze` (predictor sobre features), `/stats`, `/monitor/start|stop`, WebSocket `/ws`.
+- API clásica adicional (`/health`, `/analyze`, `/monitor/*`, WS `/ws`…): ver contrato en `backend-schema.md §3`.
 
 ### F4 — CLI
 - `qzero train | analyze | server | monitor | agent` (Click). `agent` arranca F1 con flags/env vars.

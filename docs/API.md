@@ -1,5 +1,8 @@
 # API Reference - QZero
 
+> ⚠️ Este manual interno de módulos (`sniffer.py`, `pipeline.py`, `inference.py`) corresponde a v1–v2 y está obsoleto. Para el contrato REST/WS real ver `backend-schema.md §3`; para la estructura de paquetes actual, `ARCHITECTURE.md`.
+
+
 ## Módulo: sniffer.py
 
 ### Clases

@@ -11,11 +11,9 @@ Dos sistemas con flujo propio: el **agente** (sin UI, flujo de datos) y la **con
       2. FlowExtractor: paquetes → flujos (14 features, caps de tasa)
       3. Modelo: anomaly_score por flujo
       4. score < QZERO_ALERT_THRESHOLD → descartar
-      5. PostFilter.should_suppress(flow, score):
-         - DNS / link-local / multicast / broadcast 1-2 pkt / HTTPS sin payload → SUPRIMIDA (log)
-         - RFC1918 → NO se suprime (whitelist_private=False)
-      6. PostFilter.severity_for(flow, score): LOW/HIGH/CRITICAL
-         - 443 de alto volumen (score≥https_volume_cap_score) → tope HIGH
+      5. PostFilter.should_suppress(flow, score) → SUPRIMIDA (a log) o continúa
+      6. PostFilter.severity_for(flow, score) → LOW/MEDIUM/HIGH/CRITICAL
+         (reglas de supresión y topes de severidad: fuente única en TRD §5)
       7. POST /api/v1/agents/{id}/alerts (lote, con detail: bytes/s, pkts/s, org)
          - fallo de red → escribir en QZERO_BUFFER_DIR y reintentar
       8. POST .../heartbeat
@@ -57,4 +55,4 @@ Dos sistemas con flujo propio: el **agente** (sin UI, flujo de datos) y la **con
 ### Reglas de interacción
 - Toda acción es *read-only* sobre el hub: el dashboard **no** modifica ni borra alertas.
 - El refresh global es el único "botón de acción" persistente; el resto son filtros/expand.
-- Sin auth en v3 (perímetro); si se activa (PRD Q2): login app-level con token SPA, contraseña por env fail-closed — nunca Basic Auth.
+- Sin auth en v3 (perímetro de red). Si se activa (PRD Q2), el flujo completo es propiedad de `backend-schema.md §2` — no duplicarlo aquí.

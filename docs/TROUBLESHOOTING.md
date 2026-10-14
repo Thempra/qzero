@@ -417,7 +417,7 @@ Si encuentras un problema que no está documentado aquí:
 - 📚 [README.md](README.md)
 - 🔍 [API.md](API.md)
 - 🛠️ [Troubleshooting.md](TROUBLESHOOTING.md)
-- 📖 [Roadmap.md](ROADMAP.md)
+- 📖 [Plan de implementación](implementation-plan.md)
 
 ---
 
