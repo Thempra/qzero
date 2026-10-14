@@ -30,16 +30,37 @@ Estado: **v3.0.0 en producción** (hub+dashboard en Nuke/Coolify, agente en `eno
 
 ## B. Hoja de ruta v3.1 (incremental, en orden)
 
-| # | Tarea | Depende de | Aceptación |
+Contexto (lo último landed): post-filtro anti-FP (−73 % CRITICALs), caps de rate, Sonar limpio, cobertura 42→75 %, CI con escáneres→DefectDojo + Sonar + deploy Coolify condicional, docs fundacionales deduplicadas.
+
+### Hito 1 — Operación confiable (semanas 1–2)
+| # | Tarea | Estado/Notas | Aceptación |
 |---|---|---|---|
-| 1 | Rotación/retención de `alerts` (p. ej. `QZERO_ALERT_RETENTION_DAYS`, borrado por lotes en heartbeat) | — | BD < umbral tras config; test con BD falsa antigua |
-| 2 | Notificación externa de CRITICALs a Telegram (rate-limited, resumen no por-alerta) | 1 | Mensaje real al trigger nmap; sin spam en tormenta de FP (verificar con sample real) |
-| 3 | Auth app-level del dashboard (login token SPA, `ADMIN_PASSWORD` por env fail-closed, refresh por `token_version`; NUNCA Basic Auth) + `X-Agent-Token` opcional en ingest | — | 401 sin token; agente viejo sigue si `QZERO_REQUIRE_AGENT_TOKEN=0` |
-| 4 | Enriquecimiento persistido (cache org/ASN por IP en tabla `ip_intel`) | 1 | `/alerts/recent` sin latencia de WHOIS; dashboard sin llamadas externas síncronas |
-| 5 | Umbral/severidad **por agente** (override en heartbeat) | 1 | DMZ con IP pública puede activar `whitelist_private=True` por agente sin afectar LAN |
-| 6 | Reentrenamiento programado + informe automático (cron → `model-performance-reports/`) | — | Informe nuevo fechado; diff de F1 vs modelo en producción |
+| 1 | Rotación/retención de `alerts` (`QZERO_ALERT_RETENTION_DAYS`, borrado por lotes en heartbeat) — bloquea el riesgo de BD SQLite infinita en el volumen Nuke | pendiente | BD < umbral tras config; test con BD falsa antigua |
+| 2 | Notificación de CRITICALs a Telegram (rate-limited, resumen no por-alerta) | **parcial**: `logger.send_telegram_alert` ya existe; falta cablearlo desde el hub + anti-spam | Mensaje real al trigger nmap; sin spam en tormenta de FP |
+| 3 | Supervisión del agente: systemd/healthcheck con reinicio + alerta si heartbeat cesa > N min | pendiente | Agente matado a mano → online de nuevo solo + nota en Agents |
+
+### Hito 2 — Credibilidad del modelo (semanas 3–5)
+| # | Tarea | Notas | Aceptación |
+|---|---|---|---|
+| 4 | Reentrenamiento programado por cron + informe automático a `model-performance-reports/` | pendiente | Informe fechado; diff de F1 vs modelo en producción |
+| 5 | **Benchmark cuántico vs clásico** con pcaps etiquetados propios: QSVM vs QI-VAE vs baselines en detección real, no solo UGRansome | cierre la promesa pendiente del PRD/PROJECT_DEFINITION; alimenta paper y PRESENTATION | Tabla de resultados reproducible por script; conclusiones en informe |
+| 6 | Umbral/severidad **por agente** (override en heartbeat) — una DMZ con IP pública puede activar `whitelist_private=True` sin afectar a la LAN | depende de 1 | Config por agente persistida; test con 2 agentes ficticios |
+
+### Hito 3 — Platformización (semanas 6–8)
+| # | Tarea | Notas | Aceptación |
+|---|---|---|---|
+| 7 | Auth app-level del dashboard (flujo: `backend-schema.md §2`: token SPA, `ADMIN_PASSWORD` env fail-closed, `token_version`; NUNCA Basic Auth) + `X-Agent-Token` opcional en ingest | desbloquea meter más hosts/segmentos (PRD Q2) | 401 sin token; agente viejo sigue si `QZERO_REQUIRE_AGENT_TOKEN=0` |
+| 8 | Enriquecimiento persistido: cache org/ASN por IP en tabla `ip_intel` | quita WHOIS síncrono del `/alerts/recent` | Latencia estable; sin llamadas externas en el render |
+| 9 | API pública consultiva `/api/v1/*` versionada + doc OpenAPI en `/docs` | contrato actual ya en backend-schema §3 | Cliente externo real consume alertas sin leer código |
+
+### Hito 4 — Expansión (post-v3.1, a decidir)
+- Agente Windows/macOS (hoy Linux/Docker) y modo mirror/span sin agente (sniffer pasivo en el router).
+- Integración con el stack Thempra: alertas al CECOM / canal Zulip por-usuario (preferencia: filtros por usuario, no globales).
+- Playbooks de respuesta semi-automática (sigue sin haber bloqueo activo: PRD §3 lo mantiene fuera).
+
+**Criterio de salida de v3.1:** hitos 1–2 verdes con el QA del workflow nmap (PRD §4) repetido tras cada hito; entonces tag `v3.1.0`.
 
 ## Reglas de ejecución
-- Construir estrictamente en orden A1→A10 (o B1→B6); si la realidad fuerza un cambio, actualizar el doc afectado **en el mismo commit**.
+- Construir estrictamente en orden A1→A10 (o B por hitos, 1→9); si la realidad fuerza un cambio, actualizar el doc afectado **en el mismo commit**.
 - Desplegar solo desde `main` (auto-deploy); nunca fusionar dev→main sin pedirlo.
 - Toda "mejora de detección" se valida con el workflow QA del skill `qzero-ndr`: baseline → trigger nmap → comparar antes/después con datos reales.
