@@ -47,6 +47,12 @@ CREATE TABLE IF NOT EXISTS alerts (
 );
 CREATE INDEX IF NOT EXISTS idx_alerts_ts ON alerts(timestamp);
 CREATE INDEX IF NOT EXISTS idx_alerts_sev ON alerts(severity);
+CREATE TABLE IF NOT EXISTS agent_config (
+    agent_id        TEXT PRIMARY KEY,
+    alert_threshold REAL,               -- per-agent override (Hito 1/6)
+    whitelist_private INTEGER,          -- 0/1; DMZ agents may differ from LAN
+    updated_at      TEXT
+);
 """
 
 # Optional columns added after the table was first created (pre-migration hubs
@@ -209,6 +215,45 @@ class HubStore:
             self._report_agent(agent_id, agent_name, interface)
             # Only last_seen / agent presence changed; totals unchanged.
         return {"heartbeat": True, "agent_id": agent_id}
+
+    # ------------------------------------------------------------------
+    # Per-agent config (Hito 2.6): threshold / whitelist overrides
+    # ------------------------------------------------------------------
+
+    def set_agent_config(self, agent_id, alert_threshold=None,
+                         whitelist_private=None) -> Dict:
+        """Upsert a per-agent override; NULL column = use agent default."""
+        current = self.get_agent_config(agent_id)
+        threshold = (alert_threshold if alert_threshold is not None
+                     else current.get("alert_threshold"))
+        if whitelist_private is not None:
+            whitelist = int(bool(whitelist_private))
+        else:
+            whitelist = current.get("whitelist_private")
+        with self._lock:
+            self._conn.execute(
+                """
+                INSERT INTO agent_config (agent_id, alert_threshold,
+                                          whitelist_private, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(agent_id) DO UPDATE SET
+                    alert_threshold   = excluded.alert_threshold,
+                    whitelist_private = excluded.whitelist_private,
+                    updated_at        = excluded.updated_at
+                """,
+                (agent_id, threshold, whitelist,
+                 datetime.now().isoformat()),
+            )
+            self._conn.commit()
+        # outside the lock: get_agent_config takes it itself
+        return self.get_agent_config(agent_id)
+
+    def get_agent_config(self, agent_id: str) -> Dict:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM agent_config WHERE agent_id = ?", (agent_id,)
+            ).fetchone()
+        return dict(row) if row else {}
 
     # ------------------------------------------------------------------
     # Retention (Hito 1.1)

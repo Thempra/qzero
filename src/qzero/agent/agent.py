@@ -402,8 +402,27 @@ class QZeroAgent:
             with urllib.request.urlopen(req, timeout=5) as resp:
                 if 200 <= resp.status < 300:
                     logger.debug("Heartbeat sent to %s", url)
+                    self._apply_remote_config(resp.read())
         except Exception as e:  # noqa: BLE001
             logger.debug("Heartbeat failed: %s", e)
+
+    def _apply_remote_config(self, body: bytes) -> None:
+        """Apply per-agent overrides pushed by the hub in the heartbeat
+        response (Hito 2.6). Missing/empty config = keep local defaults."""
+        try:
+            cfg = json.loads(body).get("config") or {}
+        except (ValueError, AttributeError):
+            return
+        threshold = cfg.get("alert_threshold")
+        if threshold is not None and float(threshold) != self.config.alert_threshold:
+            logger.info(
+                "Hub override: alert_threshold %s → %s",
+                self.config.alert_threshold, threshold)
+            self.config.alert_threshold = float(threshold)
+        wl = cfg.get("whitelist_private")
+        if wl is not None and bool(wl) != self.config.whitelist_private:
+            logger.info("Hub override: whitelist_private → %s", bool(wl))
+            self.config.whitelist_private = bool(wl)
 
     def _push_with_retry(self, payload: Dict) -> bool:
         url = self.config.hub_url.rstrip("/") + DEFAULT_HUB_PATH.format(

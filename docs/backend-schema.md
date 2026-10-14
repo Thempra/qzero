@@ -39,6 +39,16 @@ agents 1 ──── * alerts        (relación lógica por agent_id; sin FK f�
 
 **Nota de esquema:** no hay FK ni normalización de agente a propósito (cero JOINs, ingest barato). Rotación **sí implementada** (Hito 1): `hub.purge_old_alerts()` borra por lotes lo anterior a `QZERO_ALERT_RETENTION_DAYS` (0 = desactivado) desde el loop de mantenimiento del hub.
 
+### Tabla `agent_config` (Hito 2.6)
+| Columna | Tipo | Notas |
+|---|---|---|
+| agent_id | TEXT **PK** | |
+| alert_threshold | REAL | override del umbral QI-VAE; NULL = default local del agente |
+| whitelist_private | INTEGER | 0/1; una DMZ con IP pública puede activarla sin afectar a la LAN |
+| updated_at | TEXT ISO8601 | |
+
+Se propaga **sin reiniciar**: la respuesta del heartbeat incluye `config`, y el agente aplica los overrides (`_apply_remote_config`). Escritura vía `PUT /api/v1/agents/{id}/config` (upsert: los campos no enviados NO se pisan).
+
 ## 2. Autenticación
 
 **v3 actual: sin auth en el data-plane.** Confianza de red: agentes → hub dentro de la LAN/VPN Thempra; dashboard expuesto por Traefik con TLS (protección de perímetro). El hub **no** valida `agent_id`: cualquiera que alcance la API puede ingestar (riesgo aceptado en LAN, documentado).

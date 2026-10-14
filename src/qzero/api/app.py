@@ -315,11 +315,33 @@ async def hub_ingest_agent_alerts(agent_id: str, payload: dict):
 
 @app.post("/api/v1/agents/{agent_id}/heartbeat")
 async def hub_agent_heartbeat(agent_id: str, payload: dict | None = None):
-    """Keep an agent's last_seen fresh even when it has NO alerts to push."""
+    """Keep an agent's last_seen fresh even when it has NO alerts to push.
+
+    The response carries the agent's per-agent config overrides (Hito 2.6)
+    so the agent picks up threshold/whitelist changes without restart.
+    """
     payload = payload or {}
     agent_name = payload.get("agent_name", "")
     interface = payload.get("interface", "")
-    return hub_store.heartbeat(agent_id, agent_name, interface)
+    result = hub_store.heartbeat(agent_id, agent_name, interface)
+    result["config"] = hub_store.get_agent_config(agent_id)
+    return result
+
+
+@app.get("/api/v1/agents/{agent_id}/config")
+async def hub_get_agent_config(agent_id: str):
+    """Per-agent detection config overrides."""
+    return hub_store.get_agent_config(agent_id)
+
+
+@app.put("/api/v1/agents/{agent_id}/config")
+async def hub_set_agent_config(agent_id: str, payload: dict):
+    """Set per-agent overrides: {alert_threshold?: float, whitelist_private?: bool}."""
+    return hub_store.set_agent_config(
+        agent_id,
+        alert_threshold=payload.get("alert_threshold"),
+        whitelist_private=payload.get("whitelist_private"),
+    )
 
 
 @app.on_event("startup")
