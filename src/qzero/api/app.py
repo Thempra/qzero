@@ -334,6 +334,14 @@ async def hub_get_agent_config(agent_id: str):
     return hub_store.get_agent_config(agent_id)
 
 
+@app.get("/api/v1/intel/{ip}")
+async def hub_ip_intel(ip: str):
+    """ASN/org enrichment for an IP, served from the hub's ip_intel cache
+    (Hito 3.8). Network hit only on cache miss/stale; private IPs → LAN stub."""
+    from .intel import enrich_ip
+    return enrich_ip(hub_store, ip)
+
+
 @app.put("/api/v1/agents/{agent_id}/config")
 async def hub_set_agent_config(agent_id: str, payload: dict):
     """Set per-agent overrides: {alert_threshold?: float, whitelist_private?: bool}."""

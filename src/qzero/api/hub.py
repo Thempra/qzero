@@ -53,6 +53,14 @@ CREATE TABLE IF NOT EXISTS agent_config (
     whitelist_private INTEGER,          -- 0/1; DMZ agents may differ from LAN
     updated_at      TEXT
 );
+CREATE TABLE IF NOT EXISTS ip_intel (
+    ip          TEXT PRIMARY KEY,
+    org         TEXT,
+    asn         TEXT,
+    country     TEXT,
+    anycast     INTEGER DEFAULT 0,
+    fetched_at  TEXT                    -- ISO8601; stale rows re-fetched (Hito 3.8)
+);
 """
 
 # Optional columns added after the table was first created (pre-migration hubs
@@ -254,6 +262,38 @@ class HubStore:
                 "SELECT * FROM agent_config WHERE agent_id = ?", (agent_id,)
             ).fetchone()
         return dict(row) if row else {}
+
+    # ------------------------------------------------------------------
+    # IP intel cache (Hito 3.8)
+    # ------------------------------------------------------------------
+
+    def get_ip_intel(self, ip: str) -> Dict:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM ip_intel WHERE ip = ?", (ip,)
+            ).fetchone()
+        if not row:
+            return {}
+        d = dict(row)
+        d["anycast"] = bool(d.get("anycast"))
+        return d
+
+    def put_ip_intel(self, ip: str, org="", asn="", country="",
+                     anycast=False) -> None:
+        with self._lock:
+            self._conn.execute(
+                """
+                INSERT INTO ip_intel (ip, org, asn, country, anycast, fetched_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(ip) DO UPDATE SET
+                    org = excluded.org, asn = excluded.asn,
+                    country = excluded.country, anycast = excluded.anycast,
+                    fetched_at = excluded.fetched_at
+                """,
+                (ip, org, asn, country, int(bool(anycast)),
+                 datetime.now().isoformat()),
+            )
+            self._conn.commit()
 
     # ------------------------------------------------------------------
     # Retention (Hito 1.1)
