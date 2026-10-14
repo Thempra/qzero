@@ -236,16 +236,19 @@ def run_fold(X, y_bin, train_mask, test_mask, multiclass_train, multiclass_test,
         m.update(train_time_s=tt, inference_time_s=it)
         rows[name] = m
 
-    # Multiclase OVR (solo en el split estratificado)
+    # Multiclase OVR (solo en el split estratificado).
+    # multiclass_train/test son máscaras sobre el dataset COMPLETO.
     multi = {}
     if multiclass_train is not None:
         mc_tr, mc_te = multiclass_train, multiclass_test
-        y_mc_tr = y_multi[train_mask][mc_tr]
-        y_mc_te = y_multi[test_mask][mc_te]
+        Xmc_tr = scaler.transform(X[mc_tr])
+        Xmc_te = scaler.transform(X[mc_te])
+        y_mc_tr = y_multi[mc_tr]
+        y_mc_te = y_multi[mc_te]
         for name in ["random_forest", "svm_rbf"]:
             baseline = ClassicalBaseline(name)
-            baseline.fit(Xtr[mc_tr], y_mc_tr)
-            pred = baseline.predict(Xte[mc_te])
+            baseline.fit(Xmc_tr, y_mc_tr)
+            pred = baseline.predict(Xmc_te)
             acc = accuracy_score(y_mc_te, pred)
             f1 = f1_score(y_mc_te, pred, average="macro")
             multi[name] = {"accuracy": acc, "f1_macro": f1}
@@ -309,8 +312,8 @@ def main():
     train_mask = np.zeros(n_flows, bool)
     train_mask[tr_idx] = True
     test_mask = ~train_mask
-    mc_tr = np.ones(train_mask.sum(), bool)
-    mc_te = np.ones(test_mask.sum(), bool)
+    mc_tr = train_mask  # máscaras sobre el dataset completo (no doble indexado)
+    mc_te = test_mask
     rows, multi = run_fold(X, y_bin, train_mask, test_mask, mc_tr, mc_te,
                        y_multi=y_multi)
     results["split"]["strat_80_20"] = rows
