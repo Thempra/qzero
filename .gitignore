@@ -110,3 +110,4 @@ legacy/
 .claude/
 
 .taste-skill/
+!docs/assets/ledger.json
