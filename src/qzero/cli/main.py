@@ -76,7 +76,7 @@ def analyze(pcap_file, method, model_dir, output, qubits):
 
     if result.get("status") == "success":
         r = result.get("results", {})
-        click.echo(f"  Packets analyzed : {result['features_extracted']}")
+        click.echo(f"  Flows extracted  : {result.get('flows_extracted', 0)}")
         click.echo(f"  Anomalies found  : {r.get('n_anomalies_detected', 0)}")
         click.echo(f"  Anomaly rate     : {r.get('anomaly_percentage', 0):.1f}%")
     else:

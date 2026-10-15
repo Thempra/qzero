@@ -108,3 +108,5 @@ scripts/insights/
 scripts/reports/
 legacy/
 .claude/
+
+.taste-skill/
