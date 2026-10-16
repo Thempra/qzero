@@ -149,12 +149,29 @@ summary:hover{color:var(--hi)}
 .shot figcaption{font-size:var(--t-sm);color:var(--lo);padding:14px 18px}
 .shot figcaption b{color:var(--hi);font-weight:700}
 
-/* honest numbers */
-.num{margin-top:56px}
-.num:first-of-type{margin-top:44px}
-.num b{font-size:clamp(34px,4.4vw,52px);font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:-0.01em;display:block;line-height:1.08}
-.num .arr{color:var(--lo)}
-.num p{color:var(--lo);margin-top:12px;max-width:56ch;text-wrap:pretty}
+/* honest numbers: the real bench sheet */
+.benchwrap{margin-top:44px;overflow-x:auto}
+table.bench{width:100%;min-width:560px;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:var(--t-body)}
+table.bench caption{caption-side:bottom;text-align:left;color:var(--lo);font-size:var(--t-sm);padding-top:14px}
+table.bench th{font-weight:400;color:var(--lo);font-size:var(--t-sm);padding:9px 14px;text-align:right;white-space:nowrap}
+table.bench th[scope="col"]{border-bottom:1px solid var(--border)}
+table.bench th:first-child,table.bench td:first-child{text-align:left}
+table.bench td{padding:9px 14px;text-align:right;color:var(--lo);white-space:nowrap}
+table.bench tr.q td,table.bench tr.q td:first-child{color:var(--hi)}
+table.bench tr.q{background:var(--bg-1)}
+table.bench td:first-child{font-size:var(--t-sm);color:var(--lo)}
+table.bench tr.q td:first-child{color:var(--lo)}
+table.bench td b{font-weight:500;color:inherit}
+table.bench tr.grp td{padding-top:22px;border-top:1px solid var(--border)}
+table.bench tr.grp.q{background:none}
+.verdict{margin-top:36px;color:var(--lo);max-width:62ch;text-wrap:pretty}
+.verdict b{color:var(--hi);font-weight:500}
+.confess{margin-top:64px;display:grid;grid-template-columns:auto 1fr;gap:34px;align-items:start}
+.confess .big{font-size:clamp(44px,6vw,72px);font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:-0.01em;line-height:1;color:var(--high)}
+.confess p{color:var(--lo);max-width:56ch;text-wrap:pretty}
+.license{margin-top:56px;color:var(--lo);max-width:62ch;text-wrap:pretty}
+.license a{color:var(--hi);text-decoration:underline;text-underline-offset:3px}
+@media (max-width:680px){.confess{grid-template-columns:1fr;gap:14px}}
 
 /* live hub strip */
 .hubline{margin-top:44px;display:flex;gap:22px;align-items:center;flex-wrap:wrap}
@@ -329,21 +346,36 @@ footer a{color:var(--hi)}
   </section>
 
   <!-- HONEST NUMBERS -->
-  <section class="axis" id="truth">
+  <section class="axis wide" id="truth">
     <h2 class="rv"><span class="en">Numbers that do not flatter us.</span><span class="es">Números que no nos favorecen.</span></h2>
-    <p class="sec-intro rv d1"><span class="en">Security tools love to quote one lucky benchmark. We would rather show you the whole bench, including the parts where the quantum kernel loses. Open source means you can re-run every number here; auditing it is the point.</span><span class="es">Las herramientas de seguridad encantan de citar un benchmark afortunado.  Preferimos enseñarte el banco completo, incluidas las partes donde el kernel cuántico pierde. Open source significa que puedes volver a ejecutar cada número; auditarlo es el objetivo.</span></p>
-    <div class="num rv">
-      <b>F1 0.711 <span class="arr">/</span> 0.707</b>
-      <p><span class="en">QSVM against classical svm_linear on our 5 labeled PCAPs, 2026-10-14, CV=1. The quantum kernel is not magically better, and this page will not pretend it is. The argument is elsewhere: no signatures, unsupervised, the score exists before the name.</span><span class="es">QSVM frente a svm_linear clásico en nuestros 5 PCAP etiquetados, 2026-10-14, CV=1. El kernel cuántico no es mágicamente mejor, y esta página no va a fingir que lo es. El argumento está en otro lado: sin firmas, sin supervisión, el score existe antes que el nombre.</span></p>
+    <p class="sec-intro rv d1"><span class="en">Security tools love to quote one lucky benchmark. We would rather print the whole bench sheet — QSVM row included, wins and losses. Every row below comes from model-performance-reports/benchmark-pcaps-latest.json in the repo; re-run it and check.</span><span class="es">A las herramientas de seguridad les encanta citar un benchmark afortunado. Nosotros preferimos imprimir el banco completo — fila QSVM incluida, victorias y derrotas. Cada fila viene de model-performance-reports/benchmark-pcaps-latest.json en el repo; vuelve a ejecutarlo y comprueba.</span></p>
+    <div class="benchwrap rv">
+      <table class="bench">
+        <caption><span class="en">Leave-one-attack-type-out over 5 labeled PCAPs (2 942 flows), seed 42, CPU, 2026-10-14. QSVM: 4 qubits, real quantum kernel (Qiskit), train capped at 120 samples. Inference time: whole test set, one flow per second against twenty-six thousand.</span><span class="es">Leave-one-attack-type-out sobre 5 PCAP etiquetados (2 942 flujos), semilla 42, CPU, 2026-10-14. QSVM: 4 qubits, kernel cuántico real (Qiskit), tope de 120 muestras de train. Tiempo de inferencia: test completo, un flujo por segundo contra veintiséis mil.</span></caption>
+        <thead>
+          <tr>
+            <th scope="col"><span class="en">attack type</span><span class="es">tipo de ataque</span></th>
+            <th scope="col">F1 · <span class="en">QSVM</span><span class="es">QSVM</span> / svm_linear</th>
+            <th scope="col">ROC-AUC · QSVM / svm_linear</th>
+            <th scope="col"><span class="en">inference</span><span class="es">inferencia</span> · QSVM / svm_linear</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="q"><td>ddos</td><td><b>0.711</b> / 0.707</td><td>0.57 / 0.61</td><td>92.9 s / 0.023 s</td></tr>
+          <tr class="q"><td>bruteforce</td><td><b>0.711</b> / 0.707</td><td>0.84 / 0.25</td><td>74.3 s / 0.034 s</td></tr>
+          <tr class="q"><td>exfiltration</td><td><b>0.711</b> / 0.707</td><td>0.52 / 0.61</td><td>64.0 s / 0.023 s</td></tr>
+          <tr class="q"><td>malware</td><td><b>0.711</b> / 0.707</td><td>0.56 / 0.61</td><td>63.0 s / 0.023 s</td></tr>
+          <tr class="grp"><td><span class="en">mean F1, four folds</span><span class="es">F1 medio, cuatro folds</span></td><td><b>0.569</b> / 0.566</td><td>—</td><td>—</td></tr>
+          <tr class="grp"><td><span class="en">scoring throughput, 2 cores</span><span class="es">throughput de puntuación, 2 cores</span></td><td>—</td><td>—</td><td><b>16 050</b> <span class="en">flows/s</span><span class="es">flujos/s</span></td></tr>
+        </tbody>
+      </table>
     </div>
-    <div class="num rv">
-      <b>100.0%</b>
+    <p class="verdict rv"><span class="en">Read the sheet honestly: <b>0.711 against 0.707</b> is a statistical shrug, and the QSVM loses on ROC-AUC in three of four folds while burning three orders of magnitude more CPU. The quantum kernel is not magically better, and this page will not pretend it is. The argument is elsewhere: no signatures, unsupervised, the score exists before the name.</span><span class="es">Lee el banco con honestidad: <b>0.711 contra 0.707</b> es un encogimiento estadístico, y el QSVM pierde en ROC-AUC en tres de cuatro folds gastándose tres órdenes de magnitud más de CPU. El kernel cuántico no es mágicamente mejor, y esta página no va a fingir que lo es. El argumento está en otro lado: sin firmas, sin supervisión, el score existe antes que el nombre.</span></p>
+    <div class="confess rv">
+      <b class="big">100.0%</b>
       <p><span class="en">Yes, the candidate model also flags normal.pcap at 100%. It is a retraining candidate — and that is exactly why this page shows raw scores and a threshold you control, never a friendly green "all clear".</span><span class="es">Sí, el candidato también marca el normal.pcap al 100%. Es un candidato en reentrenamiento. Por eso esta página muestra scores crudos y un umbral que controlas, nunca un verde "todo despejado" de cortesía.</span></p>
     </div>
-    <div class="num rv">
-      <b>MIT</b>
-      <p><span class="en">Source, models, benchmarks and labeled PCAPs live in the open. Everything this page claims was produced with code you can check out today.</span><span class="es">Código, modelos, benchmarks y PCAP etiquetados viven en abierto. Todo lo que esta página afirma se produjo con código que puedes descargar hoy mismo.</span></p>
-    </div>
+    <p class="license rv"><span class="en">Source, models, benchmarks and labeled PCAPs live under <a href="https://github.com/thempra/qzero/blob/main/LICENSE">MIT</a>. Everything this page claims was produced with code you can check out today.</span><span class="es">Código, modelos, benchmarks y PCAP etiquetados viven bajo licencia <a href="https://github.com/thempra/qzero/blob/main/LICENSE">MIT</a>. Todo lo que esta página afirma se produjo con código que puedes descargar hoy mismo.</span></p>
   </section>
 
   <!-- INSTALL: call & response, ends with the live hub -->
