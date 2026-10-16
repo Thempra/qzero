@@ -43,7 +43,7 @@ html[lang="en"] .es{display:none}
 .topnav a:hover{color:var(--hi)}
 .clock{font-size:var(--t-sm);color:var(--lo);font-variant-numeric:tabular-nums}
 .langs{display:flex;background:var(--bg-2);border-radius:6px;padding:2px}
-.langs button{background:none;border:none;color:var(--lo);font:500 var(--t-sm) var(--ui);padding:4px 12px;border-radius:4px;cursor:pointer}
+.langs button{background:none;border:none;color:var(--lo);font:500 var(--t-sm) var(--ui);padding:4px 12px;min-height:32px;border-radius:4px;cursor:pointer}
 .langs button.on{background:var(--acc);color:#fff}
 .ghbtn{background:var(--bg-2);border-radius:6px;padding:6px 14px;font-size:var(--t-sm);font-weight:500}
 
@@ -55,7 +55,8 @@ html[lang="en"] .es{display:none}
 .tile.w3{grid-column:span 3}
 .tile.dark{background:var(--bg-0)}
 .tile{position:relative}
-.tag{font-family:var(--mono);font-size:var(--t-sm);color:var(--lo);position:absolute;top:28px;right:28px;margin:0;text-align:right;max-width:46%} /* taste-skill-ignore: mono = etiqueta de artefacto de consola, convencion del brand brief */
+.tile:has(> .tag):not(.hero){padding-top:64px}
+.tag{font-family:var(--mono);font-size:var(--t-sm);color:var(--lo);position:absolute;top:28px;right:28px;margin:0;text-align:right;white-space:nowrap} /* taste-skill-ignore: mono = etiqueta de artefacto de consola, convencion del brand brief */
 .tile h2{font-size:var(--t-h2);font-weight:700;line-height:1.12;letter-spacing:-0.01em}
 .tile h3{font-size:var(--t-h3);font-weight:500;line-height:1.3}
 .lead{color:var(--lo);max-width:62ch;margin-top:14px}
@@ -63,7 +64,7 @@ html[lang="en"] .es{display:none}
 
 /* hero */
 .hero{padding:64px 40px 56px}
-.hero .tag{position:static;margin:0 0 96px;max-width:none;text-align:left}
+.hero .tag{margin:0 0 96px}
 .hero h1{font-size:var(--t-display);font-weight:700;line-height:1.02;letter-spacing:-0.02em;max-width:22ch;text-wrap:balance}
 .hero .lead{font-size:var(--t-h3);margin-top:20px}
 .hero .cta{margin:28px 0 96px}
@@ -112,14 +113,14 @@ table.flows tr.in td{animation:fadein .5s ease-out both}
 .sv.LOW{background:rgba(59,130,246,.16);color:var(--low)}
 .sv.SUP{background:var(--bg-2);color:var(--lo)}
 .arr{color:var(--lo)}
-#flowwrap{max-height:560px;overflow-y:auto}
+#flowwrap{height:560px;overflow-y:auto;overflow-x:auto}
 .scorebar{display:block;width:110px;height:6px;background:var(--bg-2);border-radius:3px;position:relative}
 .scorebar i{position:absolute;left:0;top:0;bottom:0;background:var(--acc);border-radius:3px;display:block}
 canvas.hist{width:100%;height:180px;display:block}
 
 /* tiles: truth */
 .big{font-size:var(--t-h3);font-weight:700;font-variant-numeric:tabular-nums}
-.tinynote{font-size:var(--t-sm);color:var(--lo);margin-top:10px;max-width:66ch}
+.tinynote{font-size:var(--t-sm);color:var(--lo);margin-top:10px;max-width:66ch;text-wrap:pretty}
 .pipes{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch}
 .pipe{background:var(--bg-2);border-radius:8px;padding:14px 16px;flex:1 1 150px;min-width:150px}
 .pipe code{display:block;font-size:var(--t-sm);color:var(--acc-hi);margin-bottom:4px}
@@ -147,17 +148,21 @@ footer a{color:var(--hi)}
   .board{display:block}
   .tile{margin-bottom:2px}
   .topnav{display:none}
+  #screens>div{grid-template-columns:1fr 1fr !important}
 }
 @media (max-width:680px){
+  #screens>div{grid-template-columns:1fr !important}
   .tile h2{font-size:24px}
   .big,.f1{font-size:21px}
   .tile{padding:22px}
   .hero{padding:44px 22px}
-  section.tile:not(.hero) > .tag{position:static;max-width:none;text-align:left;margin-bottom:14px}
+  .tag{position:static;max-width:none;text-align:left;margin:0 0 14px}
+  .tile:has(> .tag){padding-top:22px}
   .runctl{margin-left:0}
   .hide-s{display:none}
   table.flows td,table.flows th{padding:6px 7px}
-  table.flows{min-width:340px}
+  table.flows{min-width:480px}
+table.flows td samp{white-space:nowrap}
   .topbar{gap:12px;padding:0 14px}
   .clock{display:none}
   .ghbtn{padding:6px 10px;font-size:14px}
@@ -193,7 +198,6 @@ footer a{color:var(--hi)}
 
   <!-- HERO -->
   <section class="tile dark w12 hero">
-    <p class="tag mono"><code><span class="en">qzero · network detection &amp; response · MIT</span><span class="es">qzero · detección y respuesta de red · MIT</span></code></p>
     <h1><span class="en">See the attack<br>before its signature.</span><span class="es">Detecta el ataque<br>antes de la firma.</span></h1>
     <p class="lead"><span class="en">QZero is an open-source, self-hosted NDR. A Quantum-Inspired Variational Autoencoder learns what normal looks like on your network and scores every flow with a continuous number, not a boolean. Zero signatures. Zero cloud.</span><span class="es">QZero es un NDR open source y autoalojado. Un autoencoder variacional inspirado en computación cuántica aprende qué es normal en tu red y puntúa cada flujo con un número continuo, no un booleano. Cero firmas. Cero nube.</span></p>
     <p class="cta"><a class="go" href="https://github.com/thempra/qzero"><span class="en">Download QZero free</span><span class="es">Descargar QZero gratis</span></a></p>
@@ -265,8 +269,7 @@ footer a{color:var(--hi)}
 
   <!-- HOW IT WORKS -->
   <section class="tile w12" id="how">
-    <p class="tag mono"><code>§1 · <span class="en">principle of operation</span><span class="es">principio de operación</span></code></p>
-    <h2><span class="en">From raw traffic to an actionable alert, in one pass.</span><span class="es">Del tráfico en bruto a la alerta accionable, en una pasada.</span></h2>
+    <h2><span class="en">Principle of operation: from raw traffic to alert.</span><span class="es">Principio de operación: del tráfico en bruto a la alerta.</span></h2>
     <div class="pipes" style="margin-top:24px">
       <div class="pipe"><code>capture →</code><span><span class="en">A lightweight agent taps the interface, or you feed it a PCAP.</span><span class="es">Un agente ligero captura la interfaz, o le pasas un PCAP.</span></span></div>
       <div class="pipe"><code>featurize</code><span><span class="en">14 flow features per flow, in real time.</span><span class="es">14 features por flujo, en tiempo real.</span></span></div>
@@ -282,7 +285,7 @@ footer a{color:var(--hi)}
   </section>
 
   <!-- SCREENS mosaic -->
-  <section class="tile dark w8" id="screens" style="padding:0;background:var(--border);display:grid;grid-template-columns:2fr 1fr 1fr;gap:2px">
+  <section class="tile dark w8" id="screens" style="padding:0;background:var(--border)">
     <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:2px">
       <figure class="shot"><img src="assets/overview.webp" alt="Overview screen of the QZero console" loading="lazy"><figcaption><b>Overview</b> · <span class="en">KPIs, severity mix, agent health</span><span class="es">KPIs, severidades, salud de agentes</span></figcaption></figure>
       <figure class="shot"><img src="assets/alerts.webp" alt="Alerts feed of the QZero console" loading="lazy"><figcaption><b>Alerts</b> · <span class="en">live 5-tuple feed</span><span class="es">flujo 5-tupla en vivo</span></figcaption></figure>
@@ -342,6 +345,7 @@ function setLang(l){
   document.getElementById('b-en').classList.toggle('on',l==='en');
   document.getElementById('b-es').classList.toggle('on',l==='es');
   try{localStorage.setItem('qzero-lang',l)}catch(e){}
+  if(typeof render==='function')render();
 }
 (function(){var s=null;try{s=localStorage.getItem('qzero-lang')}catch(e){}
  setLang(s||(navigator.language.startsWith('es')?'es':'en'));})();
@@ -389,7 +393,9 @@ document.querySelectorAll('.install .cmd').forEach(function(c){
   };
 });
 document.getElementById('copybtn').onclick=function(){
-  navigator.clipboard.writeText('git clone https://github.com/thempra/qzero.git && cd qzero\npip install -e ".[all]"\nqzero analyze suspicious.pcap --model-dir models/qzero-candidate\nqzero server --port 8000');
+  var self=this;
+  function done(){var t=self.textContent;self.textContent=document.documentElement.lang==='es'?'copiado':'copied';setTimeout(function(){self.textContent=t},1500)}
+  try{navigator.clipboard.writeText('git clone https://github.com/thempra/qzero.git && cd qzero\npip install -e ".[all]"\nqzero analyze suspicious.pcap --model-dir models/qzero-candidate\nqzero server --port 8000').then(done,function(){done()})}catch(e){done()}
 };
 
 /* ---------- flow ledger ---------- */
@@ -433,7 +439,7 @@ function hist(f,thr){
     x.fillRect(i*(W/30)+1,H-10-h,W/30-2,h);
   }
   x.fillStyle='#8B94A7';x.font='22px monospace';
-  x.fillText(lo.toFixed(1),2,H);x.fillText(hi.toFixed(1),W-46,H);
+  x.fillText(lo.toFixed(1),2,H);var _hi=hi.toFixed(1);x.fillText(_hi,W-x.measureText(_hi).width-2,H);
 }
 fetch('assets/ledger.json').then(function(r){return r.json()}).then(function(d){
   LEDGER=d;
