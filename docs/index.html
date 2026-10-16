@@ -97,6 +97,7 @@ input[type=checkbox]{accent-color:var(--acc);width:16px;height:16px}
 .runstats{display:flex;gap:26px;margin-bottom:14px;flex-wrap:wrap}
 .runstats div{font-size:var(--t-sm);color:var(--lo)}
 .runstats b{color:var(--hi);font-size:var(--t-h3);font-weight:700;margin-right:6px;font-variant-numeric:tabular-nums}
+#flowwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 table.flows{width:100%;border-collapse:collapse;font-size:var(--t-sm)}
 table.flows samp{font-family:var(--mono);font-size:inherit;color:inherit}
 table.flows th{color:var(--lo);font-weight:400;text-align:left;padding:7px 10px;border-bottom:1px solid var(--border)}
@@ -117,7 +118,7 @@ table.flows tr.in td{animation:fadein .5s ease-out both}
 canvas.hist{width:100%;height:180px;display:block}
 
 /* tiles: truth */
-.big{font-size:var(--t-h2);font-weight:700;font-variant-numeric:tabular-nums}
+.big{font-size:var(--t-h3);font-weight:700;font-variant-numeric:tabular-nums}
 .tinynote{font-size:var(--t-sm);color:var(--lo);margin-top:10px;max-width:66ch}
 .pipes{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch}
 .pipe{background:var(--bg-2);border-radius:8px;padding:14px 16px;flex:1 1 150px;min-width:150px}
@@ -143,19 +144,26 @@ footer{padding:36px 40px;background:var(--bg-1);display:flex;gap:26px;flex-wrap:
 footer a{color:var(--hi)}
 
 @media (max-width:1080px){
-  .tile.w8,.tile.w7,.tile.w6,.tile.w5,.tile.w4,.tile.w3{grid-column:span 6}
+  .board{display:block}
+  .tile{margin-bottom:2px}
   .topnav{display:none}
 }
 @media (max-width:680px){
   .tile h2{font-size:24px}
   .big,.f1{font-size:21px}
-  .board{grid-template-columns:repeat(2,1fr)}
   .tile{padding:22px}
-  .tile.w8,.tile.w7,.tile.w6,.tile.w5,.tile.w4,.tile.w3{grid-column:span 2}
   .hero{padding:44px 22px}
+  section.tile:not(.hero) > .tag{position:static;max-width:none;text-align:left;margin-bottom:14px}
   .runctl{margin-left:0}
   .hide-s{display:none}
   table.flows td,table.flows th{padding:6px 7px}
+  table.flows{min-width:340px}
+  .topbar{gap:12px;padding:0 14px}
+  .clock{display:none}
+  .ghbtn{padding:6px 10px;font-size:14px}
+  .topbar{position:static}
+  .facts{gap:22px}
+  input[type=range]{width:130px}
 }
 </style>
 </head>
@@ -186,7 +194,7 @@ footer a{color:var(--hi)}
   <!-- HERO -->
   <section class="tile dark w12 hero">
     <p class="tag mono"><code><span class="en">qzero · network detection &amp; response · MIT</span><span class="es">qzero · detección y respuesta de red · MIT</span></code></p>
-    <h1><span class="en">See the attack before it has a signature.</span><span class="es">Detecta el ataque antes de que tenga firma.</span></h1>
+    <h1><span class="en">See the attack<br>before its signature.</span><span class="es">Detecta el ataque<br>antes de la firma.</span></h1>
     <p class="lead"><span class="en">QZero is an open-source, self-hosted NDR. A Quantum-Inspired Variational Autoencoder learns what normal looks like on your network and scores every flow with a continuous number, not a boolean. Zero signatures. Zero cloud.</span><span class="es">QZero es un NDR open source y autoalojado. Un autoencoder variacional inspirado en computación cuántica aprende qué es normal en tu red y puntúa cada flujo con un número continuo, no un booleano. Cero firmas. Cero nube.</span></p>
     <p class="cta"><a class="go" href="https://github.com/thempra/qzero"><span class="en">Download QZero free</span><span class="es">Descargar QZero gratis</span></a></p>
     <div class="facts">
