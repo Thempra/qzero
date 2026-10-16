@@ -22,8 +22,8 @@
   --t-sm:14px; --t-body:17px; --t-h3:20px; --t-h2:clamp(26px,3.2vw,36px); --t-display:clamp(42px,6vw,72px);
   --ui:'Schibsted Grotesk',system-ui,sans-serif;
   --mono:'JetBrains Mono',ui-monospace,monospace; /* taste-skill-ignore: mono = marca de artefactos (IPs, scores, timestamps), convencion del brand brief */
-  --col:660px;            /* eje de texto */
-  --wide:980px;           /* paneles que rompen la columna */
+  --col:780px;            /* eje de texto */
+  --wide:1180px;          /* paneles que rompen la columna */
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -35,11 +35,10 @@ code,samp,kbd{font-family:var(--mono);font-weight:inherit;font-size:inherit} /* 
 html[lang="es"] .en{display:none}
 html[lang="en"] .es{display:none}
 
-/* axis: narrow column riding left of centre */
+/* axis: centered reading column, generous gutters */
 .axis{max-width:var(--col);margin:0 auto;padding:0 24px}
 section > .axis > .axis{padding:0}
-@media (min-width:1180px){.axis{margin-left:clamp(24px,17vw,330px)}}
-.wide{max-width:var(--wide)}
+.wide{max-width:var(--wide);margin-left:auto;margin-right:auto}
 
 /* topbar: wordmark, few links, one action */
 .topbar{position:sticky;top:0;z-index:50;background:var(--bg-0);display:flex;align-items:center;gap:24px;padding:0 24px;height:56px}
