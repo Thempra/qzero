@@ -19,86 +19,87 @@
   --hi:#E6EAF2; --lo:#98A1B3;
   --acc:#3B82F6; --acc-hi:#8AB4F8; --ink-on-acc:#0B0E14;
   --crit:#EF4444; --high:#F97316; --med:#EAB308; --low:#3B82F6; --ok:#22C55E;
-  --t-sm:16px; --t-body:16px; --t-h3:20px; --t-h2:32px; --t-display:clamp(40px,5.6vw,64px);
+  --t-sm:14px; --t-body:17px; --t-h3:20px; --t-h2:clamp(26px,3.2vw,36px); --t-display:clamp(42px,6vw,72px);
   --ui:'Schibsted Grotesk',system-ui,sans-serif;
   --mono:'JetBrains Mono',ui-monospace,monospace; /* taste-skill-ignore: mono = marca de artefactos (IPs, scores, timestamps), convencion del brand brief */
+  --col:660px;            /* eje de texto */
+  --wide:980px;           /* paneles que rompen la columna */
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{background:var(--bg-0);color:var(--hi);font:400 var(--t-body)/1.55 var(--ui)}
 a{color:var(--hi);text-decoration:none}
-.btn.on{color:var(--acc-hi)}
-.btn.on:hover{color:var(--hi)}
 ::selection{background:var(--acc);color:#fff}
 code,samp,kbd{font-family:var(--mono);font-weight:inherit;font-size:inherit} /* taste-skill-ignore: mono = artifacts semanticos (code/samp), house rule los permite dentro de semantica de codigo */
 
 html[lang="es"] .en{display:none}
 html[lang="en"] .es{display:none}
 
-/* topbar */
-.topbar{position:sticky;top:0;z-index:50;background:var(--bg-1);display:flex;align-items:center;gap:24px;padding:0 24px;height:56px}
+/* axis: narrow column riding left of centre */
+.axis{max-width:var(--col);margin:0 auto;padding:0 24px}
+section > .axis > .axis{padding:0}
+@media (min-width:1180px){.axis{margin-left:clamp(24px,17vw,330px)}}
+.wide{max-width:var(--wide)}
+
+/* topbar: wordmark, few links, one action */
+.topbar{position:sticky;top:0;z-index:50;background:var(--bg-0);display:flex;align-items:center;gap:24px;padding:0 24px;height:56px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:var(--t-body)}
 .brand svg{display:block}
-.topnav{display:flex;gap:22px;font-size:var(--t-sm);color:var(--lo);margin-left:auto}
+.topnav{display:flex;gap:22px;font-size:15px;color:var(--lo);margin-left:auto}
 .topnav a:hover{color:var(--hi)}
-.clock{font-size:var(--t-sm);color:var(--lo);font-variant-numeric:tabular-nums}
-.langs{display:flex;background:var(--bg-2);border-radius:6px;padding:2px}
-.langs button{background:none;border:none;color:var(--lo);font:500 var(--t-sm) var(--ui);padding:4px 12px;min-height:32px;border-radius:4px;cursor:pointer}
-.langs button.on{background:var(--acc);color:#fff}
-.ghbtn{background:var(--bg-2);border-radius:6px;padding:6px 14px;font-size:var(--t-sm);font-weight:500}
+.ghbtn{background:var(--bg-2);border-radius:6px;padding:6px 14px;font-size:15px;font-weight:500}
 
-/* board */
-.board{display:grid;grid-template-columns:repeat(12,1fr);gap:2px;background:var(--border);min-height:100dvh}
-.tile{background:var(--bg-1);padding:28px}
-.tile.w12{grid-column:span 12}.tile.w8{grid-column:span 8}.tile.w7{grid-column:span 7}
-.tile.w6{grid-column:span 6}.tile.w5{grid-column:span 5}.tile.w4{grid-column:span 4}
-.tile.w3{grid-column:span 3}
-.tile.dark{background:var(--bg-0)}
-.tile{position:relative}
-.tile:has(> .tag):not(.hero){padding-top:64px}
-.tag{font-family:var(--mono);font-size:var(--t-sm);color:var(--lo);position:absolute;top:28px;right:28px;margin:0;text-align:right;white-space:nowrap} /* taste-skill-ignore: mono = etiqueta de artefacto de consola, convencion del brand brief */
-.tile h2{font-size:var(--t-h2);font-weight:700;line-height:1.12;letter-spacing:-0.01em}
-.tile h3{font-size:var(--t-h3);font-weight:500;line-height:1.3}
-.lead{color:var(--lo);max-width:62ch;margin-top:14px}
+/* sections: generous vertical rhythm + one hairline divider between chapters */
+main > section{padding-top:clamp(88px,12vh,150px);padding-bottom:clamp(88px,12vh,150px)}
+main > section.hero{padding-top:clamp(72px,26vh,220px);padding-bottom:clamp(64px,9vh,110px)}
+main > section + section{position:relative}
+section.block{padding:clamp(96px,13vh,170px) 0}
+h2{font-size:var(--t-h2);font-weight:500;line-height:1.14;letter-spacing:-0.01em;text-wrap:balance}
+.sec-intro{color:var(--lo);margin-top:18px;max-width:58ch;text-wrap:pretty}
+.sec-intro b, .sec-intro strong{color:var(--hi);font-weight:500}
+p.prose{color:var(--lo);max-width:58ch;text-wrap:pretty;margin-top:14px}
 .mono{font-family:var(--mono)} /* taste-skill-ignore: mono = marca de artefactos (IPs, scores, timestamps), convencion del brand brief */
 
 /* hero */
-.hero{padding:64px 40px 56px}
-.hero .tag{margin:0 0 96px}
-.hero h1{font-size:var(--t-display);font-weight:700;line-height:1.02;letter-spacing:-0.02em;max-width:22ch;text-wrap:balance}
-.hero .lead{font-size:var(--t-h3);margin-top:20px}
-.hero .cta{margin:28px 0 96px}
-.cta a.go{display:inline-block;background:var(--acc);color:var(--ink-on-acc);font-weight:700;padding:13px 26px;border-radius:8px;font-size:var(--t-body)}
-.cta a.go:hover{filter:brightness(1.12)}
-.facts{display:flex;gap:36px;margin-top:44px;flex-wrap:wrap}
-.facts b{display:block;font-size:var(--t-h2);font-weight:700;font-variant-numeric:tabular-nums}
-.facts span{font-size:var(--t-sm);color:var(--lo)}
+.hero{padding-top:clamp(72px,26vh,220px);padding-bottom:clamp(80px,12vh,150px)}
+.hero .lnc{overflow:hidden;display:block}
+.hero h1{font-size:var(--t-display);font-weight:500;line-height:1.02;letter-spacing:-0.02em}
+.hero .lnc>.ln{display:block;transform:translateY(110%);animation:rise .9s cubic-bezier(.16,1,.3,1) forwards}
+.hero .lnc:nth-of-type(2)>.ln{animation-delay:.11s}
+@keyframes rise{to{transform:none}}
+.hero .lede{color:var(--lo);max-width:52ch;margin-top:26px;font-size:var(--t-body);opacity:0;animation:up .8s .35s ease-out forwards}
+@keyframes up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.hero .cta{margin-top:34px;display:flex;gap:22px;align-items:center;flex-wrap:wrap;opacity:0;animation:up .8s .5s ease-out forwards}
+.go{display:inline-block;background:var(--acc);color:var(--ink-on-acc);font-weight:700;padding:12px 24px;border-radius:8px;font-size:var(--t-body)}
+.go:hover{filter:brightness(1.12)}
+a.link{color:var(--acc-hi);font-size:var(--t-body)}
+a.link:hover{color:var(--hi)}
+
+/* scroll reveal */
+.rv{opacity:0;transform:translateY(22px);transition:opacity .7s ease-out,transform .7s ease-out}
+.rv.on{opacity:1;transform:none}
+.rv.d1{transition-delay:.08s}.rv.d2{transition-delay:.16s}.rv.d3{transition-delay:.24s}
 
 /* console fragments */
 [data-ui]{border-radius:10px}
-.term{background:var(--bg-0);border:1px solid var(--bg-2);font-family:var(--mono);font-size:var(--t-sm);line-height:1.75;padding:20px 22px;white-space:pre-wrap;word-break:break-word} /* taste-skill-ignore: mono = marca de artefactos (IPs, scores, timestamps), convencion del brand brief */
+.term{background:var(--bg-1);border:1px solid var(--bg-2);font-family:var(--mono);font-size:var(--t-sm);line-height:1.75;padding:20px 22px;white-space:pre-wrap;word-break:break-word} /* taste-skill-ignore: mono = marca de artefactos, convencion del brand brief */
 .term .p{color:var(--acc)}
 .term .ok{color:var(--ok)}
-.termplay{margin-top:12px;display:flex;gap:10px;align-items:center}
-.btn{background:var(--bg-2);color:var(--hi);border:none;border-radius:6px;padding:8px 16px;font:500 var(--t-sm) var(--ui);cursor:pointer}
-.btn:hover{background:#222A3E}
-.btn.on{background:var(--acc);color:var(--ink-on-acc)}
 .note{font-size:var(--t-sm);color:var(--lo)}
+.agentline{display:block;margin-top:14px;font-size:13px;word-break:break-all}
 
-/* run panel */
-.runbar{display:flex;flex-wrap:wrap;gap:18px;align-items:center;margin-bottom:18px}
-.files{display:flex;gap:8px;flex-wrap:wrap}
+/* live demo panel: 62/38 split, one tone apart */
+.panel{margin-top:44px;background:var(--bg-1);border-radius:12px;overflow:hidden}
+.panel-grid{display:grid;grid-template-columns:1.62fr 1fr}
+.pcap-bar{display:flex;gap:8px;flex-wrap:wrap;padding:18px 20px 0}
 .chip{background:var(--bg-2);color:var(--lo);border:none;border-radius:999px;padding:7px 15px;font:500 var(--t-sm) var(--ui);cursor:pointer}
 .chip.on{background:var(--acc);color:var(--ink-on-acc)}
-.runctl{display:flex;gap:22px;align-items:center;flex-wrap:wrap;margin-left:auto}
-.runctl label{font-size:var(--t-sm);color:var(--lo);display:flex;gap:10px;align-items:center}
-input[type=range]{accent-color:var(--acc);width:170px}
-input[type=checkbox]{accent-color:var(--acc);width:16px;height:16px}
-.thrval{color:var(--hi);min-width:4ch;text-align:right;font-variant-numeric:tabular-nums}
-.runstats{display:flex;gap:26px;margin-bottom:14px;flex-wrap:wrap}
+.chip:hover{color:var(--hi)}
+.chip.on:hover{color:var(--ink-on-acc)}
+.runstats{display:flex;gap:22px;padding:16px 20px 0;flex-wrap:wrap}
 .runstats div{font-size:var(--t-sm);color:var(--lo)}
 .runstats b{color:var(--hi);font-size:var(--t-h3);font-weight:700;margin-right:6px;font-variant-numeric:tabular-nums}
-#flowwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+#flowwrap{padding:14px 8px 20px 20px;height:460px;overflow-y:auto;overflow-x:auto}
 table.flows{width:100%;border-collapse:collapse;font-size:var(--t-sm)}
 table.flows samp{font-family:var(--mono);font-size:inherit;color:inherit}
 table.flows th{color:var(--lo);font-weight:400;text-align:left;padding:7px 10px;border-bottom:1px solid var(--border)}
@@ -106,69 +107,99 @@ table.flows td{padding:6px 10px;border-bottom:1px solid var(--bg-2);color:var(--
 table.flows tr:hover td{background:var(--bg-2)}
 table.flows tr.in td{animation:fadein .5s ease-out both}
 @keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-.sv{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;letter-spacing:.04em}
+.sv{display:inline-block;border-radius:999px;padding:2px 10px;font-size:var(--t-sm);font-weight:700}
 .sv.CRIT{background:rgba(239,68,68,.16);color:var(--crit)}
 .sv.HIGH{background:rgba(249,115,22,.16);color:var(--high)}
 .sv.MED{background:rgba(234,179,8,.16);color:var(--med)}
 .sv.LOW{background:rgba(59,130,246,.16);color:var(--low)}
 .sv.SUP{background:var(--bg-2);color:var(--lo)}
 .arr{color:var(--lo)}
-#flowwrap{height:560px;overflow-y:auto;overflow-x:auto}
-.scorebar{display:block;width:110px;height:6px;background:var(--bg-2);border-radius:3px;position:relative}
-.scorebar i{position:absolute;left:0;top:0;bottom:0;background:var(--acc);border-radius:3px;display:block}
+.ctl{background:var(--bg-2);padding:24px;display:flex;flex-direction:column;gap:22px}
+.ctl-row{display:flex;flex-direction:column;gap:8px}
+.ctl-row label,.ctl .cap{font-size:var(--t-sm);color:var(--lo)}
+.ctl-row .v{color:var(--hi);font-variant-numeric:tabular-nums}
+input[type=range]{accent-color:var(--acc);width:100%}
+input[type=checkbox]{accent-color:var(--acc);width:17px;height:17px}
+.toggle{display:flex;gap:10px;align-items:center;font-size:var(--t-sm);color:var(--lo)}
 canvas.hist{width:100%;height:180px;display:block}
+.ctl .kv{font-size:var(--t-sm);color:var(--lo);font-variant-numeric:tabular-nums}
+.ctl .kv b{color:var(--hi);font-weight:700;font-size:var(--t-h3)}
+.ctl .capline{margin-top:auto}
+.hint{margin-top:14px;font-size:var(--t-sm);color:var(--lo)}
 
-/* tiles: truth */
-.big{font-size:var(--t-h3);font-weight:700;font-variant-numeric:tabular-nums}
-.tinynote{font-size:var(--t-sm);color:var(--lo);margin-top:10px;max-width:66ch;text-wrap:pretty}
-.pipes{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch}
-.pipe{background:var(--bg-2);border-radius:8px;padding:14px 16px;flex:1 1 150px;min-width:150px}
-.pipe code{display:block;font-size:var(--t-sm);color:var(--acc-hi);margin-bottom:4px}
-.pipe span{font-size:var(--t-sm);color:var(--lo)}
-.pipe em{color:var(--acc);font-style:normal;margin-left:6px}
-.featlist{margin-top:16px;font-family:var(--mono);font-size:var(--t-sm);color:var(--lo);line-height:1.9} /* taste-skill-ignore: mono = marca de artefactos (IPs, scores, timestamps), convencion del brand brief */
+/* call & response (how it works / install) */
+.exchange{margin-top:64px}
+.exchange:first-of-type{margin-top:56px}
+.exchange .ask{font-size:var(--t-h3);font-weight:500}
+.exchange .call{margin-top:16px;background:var(--bg-1);border:1px solid var(--line);border-radius:8px;padding:18px 22px;font-family:var(--mono);font-size:var(--t-sm);line-height:1.8;white-space:pre-wrap;word-break:break-word;cursor:default} /* taste-skill-ignore: mono = bloque de comando literal (codigo real de CLI) */
+.exchange .call .cmd{color:var(--hi);cursor:pointer;border-radius:4px}
+.exchange .call .cmd:hover{background:var(--bg-2)}
+.call,.call code,.term,.term code{font-family:var(--mono)}
+.exchange .resp{margin-left:56px;margin-top:16px}
+.exchange .resp p{color:var(--lo);max-width:52ch}
+.exchange .resp .term{cursor:default}
+.featlist{margin-top:14px;font-family:var(--mono);font-size:var(--t-sm);color:var(--lo);line-height:1.9} /* taste-skill-ignore: mono = lista de nombres de features = artefacto de consola */
 .featlist b{color:var(--hi);font-weight:400}
+summary{cursor:pointer;color:var(--acc-hi);font-size:var(--t-body);margin-top:22px}
+summary:hover{color:var(--hi)}
 
-/* shots */
-.shot{background:var(--bg-2);border-radius:10px;overflow:hidden;height:100%;display:flex;flex-direction:column}
-.shot img{width:100%;display:block;flex:1;object-fit:cover;object-position:top}
-.shot figcaption{font-size:var(--t-sm);color:var(--lo);padding:12px 16px;background:var(--bg-1)}
+/* screens */
+.shots{margin-top:44px;display:grid;grid-template-columns:1fr 1fr;gap:2px;border-radius:12px;overflow:hidden}
+.shot{background:var(--bg-1)}
+.shot img{width:100%;display:block;aspect-ratio:16/9;object-fit:contain;background:var(--bg-0)}
+.shot figcaption{font-size:var(--t-sm);color:var(--lo);padding:14px 18px}
 .shot figcaption b{color:var(--hi);font-weight:700}
 
-/* install */
-.install .term{cursor:pointer}
-.install .cmd{color:var(--hi)}
-.install .cmd:hover{background:var(--bg-2)}
+/* honest numbers */
+.num{margin-top:56px}
+.num:first-of-type{margin-top:44px}
+.num b{font-size:clamp(34px,4.4vw,52px);font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:-0.01em;display:block;line-height:1.08}
+.num .arr{color:var(--lo)}
+.num p{color:var(--lo);margin-top:12px;max-width:56ch;text-wrap:pretty}
 
-/* footer */
-footer{padding:36px 40px;background:var(--bg-1);display:flex;gap:26px;flex-wrap:wrap;align-items:center;font-size:var(--t-sm);color:var(--lo)}
+/* live hub strip */
+.hubline{margin-top:44px;display:flex;gap:22px;align-items:center;flex-wrap:wrap}
+
+/* final CTA: almost empty screen */
+.endcta{background:var(--bg-1);padding-top:clamp(64px,9vh,110px);padding-bottom:clamp(64px,9vh,110px)}
+.endcta p{font-size:21px;font-weight:400;max-width:34ch;line-height:1.4}
+.endcta .cta2{margin-top:26px;display:flex;gap:22px;align-items:center;flex-wrap:wrap}
+
+.btn{background:var(--bg-2);color:var(--hi);border:none;border-radius:6px;padding:8px 16px;font:500 var(--t-sm) var(--ui);cursor:pointer}
+.btn:hover{background:#222A3E}
+.btnrow{margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+/* footer: one quiet line */
+footer{padding:32px 24px;display:flex;gap:26px;flex-wrap:wrap;align-items:center;font-size:var(--t-sm);color:var(--lo)}
 footer a{color:var(--hi)}
 
 @media (max-width:1080px){
-  .board{display:block}
-  .tile{margin-bottom:2px}
-  .topnav{display:none}
-  #screens>div{grid-template-columns:1fr 1fr !important}
+  .axis{max-width:var(--wide);margin-left:auto;margin-right:auto}
+}
+@media (max-width:860px){
+  .panel-grid{grid-template-columns:1fr}
+  .ctl{order:-1}
 }
 @media (max-width:680px){
-  #screens>div{grid-template-columns:1fr !important}
-  .tile h2{font-size:24px}
-  .big,.f1{font-size:21px}
-  .tile{padding:22px}
-  .hero{padding:44px 22px}
-  .tag{position:static;max-width:none;text-align:left;margin:0 0 14px}
-  .tile:has(> .tag){padding-top:22px}
-  .runctl{margin-left:0}
-  .hide-s{display:none}
-  table.flows td,table.flows th{padding:6px 7px}
-  table.flows{min-width:480px}
-table.flows td samp{white-space:nowrap}
+  .topnav{display:none}
+  .axis{padding:0 20px}
+  .hero{padding-top:64px}
+  .hero h1{font-size:9.4vw}
+  .shots{grid-template-columns:1fr}
+  .exchange .resp{margin-left:0}
+  .endcta{padding-top:24svh;padding-bottom:16svh}
+  .endcta p{font-size:19px}
+  table.flows{min-width:440px}
+  table.flows td samp{white-space:nowrap}
   .topbar{gap:12px;padding:0 14px}
-  .clock{display:none}
   .ghbtn{padding:6px 10px;font-size:14px}
   .topbar{position:static}
-  .facts{gap:22px}
-  input[type=range]{width:130px}
+}
+@media (prefers-reduced-motion:reduce){
+  .hero .lnc>.ln{transform:none;animation:none}
+  .hero .lede,.hero .cta{opacity:1;animation:none}
+  .rv{opacity:1;transform:none;transition:none}
+  html{scroll-behavior:auto}
 }
 </style>
 </head>
@@ -186,155 +217,172 @@ table.flows td samp{white-space:nowrap}
     <a href="#truth"><span class="en">Honest numbers</span><span class="es">Números honestos</span></a>
     <a href="#install"><span class="en">Install</span><span class="es">Instalación</span></a>
   </nav>
-  <span class="clock" id="clock">--:--:--</span>
-  <div class="langs" role="group" aria-label="Language">
-    <button id="b-en" onclick="setLang('en')">EN</button>
-    <button id="b-es" onclick="setLang('es')">ES</button>
-  </div>
   <a class="ghbtn" href="https://github.com/thempra/qzero">GitHub ↗</a>
 </header>
 
-<main class="board" id="top">
+<main id="top">
 
-  <!-- HERO -->
-  <section class="tile dark w12 hero">
-    <h1><span class="en">See the attack<br>before its signature.</span><span class="es">Detecta el ataque<br>antes de la firma.</span></h1>
-    <p class="lead"><span class="en">QZero is an open-source, self-hosted NDR. A Quantum-Inspired Variational Autoencoder learns what normal looks like on your network and scores every flow with a continuous number, not a boolean. Zero signatures. Zero cloud.</span><span class="es">QZero es un NDR open source y autoalojado. Un autoencoder variacional inspirado en computación cuántica aprende qué es normal en tu red y puntúa cada flujo con un número continuo, no un booleano. Cero firmas. Cero nube.</span></p>
-    <p class="cta"><a class="go" href="https://github.com/thempra/qzero"><span class="en">Download QZero free</span><span class="es">Descargar QZero gratis</span></a></p>
-    <div class="facts">
-      <div><b id="f-flows">2 942</b><span><span class="en">real flows scored below</span><span class="es">flujos reales puntuados abajo</span></span></div>
-      <div><b>0</b><span><span class="en">signatures needed</span><span class="es">firmas necesarias</span></span></div>
-      <div><b>16 050</b><span><span class="en">flows/s scoring, CPU-only</span><span class="es">flujos/s puntuando, solo CPU</span></span></div>
-      <div><b>100%</b><span><span class="en">self-hosted</span><span class="es">autoalojado</span></span></div>
-    </div>
+  <!-- HERO: type and space, one action -->
+  <section class="axis hero">
+    <h1 aria-label="Detecta el ataque antes de la firma.">
+      <span class="lnc"><span class="ln"><span class="es">Detecta el ataque</span><span class="en">See the attack</span></span></span>
+      <span class="lnc"><span class="ln"><span class="es">antes de la firma.</span><span class="en">before its signature.</span></span></span>
+    </h1>
+    <p class="lede"><span class="en">QZero is an open-source, self-hosted NDR. A quantum-inspired variational autoencoder learns what normal looks like on your network and scores every flow with a continuous number, not a boolean. Zero signatures. Zero cloud.</span><span class="es">QZero es un NDR open source y autoalojado. Un autoencoder variacional inspirado en computación cuántica aprende qué es normal en tu red y puntúa cada flujo con un número continuo, no un booleano. Cero firmas. Cero nube.</span></p>
+    <p class="cta"><a class="go" href="https://github.com/thempra/qzero"><span class="en">Download QZero free</span><span class="es">Descargar QZero gratis</span></a>
+      <a class="link" href="#run"><span class="en">or watch it score real traffic ↓</span><span class="es">o míralo puntuar tráfico real ↓</span></a></p>
   </section>
 
-  <!-- LIVE RUN PANEL -->
-  <section class="tile w8" id="run">
-    <p class="tag mono"><code>qzero analyze · <span class="en">recorded run, 2026-10-16</span><span class="es">captura grabada, 2026-10-16</span></code></p>
-    <div class="runbar">
-      <div class="files" id="files">
+  <!-- LIVE DEMO: one panel, real ledger, working controls -->
+  <section class="axis wide" id="run">
+    <h2 class="rv"><span class="en">A capture, scored live.</span><span class="es">Una captura, puntuada en directo.</span></h2>
+    <p class="sec-intro rv d1"><span class="en">Everything below is real: <b id="f-flows">2 942</b> flows extracted from five labeled PCAPs shipped in the repo, each scored by the actual engine (qzero-candidate, method=best). No row was hand-picked. The one part that is a demo control is the threshold — the scores are not.</span><span class="es">Todo lo de abajo es real: <b id="f-flows2">2 942</b> flujos extraídos de cinco PCAP etiquetados que viven en el repo, cada uno puntuado por el motor real (qzero-candidate, method=best). Ninguna fila está elegida a mano. Lo único que es control de demostración es el umbral; los scores no.</span></p>
+    <div class="panel rv d2" data-ui>
+      <div class="pcap-bar" id="files">
         <button class="chip on" data-f="exfil">exfiltration.pcap</button>
         <button class="chip" data-f="brute">bruteforce.pcap</button>
         <button class="chip" data-f="ddos">ddos.pcap</button>
         <button class="chip" data-f="malware">malware.pcap</button>
         <button class="chip" data-f="normal">normal.pcap</button>
       </div>
-      <div class="runctl">
-        <label><span class="en">severity threshold</span><span class="es">umbral de severidad</span>
-          <input type="range" id="thr" min="18" max="24.5" step="0.1" value="23.2">
-          <span class="thrval mono" id="thrv">23.2</span>
-        </label>
-        <label><span class="en">PostFilter</span><span class="es">PostFilter</span>
-          <input type="checkbox" id="pf" checked>
-        </label>
+      <div class="runstats">
+        <div><b id="s-flows">600</b><span class="en">flows</span><span class="es">flujos</span></div>
+        <div><b id="s-alerts">106</b><span class="en">alerts above threshold</span><span class="es">alertas sobre umbral</span></div>
+        <div><b id="s-sup">494</b><span class="en">silenced by PostFilter</span><span class="es">silenciadas por PostFilter</span></div>
+      </div>
+      <div class="panel-grid">
+        <div id="flowwrap" class="wrap-x">
+          <table class="flows" aria-label="flow ledger">
+            <thead><tr>
+              <th><span class="en">source</span><span class="es">origen</span></th>
+              <th><span class="en">destination</span><span class="es">destino</span></th>
+              <th class="hide-s"><span class="en">proto</span><span class="es">proto</span></th>
+              <th>score</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="flows"><tr><td colspan="5" class="note">loading assets/ledger.json …</td></tr></tbody>
+          </table>
+        </div>
+        <aside class="ctl">
+          <div class="ctl-row">
+            <label for="thr"><span class="en">severity threshold</span><span class="es">umbral de severidad</span> · <span class="v" id="thrv">23.2</span></label>
+            <input type="range" id="thr" min="18" max="24.5" step="0.1" value="23.2">
+          </div>
+          <label class="toggle"><input type="checkbox" id="pf" checked> PostFilter</label>
+          <div class="ctl-row">
+            <span class="cap"><span class="en">score distribution, this capture</span><span class="es">distribución de scores, esta captura</span></span>
+            <canvas class="hist" id="hist" width="560" height="360"></canvas>
+          </div>
+          <p class="kv capline"><span class="en">16 050 flows/s on CPU · 0 signatures · 100% self-hosted</span><span class="es">16 050 flujos/s en CPU · 0 firmas · 100% autoalojado</span></p>
+        </aside>
       </div>
     </div>
-    <div class="runstats">
-      <div><b id="s-flows">600</b><span class="en">flows</span><span class="es">flujos</span></div>
-      <div><b id="s-alerts">494</b><span class="en">alerts above threshold</span><span class="es">alertas sobre umbral</span></div>
-      <div><b id="s-sup">106</b><span class="en">silenced by PostFilter</span><span class="es">silenciadas por PostFilter</span></div>
-    </div>
-    <div id="flowwrap" data-ui>
-      <table class="flows" aria-label="flow ledger">
-        <thead><tr>
-          <th><span class="en">source</span><span class="es">origen</span></th>
-          <th><span class="en">destination</span><span class="es">destino</span></th>
-          <th class="hide-s"><span class="en">proto</span><span class="es">proto</span></th>
-          <th>score</th>
-          <th></th>
-        </tr></thead>
-        <tbody id="flows"><tr><td colspan="5" class="note">loading assets/ledger.json …</td></tr></tbody>
-      </table>
-    </div>
-    <p class="tinynote"><span class="en">Every row is a real flow: 5-tuple and anomaly score emitted by the real engine (qzero-candidate, method=best) over the repo's labeled PCAPs. The threshold and severity bands are a demo control. The scores are not. Drag the slider: the same traffic crosses normal → medium → high. Signature-based NDRs cannot do that; the score exists before any name does.</span><span class="es">Cada fila es un flujo real: 5-tupla y score de anomalía emitidos por el motor real (qzero-candidate, method=best) sobre los PCAP etiquetados del repo. El umbral y las bandas de severidad son un control de demostración. Los scores no. Mueve el deslizador: el mismo tráfico cruza normal → medium → high. Un NDR de firmas no puede hacerlo; el score existe antes que cualquier nombre.</span></p>
-  </section>
-
-  <!-- HISTOGRAM + TERMINAL -->
-  <aside class="tile w4 dark">
-    <p class="tag mono"><code><span class="en">score distribution, this capture</span><span class="es">distribución de scores, esta captura</span></code></p>
-    <canvas class="hist" id="hist" width="560" height="360"></canvas>
-    <p class="tinynote"><span class="en">The output of QZero is this curve, not a rule list.</span><span class="es">La salida de QZero es esta curva, no una lista de reglas.</span></p>
-  </aside>
-
-  <!-- CLI OUTPUT: own tile, terminal fragment isolated -->
-  <section class="tile w4 dark" id="clip" style="padding-bottom:110px">
-    <p class="tag mono"><code>$ qzero analyze <span class="en">(output real)</span><span class="es">(salida real)</span></code></p>
-    <pre class="term" id="hero-term" data-ui></pre>
-    <div class="termplay">
-      <button class="btn" id="replay">▸ <span class="en">Replay</span><span class="es">Repetir</span></button>
+    <p class="hint rv d3"><span class="en">Mueve el umbral: el mismo tráfico cruza normal → medium → high. Un NDR de firmas no puede hacerlo; el score existe antes que cualquier nombre.</span><span class="es">Drag the threshold: the same traffic crosses normal → medium → high. A signature-based NDR cannot do that — the score exists before any name does.</span></p>
+    <div class="btnrow rv d3">
+      <button class="btn" id="replay">▸ <span class="en">Replay the CLI run</span><span class="es">Repetir la pasada por CLI</span></button>
       <span class="note"><span class="en">verbatim stdout, 2026-10-16</span><span class="es">stdout literal, 2026-10-16</span></span>
     </div>
+    <pre class="term rv d3" id="hero-term" data-ui style="margin-top:14px"><code></code></pre>
   </section>
 
-  <!-- HOW IT WORKS -->
-  <section class="tile w12" id="how">
-    <h2><span class="en">Principle of operation: from raw traffic to alert.</span><span class="es">Principio de operación: del tráfico en bruto a la alerta.</span></h2>
-    <div class="pipes" style="margin-top:24px">
-      <div class="pipe"><code>capture →</code><span><span class="en">A lightweight agent taps the interface, or you feed it a PCAP.</span><span class="es">Un agente ligero captura la interfaz, o le pasas un PCAP.</span></span></div>
-      <div class="pipe"><code>featurize</code><span><span class="en">14 flow features per flow, in real time.</span><span class="es">14 features por flujo, en tiempo real.</span></span></div>
-      <div class="pipe"><code>score</code><span><span class="en">The VAE detects what nobody has seen; the quantum-kernel SVM separates threat from noise.</span><span class="es">El VAE detecta lo que nadie ha visto; la SVM con kernel cuántico separa amenaza de ruido.</span></span></div>
-      <div class="pipe"><code>threshold →</code><span><span class="en">One continuous anomaly score per flow. You set where normal ends.</span><span class="es">Un score continuo por flujo. Tú decides dónde acaba lo normal.</span></span></div>
-      <div class="pipe"><code>postfilter →</code><span><span class="en">Silences broadcast and discovery noise (SSDP, mDNS, DNS chit-chat) before you see an alert.</span><span class="es">Silencia ruido de difusión y descubrimiento (SSDP, mDNS, DNS) antes de que veas una alerta.</span></span></div>
-      <div class="pipe dark" style="background:var(--bg-0)"><code>alert</code><span><span class="en">Telegram notification, hub console, REST. Self-hosted end to end.</span><span class="es">Telegram, consola hub, REST. Autoalojado de principio a fin.</span></span></div>
+  <!-- HOW IT WORKS: call & response -->
+  <section id="how">
+    <div class="axis">
+      <h2 class="rv"><span class="en">From raw traffic to alert, in three moves.</span><span class="es">Del tráfico en bruto a la alerta, en tres pasos.</span></h2>
+      <p class="sec-intro rv d1"><span class="en">QZero has no rule database to fall back on. What it has is a pipeline you can read end to end: it listens, it scores, and only then it decides. Here is each step as what you give it and what comes back.</span><span class="es">QZero no tiene una base de reglas a la que agarrarse. Lo que tiene es un pipeline legible de principio a fin: escucha, puntúa, y solo entonces decide. Aquí tienes cada paso como lo que le das y lo que devuelve.</span></p>
+
+      <div class="exchange rv">
+        <p class="ask"><span class="en">First, it listens.</span><span class="es">Primero, escucha.</span></p>
+        <pre class="call" data-ui><code>$ qzero agent --interface eth0 --hub http://HUB:8000</code></pre>
+        <div class="resp"><p><span class="en">A lightweight agent taps the interface — or you simply hand it a PCAP. It extracts 14 features per flow in real time: duration, packet and byte counts, direction asymmetries, inter-arrival times, flags.</span><span class="es">Un agente ligero captura la interfaz, o le pasas un PCAP directamente. Extrae 14 features por flujo en tiempo real: duración, paquetes y bytes por dirección, asimetrías, tiempos entre paquetes, flags.</span></p>
+        <details>
+          <summary><span class="en">the 14 features the engine actually reads</span><span class="es">los 14 features que el motor lee de verdad</span></summary>
+          <p class="featlist"><code><b>flow_duration</b> · total_fwd_packets · total_bwd_packets · total_length_fwd_packets · total_length_bwd_packets · <b>flow_bytes_per_sec</b> · flow_packets_per_sec · fwd_packet_length_mean · bwd_packet_length_mean · <b>fwd_iat_mean</b> · bwd_iat_mean · fwd_psh_flags · bwd_psh_flags · fwd_urg_flags</code></p>
+        </details></div>
+      </div>
+
+      <div class="exchange rv">
+        <p class="ask"><span class="en">Then, it scores.</span><span class="es">Después, puntúa.</span></p>
+        <pre class="call" data-ui><code>$ qzero analyze suspicious.pcap --model-dir models/qzero-candidate</code></pre>
+        <div class="resp"><p><span class="en">A variational autoencoder trained only on normal traffic reconstructs each flow; the harder the reconstruction, the stranger the flow. A quantum-kernel SVM then separates threat from noise. The output is one continuous score per flow — you decide where normal ends, and a PostFilter silences discovery chatter (SSDP, mDNS) before you see an alert.</span><span class="es">Un autoencoder variacional entrenado solo con tráfico normal reconstruye cada flujo. Cuanto más le cuesta, más extraño es el flujo. Una SVM con kernel cuántico separa después amenaza de ruido. El resultado es un score continuo por flujo: tú decides dónde acaba lo normal. Un PostFilter silencia el ruido de descubrimiento (SSDP, mDNS) antes de que veas una alerta.</span></p></div>
+      </div>
+
+      <div class="exchange rv">
+        <p class="ask"><span class="en">Finally, it tells you.</span><span class="es">Por último, te avisa.</span></p>
+        <pre class="call" data-ui><code>$ qzero server --port 8000   <span class="note"># hub + REST + console</span></code></pre>
+        <div class="resp"><p><span class="en">Telegram notification, hub console, REST API. The whole chain — capture to alert — runs on your own hardware. Nothing phones home, because there is no home to phone.</span><span class="es">Notificación por Telegram, consola de hub, API REST. La cadena completa, de la captura a la alerta, corre en tu hardware. Nada llama a casa, porque no hay casa a la que llamar.</span></p></div>
+      </div>
     </div>
-    <details style="margin-top:18px">
-      <summary class="note" style="cursor:pointer"><span class="en">the 14 features the engine actually reads</span><span class="es">los 14 features que el motor lee de verdad</span></summary>
-      <p class="featlist"><code><b>flow_duration</b> · total_fwd_packets · total_bwd_packets · total_length_fwd_packets · total_length_bwd_packets · <b>flow_bytes_per_sec</b> · flow_packets_per_sec · fwd_packet_length_mean · bwd_packet_length_mean · <b>fwd_iat_mean</b> · bwd_iat_mean · fwd_psh_flags · bwd_psh_flags · fwd_urg_flags</code></p>
-    </details>
   </section>
 
-  <!-- SCREENS mosaic -->
-  <section class="tile dark w8" id="screens" style="padding:0;background:var(--border)">
-    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:2px">
-      <figure class="shot"><img src="assets/overview.webp" alt="Overview screen of the QZero console" loading="lazy"><figcaption><b>Overview</b> · <span class="en">KPIs, severity mix, agent health</span><span class="es">KPIs, severidades, salud de agentes</span></figcaption></figure>
-      <figure class="shot"><img src="assets/alerts.webp" alt="Alerts feed of the QZero console" loading="lazy"><figcaption><b>Alerts</b> · <span class="en">live 5-tuple feed</span><span class="es">flujo 5-tupla en vivo</span></figcaption></figure>
-      <figure class="shot"><img src="assets/threats.webp" alt="Threats view of the QZero console" loading="lazy"><figcaption><b>Threats</b> · <span class="en">grouped, explained</span><span class="es">agrupadas, explicadas</span></figcaption></figure>
-      <figure class="shot"><img src="assets/network.webp" alt="Network flows of the QZero console" loading="lazy"><figcaption><b>Network</b> · <span class="en">top talkers, protocols</span><span class="es">top talkers, protocolos</span></figcaption></figure>
-      <figure class="shot"><img src="assets/agents.webp" alt="Agent fleet of the QZero console" loading="lazy"><figcaption><b>Agents</b> · <span class="en">sensor fleet, heartbeat</span><span class="es">flota de sensores, heartbeat</span></figcaption></figure>
-      <figure class="shot"><img src="assets/research.webp" alt="Research screen of the QZero console" loading="lazy"><figcaption><b>Research</b> · <span class="en">benchmarks, retraining</span><span class="es">benchmarks, reentrenamiento</span></figcaption></figure>
+  <!-- SCREENS -->
+  <section class="axis wide" id="screens">
+    <h2 class="rv"><span class="en">Six screens, same software.</span><span class="es">Seis pantallas, el mismo software.</span></h2>
+    <p class="sec-intro rv d1"><span class="en">The hub is not a demo skin over fake data. These are real captures from the running instance, at real size.</span><span class="es">El hub no es una piel de demostración sobre datos falsos. Estas son capturas reales de la instancia en marcha, a tamaño real.</span></p>
+    <div class="shots rv d2">
+      <figure class="shot"><img src="assets/overview.webp" alt="Overview screen of the QZero console" loading="lazy"><figcaption><b>Overview</b> — <span class="en">KPIs, severity mix and agent health at a glance</span><span class="es">KPIs, mezcla de severidades y salud de agentes</span></figcaption></figure>
+      <figure class="shot"><img src="assets/alerts.webp" alt="Alerts feed of the QZero console" loading="lazy"><figcaption><b>Alerts</b> — <span class="en">the 5-tuple alert stream, live, with scores</span><span class="es">el flujo de alertas 5-tupla en vivo, con scores</span></figcaption></figure>
+      <figure class="shot"><img src="assets/threats.webp" alt="Threats view of the QZero console" loading="lazy"><figcaption><b>Threats</b> — <span class="en">threats grouped by pattern, explained per flow</span><span class="es">amenazas agrupadas por patron, explicadas por flujo</span></figcaption></figure>
+      <figure class="shot"><img src="assets/network.webp" alt="Network flows of the QZero console" loading="lazy"><figcaption><b>Network</b> — <span class="en">top talkers and protocol mix across the network</span><span class="es">top talkers y mezcla de protocolos de la red</span></figcaption></figure>
+      <figure class="shot"><img src="assets/research.webp" alt="Research screen of the QZero console" loading="lazy"><figcaption><b>Research</b> — <span class="en">benchmarks and retraining runs, all reproducible</span><span class="es">benchmarks y reentrenamientos, todo reproducible</span></figcaption></figure>
+      <figure class="shot"><img src="assets/agents.webp" alt="Agent fleet of the QZero console" loading="lazy"><figcaption><b>Agents</b> — <span class="en">the agent fleet with per-interface heartbeat</span><span class="es">la flota de agentes con heartbeat por interfaz</span></figcaption></figure>
     </div>
   </section>
 
   <!-- HONEST NUMBERS -->
-  <aside class="tile w4" id="truth">
-    <p class="tag mono"><code>§2 · <span class="en">honest numbers</span><span class="es">números honestos</span></code></p>
-    <p class="big">F1 0.711 <span class="arr">/</span> 0.707</p>
-    <p class="tinynote"><span class="en">QSVM vs classical svm_linear on our 5 labeled PCAPs, 2026-10-14, CV=1. The quantum kernel is not magically better, and this page will not pretend it is. The argument is elsewhere: no signatures, unsupervised, the score exists before the name.</span><span class="es">QSVM frente a svm_linear clásico en nuestros 5 PCAP etiquetados, 2026-10-14, CV=1. El kernel cuántico no es mágicamente mejor, y esta página no va a fingir que lo es. El argumento está en otro lado: sin firmas, sin supervisión, el score existe antes que el nombre.</span></p>
-    <p class="big" style="margin-top:26px">100.0%</p>
-    <p class="tinynote"><span class="en">Yes, the candidate model flags the normal.pcap at 100% too. It is a retraining candidate, and that is why this page shows raw scores and a threshold you control, never a friendly green "all clear".</span><span class="es">Sí, el candidato también marca el normal.pcap al 100 %. Es un candidato en reentrenamiento, y por eso esta página muestra scores crudos y un umbral que controlas, nunca un verde "todo despejado" de cortesía.</span></p>
-    <p class="big" style="margin-top:26px">MIT</p>
-    <p class="tinynote"><span class="en">Source, models, benchmarks and labeled PCAPs live in the open. Auditing it is the point.</span><span class="es">Código, modelos, benchmarks y PCAP etiquetados viven en abierto. Auditarlo es el objetivo.</span></p>
-  </aside>
-
-  <!-- LIVE CONSOLE -->
-  <aside class="tile w4 dark">
-    <p class="tag mono"><code>§3 · <span class="en">watch it work</span><span class="es">míralo en marcha</span></code></p>
-    <h3><span class="en">A real instance, watching a real network, right now.</span><span class="es">Una instancia real, vigilando una red real, ahora mismo.</span></h3>
-    <p class="tinynote" style="margin-top:12px"><span class="en">The production hub at qzero.thempra.net is the same software this page describes. Open source means you can verify every claim above in the repo, or run it in ten minutes.</span><span class="es">El hub de producción en qzero.thempra.net es el mismo software que esta página describe. Open source significa que puedes verificar cada afirmación en el repo, o ejecutarlo en diez minutos.</span></p>
-    <p style="margin-top:18px"><a class="btn on" style="display:inline-block;padding:10px 18px" href="https://qzero.thempra.net"><span class="en">Open live console ↗</span><span class="es">Abrir consola en vivo ↗</span></a></p>
-  </aside>
-
-  <!-- INSTALL -->
-  <section class="tile w8 install" id="install">
-    <p class="tag mono"><code>§4 · <span class="en">install, and it answers back</span><span class="es">instálalo, y responde</span></code></p>
-    <p class="lead" style="margin:0 0 16px;max-width:62ch"><span class="en">Click a command to run it in the console on this page. The answer is recorded stdout from a real machine, not a mockup.</span><span class="es">Pulsa un comando para ejecutarlo en la consola de esta página. La respuesta es stdout grabado en una máquina real, no un simulacro.</span></p>
-    <pre class="term" data-ui><span class="cmd" data-out="install1">$ git clone https://github.com/thempra/qzero.git && cd qzero</span>
-<span class="cmd" data-out="install2">$ pip install -e ".[all]"</span>
-<span class="cmd" data-out="hero">$ qzero analyze suspicious.pcap --model-dir models/qzero-candidate</span>
-<span class="cmd" data-out="hub">$ qzero server --port 8000   <span class="note"># hub + REST + console</span></span></pre>
-    <div class="termplay">
-      <button class="btn" id="copybtn"><span class="en">Copy all</span><span class="es">Copiar todo</span></button>
-      <span class="note"><span class="en">agent: pip install "qzero[agent]" && qzero agent --interface eth0 --hub http://HUB:8000</span><span class="es">agente: pip install "qzero[agent]" && qzero agent --interface eth0 --hub http://HUB:8000</span></span>
+  <section class="axis" id="truth">
+    <h2 class="rv"><span class="en">Numbers that do not flatter us.</span><span class="es">Números que no nos favorecen.</span></h2>
+    <p class="sec-intro rv d1"><span class="en">Security tools love to quote one lucky benchmark. We would rather show you the whole bench, including the parts where the quantum kernel loses. Open source means you can re-run every number here; auditing it is the point.</span><span class="es">Las herramientas de seguridad encantan de citar un benchmark afortunado.  Preferimos enseñarte el banco completo, incluidas las partes donde el kernel cuántico pierde. Open source significa que puedes volver a ejecutar cada número; auditarlo es el objetivo.</span></p>
+    <div class="num rv">
+      <b>F1 0.711 <span class="arr">/</span> 0.707</b>
+      <p><span class="en">QSVM against classical svm_linear on our 5 labeled PCAPs, 2026-10-14, CV=1. The quantum kernel is not magically better, and this page will not pretend it is. The argument is elsewhere: no signatures, unsupervised, the score exists before the name.</span><span class="es">QSVM frente a svm_linear clásico en nuestros 5 PCAP etiquetados, 2026-10-14, CV=1. El kernel cuántico no es mágicamente mejor, y esta página no va a fingir que lo es. El argumento está en otro lado: sin firmas, sin supervisión, el score existe antes que el nombre.</span></p>
+    </div>
+    <div class="num rv">
+      <b>100.0%</b>
+      <p><span class="en">Yes, the candidate model also flags normal.pcap at 100%. It is a retraining candidate — and that is exactly why this page shows raw scores and a threshold you control, never a friendly green "all clear".</span><span class="es">Sí, el candidato también marca el normal.pcap al 100%. Es un candidato en reentrenamiento. Por eso esta página muestra scores crudos y un umbral que controlas, nunca un verde "todo despejado" de cortesía.</span></p>
+    </div>
+    <div class="num rv">
+      <b>MIT</b>
+      <p><span class="en">Source, models, benchmarks and labeled PCAPs live in the open. Everything this page claims was produced with code you can check out today.</span><span class="es">Código, modelos, benchmarks y PCAP etiquetados viven en abierto. Todo lo que esta página afirma se produjo con código que puedes descargar hoy mismo.</span></p>
     </div>
   </section>
+
+  <!-- INSTALL: call & response, ends with the live hub -->
+  <section class="axis" id="install">
+    <h2 class="rv"><span class="en">Install it, and it answers back.</span><span class="es">Instálalo, y responde.</span></h2>
+    <p class="sec-intro rv d1"><span class="en">Click any command below and the console above replays its real output — stdout recorded on a real machine, not a mockup. Four commands from clone to hub.</span><span class="es">Pulsa cualquier comando de abajo y la consola repite su respuesta real: stdout grabado en una máquina real, no un simulacro. Cuatro comandos del clone al hub.</span></p>
+    <div class="exchange rv">
+      <pre class="call" data-ui><code><span class="cmd" data-out="install1">$ git clone https://github.com/thempra/qzero.git && cd qzero</span>
+<span class="cmd" data-out="install2">$ pip install -e ".[all]"</span></code></pre>
+      <div class="resp"><p><span class="en">Python 3.10+, no GPU required for scoring (the quantum-kernel SVM trains on CPU).</span><span class="es">Python 3.10+, sin GPU para puntuar (la SVM con kernel cuántico entrena en CPU).</span></p></div>
+    </div>
+    <div class="exchange rv">
+      <pre class="call" data-ui><code><span class="cmd" data-out="hero">$ qzero analyze suspicious.pcap --model-dir models/qzero-candidate</span></code></pre>
+      <div class="resp"><p><span class="en">The engine loads the VAE and SVM and scores every flow in the file.</span><span class="es">El motor carga el VAE y la SVM y puntúa cada flujo del archivo.</span></p></div>
+    </div>
+    <div class="exchange rv">
+      <pre class="call" data-ui><code><span class="cmd" data-out="hub">$ qzero server --port 8000</span></code></pre>
+      <div class="resp">
+        <p><span class="en">Hub, REST API and console on your machine. Not convinced yet? The production hub below is this same software, watching a real network right now.</span><span class="es">Hub, API REST y consola en tu máquina. ¿Todavía no te convence? El hub de producción de abajo es este mismo software, vigilando una red real ahora mismo.</span></p>
+        <p class="hubline"><a class="go" href="https://qzero.thempra.net"><span class="en">Open live console ↗</span><span class="es">Abrir consola en vivo ↗</span></a>
+          <code class="note agentline">pip install "qzero[agent]" && qzero agent --interface eth0 --hub http://HUB:8000</code></p>
+        <p class="btnrow"><button class="btn" id="copybtn"><span class="en">Copy all commands</span><span class="es">Copiar todos los comandos</span></button></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA: one sentence, one action, on a colour field -->
+  <section class="endcta"><div class="axis">
+    <p><span class="en">Put it on a network of your own and see what it finds in the first ten minutes.</span><span class="es">Ponlo en una red tuya y mira lo que encuentra en los primeros diez minutos.</span></p>
+    <div class="cta2"><a class="go" href="https://github.com/thempra/qzero"><span class="en">Download QZero free</span><span class="es">Descargar QZero gratis</span></a>
+      <a class="link" href="https://qzero.thempra.net"><span class="en">or watch the live hub</span><span class="es">o mira el hub en vivo</span></a></div>
+  </div></section>
 
 </main>
 
 <footer>
   <span>QZero · MIT · <span class="en">self-hosted</span><span class="es">autoalojado</span></span>
   <a href="https://github.com/thempra/qzero">github.com/thempra/qzero</a>
-  <a href="https://qzero.thempra.net">qzero.thempra.net</a>
   <span style="margin-left:auto"><span class="en">run recorded 2026-10-16 · ledger: 2 942 flows</span><span class="es">captura grabada 2026-10-16 · ledger: 2 942 flujos</span></span>
 </footer>
 
@@ -342,18 +390,16 @@ table.flows td samp{white-space:nowrap}
 /* ---------- i18n ---------- */
 function setLang(l){
   document.documentElement.lang=l;
-  document.getElementById('b-en').classList.toggle('on',l==='en');
-  document.getElementById('b-es').classList.toggle('on',l==='es');
-  try{localStorage.setItem('qzero-lang',l)}catch(e){}
   if(typeof render==='function')render();
 }
 (function(){var s=null;try{s=localStorage.getItem('qzero-lang')}catch(e){}
  setLang(s||(navigator.language.startsWith('es')?'es':'en'));})();
 
-/* ---------- clock ---------- */
-setInterval(function(){
-  document.getElementById('clock').textContent=new Date().toTimeString().slice(0,8);
-},1000);
+/* ---------- scroll reveal ---------- */
+(function(){
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('on');io.unobserve(e.target)}})},{threshold:.12});
+  document.querySelectorAll('.rv').forEach(function(el){io.observe(el)});setTimeout(function(){document.querySelectorAll('.rv').forEach(function(x){x.classList.add('in')})},400);
+})();
 
 /* ---------- hero terminal (verbatim run) ---------- */
 var RUN=[
@@ -373,7 +419,7 @@ var HERO_OUT={
 };
 var termEl=document.getElementById('hero-term'),playT=null;
 function play(lines,el){
-  clearTimeout(playT);el.textContent='';
+  clearTimeout(playT);el.innerHTML='<code></code>';el=el.querySelector('code');
   var i=0;
   (function next(){
     if(i>=lines.length)return;
@@ -384,12 +430,15 @@ function play(lines,el){
     playT=setTimeout(next,140);
   })();
 }
-document.getElementById('replay').onclick=function(){play(HERO_OUT.hero,termEl)};
+document.getElementById('replay').onclick=function(){
+  play(HERO_OUT.hero,termEl);
+  termEl.scrollIntoView({behavior:'smooth',block:'center'});
+};
 play(HERO_OUT.hero,termEl);
-document.querySelectorAll('.install .cmd').forEach(function(c){
+document.querySelectorAll('.cmd').forEach(function(c){
   c.onclick=function(){
     play(HERO_OUT[c.dataset.out]||[["","(no recording for this command)"]],termEl);
-    document.getElementById('run').scrollIntoView({behavior:'smooth',block:'end'});
+    termEl.scrollIntoView({behavior:'smooth',block:'center'});
   };
 });
 document.getElementById('copybtn').onclick=function(){
@@ -402,7 +451,6 @@ document.getElementById('copybtn').onclick=function(){
 var LEDGER=null,CUR='exfil',SHOWN=80;
 var PROTO={6:'tcp',17:'udp',1:'icmp'};
 function sev(s){return s>=24?'CRIT':s>=23.6?'HIGH':s>=23.2?'MED':'LOW'}
-function band(s){return s>=24?'var(--crit)':s>=23.6?'var(--high)':s>=23.2?'var(--med)':'var(--low)'}
 function render(){
   if(!LEDGER)return;
   var f=LEDGER.files[CUR],thr=parseFloat(document.getElementById('thr').value),pf=document.getElementById('pf').checked;
@@ -426,24 +474,47 @@ function render(){
 }
 function hist(f,thr){
   var c=document.getElementById('hist'),x=c.getContext('2d');
-  var W=c.width,H=c.height;x.clearRect(0,0,W,H);
-  var lo=Math.min.apply(null,f.rows.map(function(r){return r[5]}));
-  var hi=25,bins=new Array(30).fill(0),bw=(hi-lo)/30;
-  f.rows.forEach(function(r){bins[Math.min(29,Math.floor((r[5]-lo)/bw))]++});
+  var dpr=window.devicePixelRatio||1;
+  var cw=c.clientWidth||300,ch=180;
+  if(c.width!==Math.round(cw*dpr)){c.width=Math.round(cw*dpr);c.height=Math.round(ch*dpr)}
+  x.setTransform(dpr,0,0,dpr,0,0);
+  var W=cw,H=ch,PL=34,PR=8,PT=16,PB=22;
+  x.clearRect(0,0,W,H);
+  var scores=f.rows.map(function(r){return r[5]});
+  var lo=Math.floor(Math.min.apply(null,scores)*4)/4;
+  var hi=Math.ceil(Math.max.apply(null,scores)*4)/4;
+  var NB=Math.max(12,Math.min(36,Math.round((hi-lo)*8)));
+  var bw=(hi-lo)/NB,bins=new Array(NB).fill(0);
+  scores.forEach(function(s){bins[Math.min(NB-1,Math.floor((s-lo)/bw))]++});
   var m=Math.max.apply(null,bins);
-  for(var i=0;i<30;i++){
-    var h=bins[i]/m*(H-30);if(!h)continue;
-    var mid=lo+(i+.5)*bw;
-    x.fillStyle=mid<thr?'var(--bg-2)':band(mid);
-    x.fillStyle=mid<thr?'#1A2030':band(mid);
-    x.fillRect(i*(W/30)+1,H-10-h,W/30-2,h);
+  var plotW=W-PL-PR,plotH=H-PT-PB,bwPx=plotW/NB;
+  x.font='10px "JetBrains Mono",monospace'; /* taste-skill-ignore: mono = ejes numericos de grafico de consola */
+  x.strokeStyle='#1A2030';x.lineWidth=1;
+  for(var g=1;g<=2;g++){var gy=PT+plotH-plotH*g/2;x.beginPath();x.moveTo(PL,gy);x.lineTo(W-PR,gy);x.stroke()}
+  x.fillStyle='#8B94A7';x.textAlign='right';x.fillText(m,PL-6,PT+4);
+  x.fillText('0',PL-6,PT+plotH+3);
+  for(var i=0;i<NB;i++){
+    if(!bins[i])continue;
+    var h=bins[i]/m*plotH,mid=lo+(i+.5)*bw;
+    x.fillStyle=mid<thr?'#1A2030':bandHex(mid);
+    x.fillRect(PL+i*bwPx+0.5,PT+plotH-h,bwPx-1,h);
   }
-  x.fillStyle='#8B94A7';x.font='22px monospace';
-  x.fillText(lo.toFixed(1),2,H);var _hi=hi.toFixed(1);x.fillText(_hi,W-x.measureText(_hi).width-2,H);
+  if(thr>lo&&thr<hi){
+    var tx=PL+(thr-lo)/(hi-lo)*plotW;
+    x.strokeStyle='#3B82F6';x.lineWidth=1;x.setLineDash([4,3]);
+    x.beginPath();x.moveTo(tx,PT-6);x.lineTo(tx,PT+plotH);x.stroke();x.setLineDash([]);
+    x.fillStyle='#8AB4F8';x.textAlign=tx>W-70?'right':'left';
+    x.fillText('▸ '+thr.toFixed(1),tx+(tx>W-70?-4:4),PT+2);
+  }
+  x.fillStyle='#8B94A7';x.textAlign='left';x.fillText(lo.toFixed(1),PL,H-8);
+  x.textAlign='right';x.fillText(hi.toFixed(1),W-PR,H-8);
+  x.textAlign='left';
 }
+function bandHex(s){return s>=24?'#EF4444':s>=23.6?'#F97316':s>=23.2?'#EAB308':'#3B82F6'}
 fetch('assets/ledger.json').then(function(r){return r.json()}).then(function(d){
   LEDGER=d;
-  document.getElementById('f-flows').textContent=d.files.exfil.n+d.files.brute.n+d.files.ddos.n+d.files.malware.n+d.files.normal.n;
+  var total=d.files.exfil.n+d.files.brute.n+d.files.ddos.n+d.files.malware.n+d.files.normal.n;
+  ['f-flows','f-flows2'].forEach(function(id){var e=document.getElementById(id);if(e)e.textContent=total.toLocaleString('es-ES').replace(/ |\u00a0/g,' ')});
   render();
 }).catch(function(){});
 document.getElementById('files').addEventListener('click',function(e){
@@ -455,6 +526,7 @@ document.getElementById('thr').addEventListener('input',function(){
   document.getElementById('thrv').textContent=parseFloat(this.value).toFixed(1);render();
 });
 document.getElementById('pf').addEventListener('change',render);
+var _rz;window.addEventListener('resize',function(){clearTimeout(_rz);_rz=setTimeout(render,150)});
 </script>
 </body>
 </html>
