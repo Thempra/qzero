@@ -111,3 +111,4 @@ legacy/
 
 .taste-skill/
 !docs/assets/ledger.json
+.venv
