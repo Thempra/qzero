@@ -98,7 +98,7 @@ def test_consola_route_serves_html(client):
     assert 'id="banner"' in html, "falta banda de error/degradado"
 
 
-# ── Auth: /consola va detrás del mismo middleware que /api/v1/flows ───────
+# ── Auth: shell público (navegable), datos protegidos ─────────────────────
 
 
 _AUTH_SCRIPT = """
@@ -110,11 +110,19 @@ from qzero.api.app import app
 c = TestClient(app)
 print("consola", c.get("/consola").status_code)
 print("health", c.get("/health").status_code)
+print("flows", c.get("/api/v1/flows").status_code)
 """
 
 
-def test_consola_is_protected_by_auth_middleware():
-    """Proceso limpio sin ADMIN_PASSWORD: /consola = 503 (fail-closed)."""
+def test_consola_shell_is_reachable_but_data_is_not():
+    """El shell HTML es público (patrón SPA); los DATOS exigen token.
+
+    Un shell protegido con bearer es inalcanzable: el navegador no manda la
+    cabecera ``Authorization`` en una navegación normal, así que
+    ``GET /consola`` devolvía 401 incluso con el token en localStorage. Se
+    sirve exento, como ``/dashboard`` y ``/hub``; lo que protege la geometría
+    de la red son las rutas de datos, que sí caen bajo el middleware.
+    """
     env = dict(os.environ)
     env.pop("QZERO_AUTH_ENFORCE", None)
     env.pop("PYTEST_CURRENT_TEST", None)
@@ -130,7 +138,13 @@ def test_consola_is_protected_by_auth_middleware():
         if len(parts) == 2 and parts[1].isdigit():
             res[parts[0]] = int(parts[1])
     assert res["health"] == 200, "health siempre público"
-    assert res["consola"] == 503, "/consola protegida sin ADMIN_PASSWORD"
+    # El shell se sirve (navegable), pero sin ADMIN_PASSWORD los datos fallan
+    # cerrado con 503.
+    assert res["consola"] == 200, "/consola debe ser navegable (shell SPA)"
+    assert res["flows"] == 503, "/api/v1/flows fail-closed sin ADMIN_PASSWORD"
+    assert res["consola"] != res["flows"], (
+        "el shell y los datos NO pueden compartir política: si coinciden, "
+        "o el shell es inalcanzable o los datos están abiertos")
 
 
 # ── Contrato real: JS no inventa campos ───────────────────────────────────
