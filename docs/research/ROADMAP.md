@@ -101,7 +101,7 @@ Objetivo: que QZero deje de ser un riesgo y empiece a decir la verdad.
 |---|---|---|---|
 | 1.1 | `GET /api/v1/flows`: `GROUP BY src,dst,dst_port,proto` + índice compuesto, p50/p99/max score, volumen/min | 0.1 | **HECHO** `ab07eaf` |
 | 1.2 | Tabla `flow_state` + `PATCH /flows/{key}/state` (requiere auth) | 1.1, 0.1 | **HECHO** `ab07eaf` |
-| 1.3 | Consola "Mesa de triaje": cola de casos + inspector fijo 62/38, read-only | 1.1 | pendiente |
+| 1.3 | Consola "Mesa de triaje": cola de casos + inspector fijo 62/38 | 1.1 | **HECHO** `4ee1b58`/`0ca1ca9` |
 | 1.4 | `PROMISCUOUS=1` + SPAN/TAP + captura de ≥5.000 flujos benignos reales | acceso a red | pendiente |
 | 1.5 | `calibrate_threshold.py` ejecutado: umbral = p99,9 de benignos | 1.4 | pendiente |
 | 1.6 | Benchmark honesto reproducible (`HONEST-BENCHMARK.md` + script) | — | **HECHO** `dc4ad26` |
@@ -111,6 +111,10 @@ Objetivo: que QZero deje de ser un riesgo y empiece a decir la verdad.
 **Lo entregado en 1.1/1.2:** `GET /api/v1/flows` (ventana 1-1440 min, `limit` ≤200, orden por severidad/score/volumen, `only_untriaged`) y `PATCH /api/v1/flows/{key}/state` (`nuevo|investigando|benigno|malicioso`, 400 si inválido). Índice covering `idx_alerts_flow_window` + `idx_alerts_flow_score` por expresión `COALESCE`; agregación antes del LEFT JOIN (910→631 ms a 1440 min sobre 1,7 M filas, 43,3 ms HTTP). Ambas rutas tras auth (503 sin `ADMIN_PASSWORD` en subproceso limpio). Corregida una divergencia real entre `flow_key()` y `_flow_key_sql()` en la cadena vacía (`'0,0'` vs `',,'`) que resucitaba flujos marcados como benignos.
 
 **Lo entregado en 1.6/1.7:** veredicto **DEGENERADO** — 48 filas únicas de 2.942 flujos (1,63 %), 6 de 14 features con varianza cero, 98,47 % de flujos con ≤1 paquete forward; un stump de un solo feature (`flow_duration`, 0,8334) supera al modelo (0,2581) y casi al baseline trivial (0,8149). Throughput: mediana de 3 repeticiones 2.059,8 flujos/s end-to-end y **326,2 pcap→scores** (la cifra citable). Reproducción independiente con más carga dio 1.193,9, un 42 % menos: la cifra es sensible a contención de CPU y así queda documentado.
+
+**Lo entregado en 1.3:** `GET /consola` sirve un HTML+JS de 41 KB sin build, sin npm y sin una sola CDN. Cola ordenada por severidad/score con ventana 15 min/1 h/6 h/24 h, toggle "solo sin triar" y buscador en cliente; inspector fijo a la derecha (medido en navegador: 61,3 % / 37,6 %, `position: static`, cero solapamiento); PATCH real de estado con reversión del chip si falla. Estados vacío/error/carga cubiertos — el 401 sin sesión muestra puerta de login, no pantalla en blanco.
+
+**El fallo que casi se cuela:** el agente dejó `/consola` detrás del middleware de auth, y lo "demostró" con `TestClient` mandando `Authorization` a mano. En un navegador real la página era **inalcanzable**: una navegación de primer nivel no envía cabeceras personalizadas. Se corrigió sirviendo el shell exento (patrón de `/dashboard` y `/hub`) y el test ahora **exige** que shell y datos no compartan política: `/consola` = 200, `/api/v1/flows` = 401. Los datos no se abren; solo se abre el esqueleto vacío.
 
 **La conclusión que importa de 1.6:** sin tráfico benigno real (1.4) y sin conversación bidireccional, no hay forma de medir detección. El corpus actual no puede demostrar capacidad; solo puede demostrar que el pipeline corre. 1.4 y 1.5 son el verdadero cuello de botella del producto, no la consola.
 

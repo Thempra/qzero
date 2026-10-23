@@ -130,8 +130,12 @@ git add src/qzero/api/consola.html src/qzero/api/app.py tests/test_fase1_consola
 git commit -m "feat(consola): Mesa de triaje (Fase 1.3)
 
 - HTML+JS estático en src/qzero/api/consola.html (41 KB, cero deps externas)
-- Ruta GET /consola en app.py:458-477 (patrón _load_*_html, NO exenta de auth)
+- Ruta GET /consola en app.py (patrón _load_*_html), EXENTA de auth como
+  /dashboard y /hub: el shell SPA es público, los datos NO. Un shell con
+  bearer es inalcanzable porque la navegación no manda cabeceras (corregido
+  en 4ee1b58; el informe original decía "NO exenta" y era el bug)
 - Layout 62/38: cola (izq) + inspector fijo (der) con chips severidad/estado
+  Medido en navegador: 61,3% / 37,6%, position:static, cero solapamiento
 - Controles: ventana 15m/1h/6h/24h, toggle solo-sin-triar, buscador cliente
 - PATCH /api/v1/flows/{key}/state con rollback si falla (UI no miente)
 - Estados: carga (esqueleto), vacío (causa+acción), error (banner+reintentar),
