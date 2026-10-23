@@ -19,14 +19,15 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import (FastAPI, UploadFile, File, HTTPException, Query, WebSocket,
+                     WebSocketDisconnect)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from .schemas import StatusResponse, AnalyzeResponse
 from .monitor import monitor_service
-from .hub import hub_store
+from .hub import hub_store, FLOW_STATES
 
 logger = logging.getLogger(__name__)
 
@@ -379,6 +380,62 @@ async def hub_alerts_recent(minutes: int = 60):
     """Alerts from the last N minutes (for the live dashboard)."""
     since = _hub_recent_since(minutes)
     return hub_store.list_alerts(limit=500, since=since)
+
+
+# ── Fase 1.1 / 1.2 — flujos agregados y triaje ───────────────────────────────
+# Un flujo es la 5-tupla (src, dst, dst_port, protocol) agregada sobre una
+# ventana temporal. Es la unidad que el analista puede triar: 8.473 alertas/hora
+# no se revisan una a una, pero se reducen a decenas de flujos.
+# Ambas rutas caen bajo spa_auth_middleware (no están exentas): sin
+# ADMIN_PASSWORD en modo enforced -> 503, igual que /api/v1/alerts.
+
+def _get_hub_store():
+    """Resuelve el store en runtime (permite sustituirlo en tests)."""
+    from . import hub as _hub
+    return _hub.hub_store
+
+
+@app.get("/api/v1/flows")
+async def hub_flows(
+    minutes: int = Query(60, ge=1, description="Ventana hacia atrás en minutos"),
+    limit: int = Query(50, ge=1, description="Máximo de flujos devueltos"),
+    only_untriaged: bool = Query(
+        False, description="Excluir flujos ya marcados (investigando/benigno/malicioso)"),
+):
+    """Agregación de alertas por flujo (5-tupla) en una ventana temporal.
+
+    ``minutes`` se capa a 1440 (24 h) y ``limit`` a 200: los topes se aplican
+    recortando el valor, no rechazándolo (un dashboard que pide 10.000 quiere
+    los 200 peores, no un 422). Valores < 1 sí son un error del cliente (422).
+    Devuelve ``has_more``/``total_flows`` para que la consola sepa si hay cola
+    detrás de la página.
+    """
+    return _get_hub_store().aggregate_flows(
+        minutes=minutes, limit=limit, only_untriaged=only_untriaged)
+
+
+@app.patch("/api/v1/flows/{key}/state")
+async def hub_set_flow_state(key: str, payload: dict):
+    """Marca el estado de triaje de un flujo.
+
+    Body: ``{"state": "nuevo"|"investigando"|"benigno"|"malicioso",
+    "note": "<opcional>"}``. Estado desconocido -> 400 con la lista válida en
+    el detalle (no 422: el body es válido, el valor no).
+    """
+    store = _get_hub_store()
+    state = payload.get("state")
+    note = payload.get("note")
+    if not isinstance(state, str) or state not in FLOW_STATES:
+        raise HTTPException(
+            status_code=400,
+            detail="invalid state {!r}; allowed: {}".format(
+                state, ", ".join(FLOW_STATES)),
+        )
+    try:
+        return store.set_flow_state(key, state, note=note)
+    except ValueError as exc:  # defensa en profundidad: misma validación abajo
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
 
 
 _HUB_DASHBOARD_HTML: Optional[str] = None
