@@ -2,11 +2,22 @@
 Shared pytest fixtures for QZero tests.
 """
 
-import pytest
-import numpy as np
+import os
 
-from qzero.preprocessing.data_loader import generate_synthetic_data, DataLoader
-from qzero.preprocessing.feature_engineering import FeatureEngineer
+# Fail-closed es el default DURO del producto: una app sin ADMIN_PASSWORD
+# responde 503 en las rutas protegidas (app.py, middleware SPA). Decenas de
+# tests construyen TestClient(app) sin credenciales, así que la suite declara
+# aquí su opt-out. Vive en conftest.py —NUNCA en el código de producción— para
+# que no exista ninguna ruta por la que un despliegue real quede abierto.
+# Los tests que verifican el comportamiento fail-closed lo desactivan a
+# propósito (ver tests/test_fase0_auth_extra.py).
+os.environ.setdefault("QZERO_AUTH_ENFORCE", "0")
+
+import pytest  # noqa: E402
+import numpy as np  # noqa: E402
+
+from qzero.preprocessing.data_loader import generate_synthetic_data, DataLoader  # noqa: E402
+from qzero.preprocessing.feature_engineering import FeatureEngineer  # noqa: E402
 
 
 @pytest.fixture(scope="session")

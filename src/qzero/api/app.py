@@ -95,21 +95,31 @@ def _is_exempt(path: str) -> bool:
 
 @app.middleware("http")
 async def spa_auth_middleware(request: Request, call_next):
-    if not _auth.auth_enabled() and not _auth.agent_token_required():
-        return await call_next(request)
+    """Fail-closed: sin ADMIN_PASSWORD, las rutas protegidas dan 503.
+
+    Antes (Fase 0.1, bug B-1) el early-return sin credenciales dejaba pasar
+    TODO: ``GET /api/v1/alerts`` respondía 200 sin auth. Ahora el modo lo
+    decide ``_auth.auth_enforced()`` (default fail-closed fuera de pytest).
+    """
     path = request.url.path
-    # ingest de agentes: exigir X-Agent-Token solo si está activo
+    # ingest de agentes: X-Agent-Token si QZERO_AGENT_TOKEN está definido
     if path.startswith("/api/v1/agents/") and path.endswith(
             _AUTH_EXEMPT_INGEST_SUFFIXES) and request.method == "POST":
         if _auth.agent_token_required():
+            if not _auth.agent_token():
+                # flag activo sin token que comparar -> fail-closed
+                return JSONResponse({"detail": "agent token not configured"}, 503)
             if not _auth.check_agent_token(request.headers.get("x-agent-token")):
                 return JSONResponse({"detail": "invalid agent token"}, 401)
         return await call_next(request)
     if _is_exempt(path):
         return await call_next(request)
     if not _auth.auth_enabled():
-        # fail-closed: algo activo la auth (agent token) pero falta password
-        return JSONResponse({"detail": "auth not configured"}, 503)
+        if not _auth.auth_enforced():
+            return await call_next(request)
+        # fail-closed: sin credenciales configuradas NUNCA se abren rutas
+        return JSONResponse({"detail": "AUTH_NOT_CONFIGURED: set ADMIN_PASSWORD"},
+                            503)
     header = request.headers.get("authorization", "")
     token = header[7:] if header.lower().startswith("bearer ") else None
     if not _auth.verify_token(token):
@@ -124,14 +134,26 @@ async def auth_status():
 
 
 @app.post("/api/v1/auth/login")
-async def auth_login(payload: dict):
-    """Login SPA: {password} -> token bearer con exp + token_version."""
+async def auth_login(payload: dict, request: Request):
+    """Login SPA: {password} -> token bearer con exp + token_version.
+
+    Rate limit en memoria por IP: máx. ``LOGIN_MAX_ATTEMPTS`` fallos por
+    ``LOGIN_WINDOW_SECONDS`` -> 429 con ``Retry-After``.
+    """
     if not _auth.auth_enabled():
         raise HTTPException(status_code=503,
                             detail="AUTH_NOT_CONFIGURED: set ADMIN_PASSWORD")
+    client_ip = request.client.host if request.client else "unknown"
+    retry_after = _auth.login_retry_after(client_ip)
+    if retry_after:
+        logger.warning("Login bloqueado por rate limit: ip=%s", client_ip)
+        raise HTTPException(status_code=429, detail="too many login attempts",
+                            headers={"Retry-After": str(retry_after)})
     result = _auth.login(payload.get("password", ""))
     if result is None:
+        _auth.register_login_failure(client_ip)
         raise HTTPException(status_code=401, detail="invalid credentials")
+    _auth.reset_login_limits()
     return result
 
 
