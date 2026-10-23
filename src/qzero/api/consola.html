@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QZero · Mesa de triaje</title>
+<!--
+  Mesa de triaje (Fase 1.3). HTML+CSS+JS estático, cero dependencias externas:
+  nada de CDNs, fuentes remotas ni build. Se sirve desde FastAPI en GET /consola
+  (src/qzero/api/app.py) y consume exactamente dos endpoints ya mergeados:
+
+    GET   /api/v1/flows?minutes&limit&only_untriaged
+    PATCH /api/v1/flows/{key}/state   body {"state", "note"}
+
+  Campos consumidos (contrato real, src/qzero/api/hub.py:_flow_row_to_dict y
+  _attach_percentiles): flows[].{flow_key,src,dst,dst_port,protocol,count,
+  severity,score_max,score_p50,score_p99,first_seen,last_seen,alerts_per_minute,
+  state,note} + envelope {flows,minutes,limit,has_more,total_flows}.
+  NO se usa ningún campo que la API no devuelva (lo comprueba
+  tests/test_fase1_consola.py::test_campos_js_existen_en_respuesta_real).
+
+  Auth: igual que el resto del producto — token bearer HS256 emitido por
+  POST /api/v1/auth/login, enviado en `Authorization: Bearer <token>`
+  (app.py:124-126). Se guarda en localStorage. Sin token, las llamadas de datos
+  devuelven 401/503 (fail-closed) y la consola muestra la puerta de login, no
+  una pantalla en blanco.
+-->
+<style>
+  :root{
+    --bg-0:#0B0E14; --bg-1:#11151F; --bg-2:#1A2030; --border:#232A3B;
+    --text-hi:#E6EAF2; --text-lo:#8B94A7; --accent:#3B82F6;
+    --sev-critical:#EF4444; --sev-high:#F97316; --sev-medium:#EAB308;
+    --sev-low:#3B82F6; --ok:#22C55E; --warn:#F59E0B; --err:#EF4444;
+    --grad-card:linear-gradient(180deg,#11151F,#0E1220);
+    --grad-inset:linear-gradient(90deg,#141A26,#101622);
+    --radius-card:8px; --radius-chip:6px;
+    --font-ui:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg-0); color:var(--text-hi);
+    font:14px/1.45 var(--font-ui); display:flex; flex-direction:column;
+  }
+  .mono{font-family:var(--font-mono); font-variant-numeric:tabular-nums}
+  header.top{
+    height:56px; flex:0 0 56px; display:flex; align-items:center; gap:16px;
+    padding:0 20px; border-bottom:1px solid var(--border); background:var(--bg-1);
+  }
+  header.top h1{font-size:16px; font-weight:600; letter-spacing:.06em;
+    text-transform:uppercase; margin:0; white-space:nowrap}
+  header.top h1 .dim{color:var(--text-lo); font-weight:400}
+  .freshness{font-size:12px; color:var(--text-lo); margin-left:auto; display:flex;
+    align-items:center; gap:8px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block}
+  .dot.stale{background:var(--warn)}
+  .dot.bad{background:var(--err)}
+  button{
+    font:inherit; color:var(--text-hi); background:var(--bg-2);
+    border:1px solid var(--border); border-radius:var(--radius-chip);
+    padding:6px 12px; cursor:pointer;
+  }
+  button:hover{border-color:var(--accent)}
+  button:disabled{opacity:.5; cursor:not-allowed}
+  button.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+  button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{
+    outline:2px solid var(--accent); outline-offset:1px}
+
+  /* ── Controles ─────────────────────────────────────────────────────── */
+  .controls{
+    flex:0 0 auto; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    padding:10px 20px; border-bottom:1px solid var(--border); background:var(--bg-1);
+  }
+  .controls label{font-size:12px; color:var(--text-lo); letter-spacing:.04em;
+    text-transform:uppercase}
+  select,input[type=search],textarea{
+    font:inherit; color:var(--text-hi); background:var(--bg-2);
+    border:1px solid var(--border); border-radius:var(--radius-chip); padding:6px 10px;
+  }
+  input[type=search]{min-width:240px}
+  .toggle{display:flex; align-items:center; gap:8px; font-size:13px;
+    color:var(--text-hi); cursor:pointer; user-select:none}
+  .toggle input{accent-color:var(--accent); width:16px; height:16px}
+  .counter{margin-left:auto; font-size:12px; color:var(--text-lo)}
+  .counter b{color:var(--text-hi); font-weight:600}
+
+  /* ── Layout 62 / 38 ─────────────────────────────────────────────────── */
+  main.split{
+    flex:1 1 auto; display:grid; grid-template-columns:62fr 38fr;
+    min-height:0; overflow:hidden;
+  }
+  section.queue{min-width:0; display:flex; flex-direction:column; overflow:hidden}
+  aside.inspector{
+    min-width:0; display:flex; flex-direction:column; overflow-y:auto;
+    background:var(--grad-inset); border-left:1px solid var(--border);
+  }
+  .thead, .rows .row{
+    display:grid;
+    grid-template-columns:64px minmax(220px,1fr) 76px 72px 64px 90px 112px 104px;
+    gap:8px; align-items:center; padding:0 16px;
+  }
+  .thead{
+    height:34px; flex:0 0 34px; font-size:11px; letter-spacing:.06em;
+    text-transform:uppercase; color:var(--text-lo); border-bottom:1px solid var(--border);
+    background:var(--bg-1);
+  }
+  .rows{overflow-y:auto; flex:1 1 auto}
+  .row{
+    height:40px; border-bottom:1px solid #161C28; cursor:pointer;
+    font-size:13px; white-space:nowrap; overflow:hidden;
+  }
+  .row:hover{background:var(--bg-2)}
+  .row.sel{background:var(--bg-2); box-shadow:inset 3px 0 0 var(--accent)}
+  .row .flow{overflow:hidden; text-overflow:ellipsis; font-family:var(--font-mono)}
+  .row .flow .arrow{color:var(--text-lo)}
+  .num{text-align:right; font-family:var(--font-mono); font-variant-numeric:tabular-nums}
+  .thead .num{text-align:right}
+
+  /* chips de severidad y estado: color + texto (nunca solo color) */
+  .chip{
+    display:inline-block; padding:1px 7px; border-radius:var(--radius-chip);
+    font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
+    border:1px solid transparent; white-space:nowrap;
+  }
+  .sev-CRITICAL{color:#fff; background:var(--sev-critical)}
+  .sev-HIGH{color:#1a0f00; background:var(--sev-high)}
+  .sev-MEDIUM{color:#1a1600; background:var(--sev-medium)}
+  .sev-LOW{color:#fff; background:var(--sev-low)}
+  .sev-UNKNOWN{color:var(--text-lo); background:var(--bg-2); border-color:var(--border)}
+  .st-nuevo{color:var(--text-lo); border-color:var(--border); background:var(--bg-2)}
+  .st-investigando{color:var(--accent); border-color:var(--accent); background:rgba(59,130,246,.12)}
+  .st-benigno{color:var(--ok); border-color:var(--ok); background:rgba(34,197,94,.12)}
+  .st-malicioso{color:var(--sev-critical); border-color:var(--sev-critical);
+    background:rgba(239,68,68,.12)}
+  .st-unknown{color:var(--text-lo); border-color:var(--border); background:var(--bg-2)}
+
+  /* ── Inspector ─────────────────────────────────────────────────────── */
+  .insp-head{padding:16px 20px 12px; border-bottom:1px solid var(--border)}
+  .insp-head .kicker{font-size:11px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--text-lo); margin-bottom:6px}
+  .insp-head .tuple{font-family:var(--font-mono); font-size:15px; word-break:break-all;
+    line-height:1.4}
+  .insp-head .facts{margin-top:8px; font-size:12px; color:var(--text-lo);
+    display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  .insp-body{padding:14px 20px 20px; display:flex; flex-direction:column; gap:16px}
+  .block h2{
+    font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--text-lo); margin:0 0 8px; padding-bottom:6px;
+    border-bottom:1px solid var(--border);
+  }
+  .kv{display:grid; grid-template-columns:1fr auto; gap:4px 12px; font-size:13px}
+  .kv dt{color:var(--text-lo)}
+  .kv dd{margin:0; text-align:right; font-family:var(--font-mono);
+    font-variant-numeric:tabular-nums}
+  .bars{display:flex; flex-direction:column; gap:8px; margin-top:4px}
+  .bar-row{display:grid; grid-template-columns:84px 1fr 72px; gap:8px;
+    align-items:center; font-size:12px}
+  .bar-row .lbl{color:var(--text-lo)}
+  .bar{height:6px; background:var(--bg-2); border-radius:3px; overflow:hidden}
+  .bar > i{display:block; height:100%; background:var(--accent); width:0}
+  .bar.sevbar > i{background:var(--sev-high)}
+  .read{margin-top:10px; font-size:12.5px; color:var(--text-hi);
+    background:var(--bg-1); border-left:2px solid var(--accent);
+    padding:8px 10px; border-radius:0 var(--radius-chip) var(--radius-chip) 0}
+  .actions{display:flex; flex-wrap:wrap; gap:8px}
+  .actions button{flex:1 1 auto; min-width:104px}
+  .actions button.act-investigando{border-color:var(--accent)}
+  .actions button.act-benigno{border-color:var(--ok)}
+  .actions button.act-malicioso{border-color:var(--sev-critical)}
+  textarea{width:100%; min-height:64px; resize:vertical; font-family:var(--font-ui)}
+  .note-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:8px}
+  .msg{font-size:12px; padding:8px 10px; border-radius:var(--radius-chip);
+    border:1px solid var(--border); display:none}
+  .msg.show{display:block}
+  .msg.ok{color:var(--ok); border-color:rgba(34,197,94,.5); background:rgba(34,197,94,.08)}
+  .msg.err{color:#FCA5A5; border-color:rgba(239,68,68,.6); background:rgba(239,68,68,.1)}
+
+  /* ── Estados: carga, vacío, error, auth ────────────────────────────── */
+  .state{
+    grid-column:1 / -1; padding:32px 24px; display:flex; flex-direction:column;
+    gap:8px; align-items:flex-start; color:var(--text-lo); font-size:13px;
+  }
+  .state .ttl{color:var(--text-hi); font-size:14px; font-weight:600}
+  .state.hidden{display:none}
+  .skeleton{padding:0}
+  .sk-row{height:40px; display:grid;
+    grid-template-columns:64px minmax(220px,1fr) 76px 72px 64px 90px 112px 104px;
+    gap:8px; align-items:center; padding:0 16px; border-bottom:1px solid #161C28}
+  .sk{height:10px; border-radius:3px; background:#1B2231;
+    animation:pulse 1.3s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.45}50%{opacity:.9}}
+  .banner{
+    display:none; align-items:center; gap:10px; padding:8px 20px; font-size:12.5px;
+    background:rgba(239,68,68,.1); border-bottom:1px solid rgba(239,68,68,.5);
+    color:#FCA5A5;
+  }
+  .banner.show{display:flex}
+  .banner.warn{background:rgba(245,158,11,.1); border-bottom-color:rgba(245,158,11,.5);
+    color:#FCD34D}
+  .banner button{margin-left:auto; padding:3px 10px; font-size:12px}
+  /* puerta de login (misma auth que el resto: POST /api/v1/auth/login) */
+  .gate{
+    position:fixed; inset:0; background:rgba(11,14,20,.94); z-index:50;
+    display:none; align-items:center; justify-content:center;
+  }
+  .gate.show{display:flex}
+  .gate form{
+    width:min(420px,92vw); background:var(--grad-card); border:1px solid var(--border);
+    border-radius:var(--radius-card); padding:24px; display:flex; flex-direction:column;
+    gap:12px;
+  }
+  .gate h2{margin:0; font-size:15px; letter-spacing:.06em; text-transform:uppercase}
+  .gate p{margin:0; font-size:13px; color:var(--text-lo)}
+  .gate input{padding:9px 10px}
+  .gate .gmsg{font-size:12px; color:#FCA5A5; min-height:16px}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+    clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  @media (max-width:900px){
+    main.split{grid-template-columns:1fr; grid-template-rows:55fr 45fr}
+    aside.inspector{border-left:none; border-top:1px solid var(--border)}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <h1>◈ QZero <span class="dim">· Mesa de triaje</span></h1>
+  <span class="freshness mono" id="freshness">
+    <span class="dot" id="freshDot"></span><span id="freshText">sin datos todavía</span>
+  </span>
+  <button id="btnRefresh" type="button" title="Recargar la cola (r)">Actualizar</button>
+</header>
+
+<div class="banner" id="banner" role="status" aria-live="polite">
+  <span id="bannerText"></span>
+  <button type="button" id="bannerRetry">Reintentar</button>
+</div>
+
+<div class="controls">
+  <label for="selWindow">Ventana</label>
+  <select id="selWindow" aria-label="Ventana temporal">
+    <option value="15">15 min</option>
+    <option value="60" selected>1 h</option>
+    <option value="360">6 h</option>
+    <option value="1440">24 h</option>
+  </select>
+
+  <label class="toggle" for="chkUntriaged">
+    <input type="checkbox" id="chkUntriaged" checked>
+    Solo sin triar
+  </label>
+
+  <label for="inpSearch" class="sr-only">Buscar por src, dst o puerto</label>
+  <input type="search" id="inpSearch" placeholder="Filtrar por src / dst / puerto…"
+         autocomplete="off" spellcheck="false">
+
+  <span class="counter" id="counter">— casos</span>
+</div>
+
+<main class="split">
+  <!-- ── Cola de casos (62 %) ─────────────────────────────────────────── -->
+  <section class="queue" aria-label="Cola de casos">
+    <div class="thead" role="row">
+      <span>Sev</span>
+      <span>Flujo (src → dst:puerto)</span>
+      <span>Proto</span>
+      <span class="num">Alertas</span>
+      <span class="num">p99</span>
+      <span class="num">Al/min</span>
+      <span>Visto</span>
+      <span>Estado</span>
+    </div>
+    <!-- esqueleto de carga con la geometría final (sin lienzo en blanco) -->
+    <div class="skeleton" id="skeleton" aria-hidden="true">
+      <div class="sk-row"><span class="sk" style="width:52px"></span><span class="sk"></span>
+        <span class="sk" style="width:34px"></span><span class="sk" style="width:44px"></span>
+        <span class="sk" style="width:30px"></span><span class="sk" style="width:46px"></span>
+        <span class="sk" style="width:76px"></span><span class="sk" style="width:70px"></span></div>
+      <div class="sk-row"><span class="sk" style="width:52px"></span><span class="sk"></span>
+        <span class="sk" style="width:34px"></span><span class="sk" style="width:44px"></span>
+        <span class="sk" style="width:30px"></span><span class="sk" style="width:46px"></span>
+        <span class="sk" style="width:76px"></span><span class="sk" style="width:70px"></span></div>
+      <div class="sk-row"><span class="sk" style="width:52px"></span><span class="sk"></span>
+        <span class="sk" style="width:34px"></span><span class="sk" style="width:44px"></span>
+        <span class="sk" style="width:30px"></span><span class="sk" style="width:46px"></span>
+        <span class="sk" style="width:76px"></span><span class="sk" style="width:70px"></span></div>
+      <div class="sk-row"><span class="sk" style="width:52px"></span><span class="sk"></span>
+        <span class="sk" style="width:34px"></span><span class="sk" style="width:44px"></span>
+        <span class="sk" style="width:30px"></span><span class="sk" style="width:46px"></span>
+        <span class="sk" style="width:76px"></span><span class="sk" style="width:70px"></span></div>
+      <div class="sk-row"><span class="sk" style="width:52px"></span><span class="sk"></span>
+        <span class="sk" style="width:34px"></span><span class="sk" style="width:44px"></span>
+        <span class="sk" style="width:30px"></span><span class="sk" style="width:46px"></span>
+        <span class="sk" style="width:76px"></span><span class="sk" style="width:70px"></span></div>
+      <div style="padding:12px 16px;font-size:12px;color:var(--text-lo)">cargando cola…</div>
+    </div>
+
+    <div class="rows" id="rows"></div>
+
+    <div class="state hidden" id="stateEmpty">
+      <span class="ttl" id="emptyTtl">No hay casos en la cola.</span>
+      <span id="emptyBody"></span>
+      <button type="button" class="primary" id="emptyAction" style="display:none"></button>
+    </div>
+    <div class="state hidden" id="stateError">
+      <span class="ttl">Sin datos del hub.</span>
+      <span id="errorBody">No se pudo leer la cola de casos.</span>
+      <button type="button" id="errorRetry">Reintentar</button>
+    </div>
+  </section>
+
+  <!-- ── Inspector (38 %) — SIEMPRE visible, nunca modal ──────────────── -->
+  <aside class="inspector" id="inspector" aria-label="Inspector del flujo">
+    <div class="insp-head">
+      <div class="kicker">Caso seleccionado</div>
+      <div class="tuple mono" id="inspTuple">—</div>
+      <div class="facts" id="inspFacts">
+        <span class="chip st-unknown" id="inspStateChip">sin selección</span>
+        <span id="inspKeyHint">Elige un caso de la cola para triarlo.</span>
+      </div>
+    </div>
+
+    <div class="insp-body" id="inspBody">
+      <div class="block">
+        <h2>Volumen y rareza</h2>
+        <dl class="kv">
+          <dt>Alertas en la ventana</dt><dd id="kCount">—</dd>
+          <dt>Score p50</dt><dd id="kP50">—</dd>
+          <dt>Score p99</dt><dd id="kP99">—</dd>
+          <dt>Score máx</dt><dd id="kMax">—</dd>
+          <dt>Alertas / min</dt><dd id="kApm">—</dd>
+          <dt>Primera vez</dt><dd id="kFirst">—</dd>
+          <dt>Última vez</dt><dd id="kLast">—</dd>
+        </dl>
+        <div class="bars">
+          <div class="bar-row"><span class="lbl">Rareza (p99)</span>
+            <span class="bar"><i id="barRareza"></i></span>
+            <span class="mono" id="barRarezaVal">—</span></div>
+          <div class="bar-row"><span class="lbl">Volumen</span>
+            <span class="bar sevbar"><i id="barVolumen"></i></span>
+            <span class="mono" id="barVolumenVal">—</span></div>
+        </div>
+        <div class="read" id="inspRead">—</div>
+      </div>
+
+      <div class="block">
+        <h2>Triaje</h2>
+        <div class="actions">
+          <button type="button" class="act-investigando" data-state="investigando"
+                  disabled>Investigando</button>
+          <button type="button" class="act-benigno" data-state="benigno"
+                  disabled>Benigno</button>
+          <button type="button" class="act-malicioso" data-state="malicioso"
+                  disabled>Malicioso</button>
+        </div>
+        <div style="margin-top:10px">
+          <label for="inpNote" class="sr-only">Nota de triaje</label>
+          <textarea id="inpNote" placeholder="Nota de triaje (opcional, se guarda con el caso)"
+                    disabled></textarea>
+          <div class="note-actions">
+            <button type="button" id="btnNote" disabled>Guardar nota</button>
+          </div>
+        </div>
+        <div class="msg" id="triajeMsg" role="status" aria-live="polite"></div>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<!-- Puerta de login: usa el endpoint que ya existe (POST /api/v1/auth/login). -->
+<div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTtl">
+  <form id="gateForm">
+    <h2 id="gateTtl">Sesión requerida</h2>
+    <p id="gateWhy">La consola necesita el token de sesión del hub.</p>
+    <input type="password" id="gatePwd" placeholder="ADMIN_PASSWORD" autocomplete="current-password">
+    <div class="gmsg" id="gateMsg"></div>
+    <button type="submit" class="primary" id="gateBtn">Entrar</button>
+  </form>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ── Configuración ─────────────────────────────────────────────────────
+  var LIMIT = 50;                 // tope del contrato (FLOWS_MAX_LIMIT=200)
+  var TOKEN_KEY = "qzero.token";  // mismo bearer que espera el middleware
+  var STATES = ["nuevo", "investigando", "benigno", "malicioso"];
+  var PROTO = {1: "ICMP", 6: "TCP", 17: "UDP", 47: "GRE", 50: "ESP",
+               51: "AH", 58: "ICMPv6", 132: "SCTP"};
+
+  // ── Estado de la UI ───────────────────────────────────────────────────
+  var all = [];          // último flows[] recibido del servidor (sin filtrar)
+  var filtered = [];     // tras el buscador de cliente
+  var selectedKey = null;
+  var loadedAt = 0;      // ms del último fetch OK
+  var inflight = null;   // AbortController del fetch en curso
+  var lastError = "";
+
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls, txt) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (txt !== undefined && txt !== null) n.textContent = txt;
+    return n;
+  }
+
+  // ── Token / auth ──────────────────────────────────────────────────────
+  function getToken() { try { return localStorage.getItem(TOKEN_KEY) || ""; }
+                        catch (e) { return ""; } }
+  function setToken(t) { try { localStorage.setItem(TOKEN_KEY, t); } catch (e) {} }
+  function clearToken() { try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
+
+  function authHeaders(extra) {
+    var h = extra || {};
+    var t = getToken();
+    if (t) h["Authorization"] = "Bearer " + t;
+    return h;
+  }
+
+  // fetch con auth + clasificación de errores (401/503 -> puerta de login)
+  function api(path, opts) {
+    opts = opts || {};
+    var init = { method: opts.method || "GET", headers: authHeaders(opts.headers || {}) };
+    if (opts.body !== undefined) {
+      init.headers["Content-Type"] = "application/json";
+      init.body = JSON.stringify(opts.body);
+    }
+    return fetch(path, init).then(function (res) {
+      return res.text().then(function (txt) {
+        var body = null;
+        try { body = txt ? JSON.parse(txt) : null; } catch (e) { body = null; }
+        if (res.ok) return body;
+        var err = new Error(apiErrorText(res.status, body));
+        err.status = res.status;
+        err.body = body;
+        throw err;
+      });
+    });
+  }
+
+  function apiErrorText(status, body) {
+    var detail = body && body.detail ? String(body.detail) : "";
+    if (status === 401) return "401 · sesión no válida o caducada";
+    if (status === 503) return "503 · " + (detail || "auth no configurada en el hub (falta ADMIN_PASSWORD)");
+    if (status === 400) return "400 · " + (detail || "petición rechazada");
+    if (status === 429) return "429 · demasiados intentos de login";
+    return status + " · " + (detail || "error del servidor");
+  }
+
+  function showGate(why) {
+    $("gateWhy").textContent = why || "La consola necesita el token de sesión del hub.";
+    $("gate").classList.add("show");
+    $("gatePwd").focus();
+  }
+  function hideGate() { $("gate").classList.remove("show"); }
+
+  // ── Formato ───────────────────────────────────────────────────────────
+  function ago(iso) {
+    if (!iso) return "—";
+    var t = Date.parse(iso);
+    if (isNaN(t)) return "—";
+    var s = Math.max(0, Math.round((Date.now() - t) / 1000));
+    if (s < 60) return "hace " + s + " s";
+    var m = Math.round(s / 60);
+    if (m < 60) return "hace " + m + " min";
+    var h = Math.round(m / 60);
+    if (h < 48) return "hace " + h + " h";
+    return "hace " + Math.round(h / 24) + " d";
+  }
+  function num(n) {
+    if (n === null || n === undefined || isNaN(n)) return "—";
+    return Number(n).toLocaleString("es-ES");
+  }
+  function dec(n, d) {
+    if (n === null || n === undefined || isNaN(n)) return "—";
+    return Number(n).toFixed(d === undefined ? 1 : d);
+  }
+  function protoName(p) {
+    if (p === null || p === undefined) return "—";
+    return PROTO[p] || ("proto " + p);
+  }
+  function sevClass(sev) {
+    var s = String(sev || "UNKNOWN").toUpperCase();
+    return "sev-" + (["CRITICAL","HIGH","MEDIUM","LOW"].indexOf(s) >= 0 ? s : "UNKNOWN");
+  }
+  function stateClass(st) {
+    var s = String(st || "nuevo");
+    return "st-" + (STATES.indexOf(s) >= 0 ? s : "unknown");
+  }
+
+  // ── Cola de casos ─────────────────────────────────────────────────────
+  function setLoading(on) {
+    $("skeleton").style.display = on ? "" : "none";
+    if (on) {
+      $("stateEmpty").classList.add("hidden");
+      $("stateError").classList.add("hidden");
+    }
+  }
+
+  function setBanner(text, kind, retry) {
+    var b = $("banner");
+    if (!text) { b.classList.remove("show", "warn"); return; }
+    b.classList.add("show");
+    b.classList.toggle("warn", kind === "warn");
+    $("bannerText").textContent = text;
+    $("bannerRetry").style.display = retry ? "" : "none";
+  }
+
+  function showError(msg, status) {
+    setLoading(false);
+    $("stateEmpty").classList.add("hidden");
+    var e = $("stateError");
+    var body = msg;
+    if (status === 401) body += ". Inicia sesión.";
+    else if (status === 503) body += ". El hub no tiene ADMIN_PASSWORD configurada.";
+    else body += ". Comprueba que el hub responde y reintenta.";
+    $("errorBody").textContent = body;
+    e.classList.remove("hidden");
+    $("freshDot").className = "dot bad";
+    $("freshText").textContent = "sin datos · " + (status ? status : "red");
+    lastError = msg;
+  }
+
+  function showEmpty() {
+    setLoading(false);
+    $("stateError").classList.add("hidden");
+    var hasFilter = $("inpSearch").value.trim() !== "";
+    var onlyUntriaged = $("chkUntriaged").checked;
+    var e = $("stateEmpty");
+    e.classList.remove("hidden");
+    var btn = $("emptyAction");
+    if (all.length > 0 && hasFilter) {
+      // Vacío por filtro: el vacío NOMBRA el filtro que lo causó.
+      $("emptyTtl").textContent = "El buscador no deja ningún caso.";
+      $("emptyBody").textContent = '“' + $("inpSearch").value.trim() + '” deja 0 de ' +
+        all.length + " casos en la ventana.";
+      btn.style.display = "";
+      btn.textContent = "Quitar filtro ✕";
+      btn.onclick = function () { $("inpSearch").value = ""; render(); };
+    } else if (all.length === 0 && onlyUntriaged) {
+      $("emptyTtl").textContent = "No hay casos pendientes de triaje.";
+      $("emptyBody").textContent = "Todos los flujos de la ventana ya están " +
+        "marcados. Quita “Solo sin triar” para verlos.";
+      btn.style.display = "";
+      btn.textContent = "Ver todos los casos";
+      btn.onclick = function () { $("chkUntriaged").checked = false; load(); };
+    } else {
+      $("emptyTtl").textContent = "No hay casos en la ventana.";
+      $("emptyBody").textContent = "El hub no ha agregado ningún flujo en " +
+        $("selWindow").selectedOptions[0].textContent + ". Amplía la ventana " +
+        "o comprueba que los agentes están reportando.";
+      btn.style.display = "";
+      btn.textContent = "Ampliar a 24 h";
+      btn.onclick = function () { $("selWindow").value = "1440"; load(); };
+    }
+  }
+
+  function render() {
+    var q = $("inpSearch").value.trim().toLowerCase();
+    filtered = !q ? all.slice() : all.filter(function (f) {
+      return (String(f.src) + " " + String(f.dst) + " " + String(f.dst_port) +
+              " " + protoName(f.protocol)).toLowerCase().indexOf(q) >= 0;
+    });
+
+    var box = $("rows");
+    box.textContent = "";
+
+    if (filtered.length === 0) {
+      $("stateError").classList.add("hidden");
+      showEmpty();
+      $("counter").textContent = "0 de " + all.length + " casos";
+      if (selectedKey === null) clearInspector();
+      return;
+    }
+    $("stateEmpty").classList.add("hidden");
+    $("stateError").classList.add("hidden");
+
+    var frag = document.createDocumentFragment();
+    filtered.forEach(function (f) {
+      var row = el("div", "row" + (f.flow_key === selectedKey ? " sel" : ""));
+      row.setAttribute("role", "row");
+      row.tabIndex = 0;
+      row.dataset.key = f.flow_key;
+
+      var sev = el("span");
+      var chip = el("span", "chip " + sevClass(f.severity), String(f.severity || "?"));
+      sev.appendChild(chip);
+
+      var flow = el("span", "flow");
+      flow.appendChild(document.createTextNode(String(f.src)));
+      flow.appendChild(el("span", "arrow", " → "));
+      flow.appendChild(document.createTextNode(String(f.dst) + ":" + f.dst_port));
+
+      var count = el("span", "num", num(f.count));
+      var p99 = el("span", "num", dec(f.score_p99, 1));
+      var apm = el("span", "num", dec(f.alerts_per_minute, 2));
+      var seen = el("span", "mono", ago(f.last_seen));
+      seen.title = "primera vez " + (f.first_seen || "—") +
+                   "\núltima vez " + (f.last_seen || "—");
+      var st = el("span");
+      st.appendChild(el("span", "chip " + stateClass(f.state), String(f.state || "nuevo")));
+
+      row.appendChild(sev); row.appendChild(flow);
+      row.appendChild(el("span", "mono", protoName(f.protocol)));
+      row.appendChild(count); row.appendChild(p99); row.appendChild(apm);
+      row.appendChild(seen); row.appendChild(st);
+
+      row.addEventListener("click", function () { select(f.flow_key); });
+      row.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); select(f.flow_key); }
+      });
+      frag.appendChild(row);
+    });
+    box.appendChild(frag);
+
+    $("counter").textContent = (q || filtered.length !== all.length)
+      ? filtered.length + " de " + all.length + " casos"
+      : all.length + " casos" +
+        (lastMeta && lastMeta.has_more ? " (de " + num(lastMeta.total_flows) + ")" : "");
+
+    // Inspector: conserva la selección si sigue en la cola; si no, primer caso.
+    var still = filtered.some(function (f) { return f.flow_key === selectedKey; });
+    if (!still) select(filtered[0].flow_key);
+  }
+
+  // ── Inspector ─────────────────────────────────────────────────────────
+  var current = null;
+  var lastMeta = null;
+
+  function clearInspector() {
+    current = null;
+    $("inspTuple").textContent = "—";
+    $("inspKeyHint").textContent = "Elige un caso de la cola para triarlo.";
+    var c = $("inspStateChip");
+    c.className = "chip st-unknown";
+    c.textContent = "sin selección";
+    ["kCount","kP50","kP99","kMax","kApm","kFirst","kLast"].forEach(function (id) {
+      $(id).textContent = "—";
+    });
+    $("barRareza").style.width = "0"; $("barRarezaVal").textContent = "—";
+    $("barVolumen").style.width = "0"; $("barVolumenVal").textContent = "—";
+    $("inspRead").textContent = "—";
+    $("inpNote").value = "";
+    setActionsEnabled(false);
+  }
+
+  function setActionsEnabled(on) {
+    Array.prototype.forEach.call(
+      document.querySelectorAll(".actions button"), function (b) { b.disabled = !on; });
+    $("inpNote").disabled = !on;
+    $("btnNote").disabled = !on;
+  }
+
+  function select(key) {
+    var f = null;
+    for (var i = 0; i < all.length; i++) if (all[i].flow_key === key) { f = all[i]; break; }
+    if (!f) { clearInspector(); return; }
+    selectedKey = key;
+    current = f;
+    Array.prototype.forEach.call($("rows").children, function (r) {
+      r.classList.toggle("sel", r.dataset.key === key);
+    });
+    paint(f);
+  }
+
+  function paint(f) {
+    $("inspTuple").textContent = f.src + " → " + f.dst + ":" + f.dst_port;
+    var chip = $("inspStateChip");
+    chip.className = "chip " + stateClass(f.state);
+    chip.textContent = String(f.state || "nuevo");
+    $("inspKeyHint").textContent = protoName(f.protocol) + " · " + f.count +
+      " alertas · sev " + (f.severity || "UNKNOWN");
+
+    $("kCount").textContent = num(f.count);
+    $("kP50").textContent = dec(f.score_p50, 2);
+    $("kP99").textContent = dec(f.score_p99, 2);
+    $("kMax").textContent = dec(f.score_max, 2);
+    $("kApm").textContent = dec(f.alerts_per_minute, 3);
+    $("kFirst").textContent = ago(f.first_seen);
+    $("kLast").textContent = ago(f.last_seen);
+    $("kFirst").title = f.first_seen || "";
+    $("kLast").title = f.last_seen || "";
+
+    // Barras: rareza = p99 sobre la escala de score normalizada [0,100]
+    // (predictor.normalize_score); volumen = alertas/min en escala log.
+    var rareza = Math.max(0, Math.min(100, Number(f.score_p99) || 0));
+    $("barRareza").style.width = rareza.toFixed(1) + "%";
+    $("barRarezaVal").textContent = dec(f.score_p99, 1);
+    var apm = Number(f.alerts_per_minute) || 0;
+    var volPct = apm <= 0 ? 0 : Math.min(100, (Math.log10(apm + 1) / 4) * 100);
+    $("barVolumen").style.width = volPct.toFixed(1) + "%";
+    $("barVolumenVal").textContent = dec(apm, 2) + "/min";
+
+    // Lectura: cruza volumen con rareza. Sin explicaciones inventadas.
+    var txt;
+    if (rareza >= 75) {
+      txt = "Rareza alta: el p99 de este flujo está en la cola del score. " +
+            "Míralo antes que el resto.";
+    } else if (apm >= 1 && rareza < 50) {
+      txt = "Volumen sin rareza: patrón de réplica, backup o DNS repetido. " +
+            "No es firma de ataque por sí solo.";
+    } else if (apm < 0.05) {
+      txt = "Rareza moderada y volumen bajo: caso de cola larga.";
+    } else {
+      txt = "Rareza y volumen intermedios: sin señal concluyente en los datos.";
+    }
+    if (f.note) txt += " Nota previa: “" + f.note + "”.";
+    $("inspRead").textContent = txt;
+
+    $("inpNote").value = f.note || "";
+    setActionsEnabled(true);
+    hideMsg();
+  }
+
+  function hideMsg() { $("triajeMsg").className = "msg"; $("triajeMsg").textContent = ""; }
+  function showMsg(text, kind) {
+    var m = $("triajeMsg");
+    m.textContent = text;
+    m.className = "msg show " + (kind || "ok");
+  }
+
+  // ── PATCH de triaje con rollback explícito ────────────────────────────
+  function setState(newState, note) {
+    if (!current) return;
+    var f = current;
+    var prevState = f.state;
+    var prevNote = f.note;
+    var key = f.flow_key;
+
+    // Optimista: pinta el chip nuevo y bloquea los botones.
+    f.state = newState;
+    paint(f);
+    setActionsEnabled(false);
+    showMsg("Guardando…", "ok");
+
+    var body = { state: newState };
+    if (note !== undefined && note !== null) body.note = note;
+
+    api("/api/v1/flows/" + encodeURIComponent(key) + "/state",
+        { method: "PATCH", body: body })
+      .then(function (res) {
+        // El servidor devuelve get_flow_state(): {flow_key, state, note, updated_at}
+        if (res && res.state) {
+          f.state = res.state;
+          f.note = res.note === undefined ? f.note : res.note;
+        }
+        paint(f);
+        renderRowChip(key, f.state);
+        showMsg("Guardado · " + f.state +
+                (res && res.updated_at ? " (" + ago(res.updated_at) + ")" : ""), "ok");
+        // Si el filtro es "solo sin triar", el caso sale de la cola: recarga.
+        if ($("chkUntriaged").checked && f.state !== "nuevo") {
+          window.setTimeout(load, 250);
+        }
+      })
+      .catch(function (err) {
+        // REVERTIR: la UI no puede mentir sobre el estado del flujo.
+        f.state = prevState;
+        f.note = prevNote;
+        if (current === f) { paint(f); } else { renderRowChip(key, prevState); }
+        renderRowChip(key, prevState);
+        setActionsEnabled(true);
+        var extra = err.status === 401 ? " Vuelve a iniciar sesión."
+                  : err.status === 503 ? " El hub no tiene auth configurada."
+                  : "";
+        showMsg("No se pudo guardar: " + err.message + "." + extra +
+                " Estado revertido a “" + prevState + "”.", "err");
+        if (err.status === 401 || err.status === 503) showGate(err.message);
+      });
+  }
+
+  function renderRowChip(key, state) {
+    Array.prototype.forEach.call($("rows").children, function (r) {
+      if (r.dataset.key !== key) return;
+      var cell = r.lastElementChild;
+      cell.textContent = "";
+      cell.appendChild(el("span", "chip " + stateClass(state), String(state || "nuevo")));
+    });
+  }
+
+  // ── Carga de la cola ──────────────────────────────────────────────────
+  function load() {
+    if (inflight) inflight.abort();
+    var ctrl = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    inflight = ctrl;
+
+    var minutes = parseInt($("selWindow").value, 10) || 60;
+    var only = $("chkUntriaged").checked;
+    var qs = "?minutes=" + minutes + "&limit=" + LIMIT +
+             "&only_untriaged=" + (only ? "true" : "false");
+
+    setLoading(true);
+    setBanner("", null, false);
+    $("btnRefresh").disabled = true;
+    $("freshDot").className = "dot stale";
+    $("freshText").textContent = "actualizando…";
+
+    var init = { headers: authHeaders() };
+    if (ctrl) init.signal = ctrl.signal;
+
+    fetch("/api/v1/flows" + qs, init)
+      .then(function (res) {
+        return res.text().then(function (txt) {
+          var body = null;
+          try { body = txt ? JSON.parse(txt) : null; } catch (e) { body = null; }
+          if (res.ok) return body;
+          var err = new Error(apiErrorText(res.status, body));
+          err.status = res.status;
+          throw err;
+        });
+      })
+      .then(function (data) {
+        if (!data || !Array.isArray(data.flows)) {
+          throw new Error("respuesta sin la clave flows[]");
+        }
+        all = data.flows;
+        lastMeta = data;
+        loadedAt = Date.now();
+        setLoading(false);
+        $("btnRefresh").disabled = false;
+        $("freshDot").className = "dot";
+        $("freshText").textContent = "hace " + ago(new Date(loadedAt).toISOString())
+          .replace("hace ", "") + " · " + data.minutes + " min · " +
+          num(data.total_flows) + " flujos";
+        if (data.has_more) {
+          setBanner("Mostrando " + all.length + " de " + num(data.total_flows) +
+                    " flujos de la ventana (tope " + data.limit + "). " +
+                    "Reduce la ventana para ver el resto.", "warn", false);
+        }
+        render();
+        hideGate();
+      })
+      .catch(function (err) {
+        $("btnRefresh").disabled = false;
+        if (err && err.name === "AbortError") return;  // petición superada
+        setLoading(false);
+        showError(err.message || "error de red", err.status);
+        if (err.status === 401 || err.status === 503) {
+          showGate(err.status === 503
+            ? "El hub no tiene auth configurada (falta ADMIN_PASSWORD)."
+            : "Sesión no válida o caducada.");
+          setBanner(err.message, null, true);
+        } else {
+          setBanner("Sin datos del hub · " + (err.message || "error de red"), null, true);
+        }
+      });
+  }
+
+  // ── Eventos ───────────────────────────────────────────────────────────
+  $("btnRefresh").addEventListener("click", load);
+  $("selWindow").addEventListener("change", load);
+  $("chkUntriaged").addEventListener("change", load);
+  $("inpSearch").addEventListener("input", render);
+  $("bannerRetry").addEventListener("click", load);
+  $("errorRetry").addEventListener("click", load);
+  $("emptyAction").addEventListener("click", function () { /* se reasigna en showEmpty */ });
+
+  Array.prototype.forEach.call(
+    document.querySelectorAll(".actions button"), function (b) {
+      b.addEventListener("click", function () {
+        setState(b.dataset.state, $("inpNote").value.trim() || null);
+      });
+    });
+  $("btnNote").addEventListener("click", function () {
+    if (current) setState(current.state || "nuevo", $("inpNote").value.trim() || null);
+  });
+
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "r" && !/^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName)) load();
+  });
+
+  $("gateForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var pwd = $("gatePwd").value;
+    if (!pwd) { $("gateMsg").textContent = "Escribe la contraseña."; return; }
+    $("gateBtn").disabled = true;
+    $("gateMsg").textContent = "";
+    fetch("/api/v1/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: pwd })
+    }).then(function (res) {
+      return res.text().then(function (txt) {
+        var body = null;
+        try { body = txt ? JSON.parse(txt) : null; } catch (e) {}
+        $("gateBtn").disabled = false;
+        if (res.ok && body && body.access_token) {
+          setToken(body.access_token);
+          $("gatePwd").value = "";
+          hideGate();
+          load();
+        } else {
+          $("gateMsg").textContent = apiErrorText(res.status, body);
+        }
+      });
+    }).catch(function () {
+      $("gateBtn").disabled = false;
+      $("gateMsg").textContent = "Error de red al iniciar sesión.";
+    });
+  });
+
+  // ── Arranque: nunca una pantalla en blanco ────────────────────────────
+  clearInspector();
+  setLoading(true);
+  load();
+  // Frescura: envejece el contador sin recargar la cola.
+  window.setInterval(function () {
+    if (!loadedAt) return;
+    var s = Math.round((Date.now() - loadedAt) / 1000);
+    if (s > 60) {
+      $("freshDot").className = "dot stale";
+      $("freshText").textContent = "datos de hace " + Math.round(s / 60) + " min";
+    }
+  }, 15000);
+})();
+</script>
+</body>
+</html>

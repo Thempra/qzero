@@ -78,7 +78,7 @@ _AUTH_EXEMPT_PREFIXES = (
     "/api/v1/auth/",
     "/metrics",
 )
-_AUTH_EXEMPT_EXACT = {"/", "/dashboard", "/hub", "/api/v1/hub", "/ws"}
+_AUTH_EXEMPT_EXACT = {"/", "/dashboard", "/hub", "/api/v1/hub", "/ws", "/consola"}
 _AUTH_EXEMPT_INGEST_SUFFIXES = ("/alerts", "/heartbeat")
 
 
@@ -453,6 +453,36 @@ def _load_hub_dashboard_html() -> str:
 async def hub_dashboard():
     """Central dashboard reflecting alerts from all deployed agents."""
     return HTMLResponse(content=_load_hub_dashboard_html())
+
+
+# ── Fase 1.3 — consola "Mesa de triaje" ─────────────────────────────────────
+# Mismo patrón de servido que /dashboard y /api/v1/hub (HTML en un fichero
+# junto a app.py, leído una vez y cacheado).
+#
+# ``/consola`` va EXENTO de auth, igual que ``/dashboard`` y ``/hub``. No es un
+# descuido: el shell es HTML+JS sin datos y el navegador NO puede mandar la
+# cabecera ``Authorization`` en una navegación normal, así que protegerlo con
+# bearer lo hacía inalcanzable (401 siempre, aunque el token estuviera en
+# localStorage). La consola trae su propio formulario de login: pide
+# ``POST /api/v1/auth/login``, guarda el token y lo manda en cada ``fetch``
+# posterior. Los DATOS siguen protegidos: ``/api/v1/flows`` y
+# ``PATCH /api/v1/flows/{key}/state`` NO están exentos y devuelven 401 sin
+# token. El HTML en sí no filtra nada — la geometría de la red vive en la API.
+_CONSOLA_HTML: Optional[str] = None
+
+
+def _load_consola_html() -> str:
+    global _CONSOLA_HTML
+    if _CONSOLA_HTML is None:
+        html_path = Path(__file__).parent / "consola.html"
+        _CONSOLA_HTML = html_path.read_text(encoding="utf-8")
+    return _CONSOLA_HTML
+
+
+@app.get("/consola", response_class=HTMLResponse)
+async def consola():
+    """Mesa de triaje (Fase 1.3): cola de casos + inspector fijo 62/38."""
+    return HTMLResponse(content=_load_consola_html())
 
 
 @app.post("/api/v1/agents/{agent_id}/alerts")
