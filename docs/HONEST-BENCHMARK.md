@@ -160,6 +160,14 @@ Aun así, 2 059,8 flujos/s sigue siendo una cifra **favorable** y hay que leerla
 son flujos sintéticos de un solo paquete, sin I/O de pcap y sin concurrencia. El número que
 ve un operador que abre un pcap es **326,2 flujos/s**, 6,3× menor, porque `rdpcap` domina.
 
+**Esta cifra es sensible a la carga de la máquina.** Reproducción independiente del
+2026-10-23 con `--flows 3000 --repeat 1` y load 1,39 dio **1 193,9 flujos/s** (y 178,6
+pcap→scores), un 42 % por debajo de la mediana publicada con load 0,87. Las dos
+ejecuciones son válidas y el script marca `contaminated=false` en ambas: la diferencia
+es contención de CPU en esta VM de 4 vCPU, no un cambio de código. Por eso el script
+aborta con load alto y por eso la cifra que debe citarse en material comercial es la de
+**pcap→scores** (326), no la de núcleo puro, que ningún operador va a ver.
+
 #### Qué NO mide este script
 
 - Gbps de red sostenidos: **NO MEDIDO** — no hay NIC dedicada ni permisos de captura en esta
