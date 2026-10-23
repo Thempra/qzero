@@ -14,7 +14,10 @@ References:
 import numpy as np
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, Tuple, List
+import logging
 import time
+
+logger = logging.getLogger(__name__)
 
 try:
     import torch
@@ -34,6 +37,18 @@ try:
     QISKIT_AVAILABLE = True
 except ImportError:
     QISKIT_AVAILABLE = False
+
+
+# --- Numeric safety bounds (Fase 0.6) -------------------------------------
+# Encoder log-variance is clamped before exp() so the reparameterisation
+# cannot overflow to inf (which poisons the MSE and yields NaN scores).
+LOGVAR_CLAMP_MIN: float = -20.0
+LOGVAR_CLAMP_MAX: float = 20.0
+
+# Value substituted for non-finite reconstruction errors (nan/inf) so that the
+# returned score stays finite. It is far above any plausible finite error, so a
+# poisoned flow ranks as the most anomalous one instead of the most normal one.
+SCORE_SANITIZE_SENTINEL: float = 1e12
 
 
 def check_torch():
@@ -304,7 +319,14 @@ if TORCH_AVAILABLE:
             
             In quantum measurement, outcomes follow Born rule (|amplitude|^2).
             We add a similar nonlinear transformation to the sampling process.
+
+            ``logvar`` is clamped to ``[LOGVAR_CLAMP_MIN, LOGVAR_CLAMP_MAX]``
+            before exponentiation. Unclamped encoder heads can emit log-variance
+            values in the hundreds, where ``exp(0.5 * logvar)`` overflows float32
+            to ``inf`` and every downstream reconstruction error becomes NaN
+            (which then compared False against the threshold => fail-open).
             """
+            logvar = torch.clamp(logvar, LOGVAR_CLAMP_MIN, LOGVAR_CLAMP_MAX)
             std = torch.exp(0.5 * logvar)
             eps = torch.randn_like(std)
             
@@ -572,7 +594,28 @@ class QIVAE:
         with torch.no_grad():
             errors = self.model.reconstruction_error(X_tensor)
         
-        return errors.cpu().numpy()
+        errors_np = errors.cpu().numpy().astype(np.float64, copy=False)
+        # Fail-closed sanitation (Fase 0.6): a non-finite error must never be
+        # reported as a small score. nan_to_num maps nan -> sentinel and
+        # +inf -> sentinel, so poisoned flows stay at the top of the ranking.
+        finite_mask = np.isfinite(errors_np)
+        n_bad = int((~finite_mask).sum())
+        if n_bad:
+            self.n_sanitized_errors = getattr(self, "n_sanitized_errors", 0) + n_bad
+            logger.warning(
+                "QI-VAE: %d/%d non-finite reconstruction errors sanitized to %g "
+                "(cumulative=%d). Check encoder logvar saturation.",
+                n_bad, errors_np.size, SCORE_SANITIZE_SENTINEL,
+                self.n_sanitized_errors,
+            )
+            errors_np = np.nan_to_num(
+                errors_np,
+                nan=SCORE_SANITIZE_SENTINEL,
+                posinf=SCORE_SANITIZE_SENTINEL,
+                neginf=0.0,
+            )
+        
+        return errors_np
     
     def predict_anomaly_scores(self, X: np.ndarray) -> np.ndarray:
         """
@@ -591,7 +634,13 @@ class QIVAE:
     def predict(self, X: np.ndarray) -> np.ndarray:
         """
         Predict binary labels (0=normal, 1=anomaly).
-        
+
+        Fail-closed semantics (Fase 0.6): any sample whose reconstruction error
+        is not finite is labelled 1 (anomaly). The old code did
+        ``(errors > threshold)`` directly, and since ``nan > x`` is False, every
+        NaN flow was silently classified as NORMAL — an attacker able to push
+        the encoder into logvar saturation got a free pass.
+
         Args:
             X: Input samples
         
@@ -599,7 +648,15 @@ class QIVAE:
             Binary predictions
         """
         errors = self.reconstruction_errors(X)
-        return (errors > self.anomaly_threshold).astype(int)
+        labels = (errors > self.anomaly_threshold).astype(int)
+        non_finite = ~np.isfinite(errors)
+        if non_finite.any():
+            labels[non_finite] = 1
+            logger.warning(
+                "QI-VAE predict: forced %d non-finite error(s) to label=1 (anomaly)",
+                int(non_finite.sum()),
+            )
+        return labels
     
     def encode(self, X: np.ndarray) -> np.ndarray:
         """
