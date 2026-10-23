@@ -20,6 +20,70 @@ from ..evaluation.metrics import (
     print_evaluation_report,
 )
 
+# --- Score normalization (Fase 0.7) ---------------------------------------
+# Raw QI-VAE reconstruction errors are unbounded (measured 1.9e9 .. 1.2e17 on
+# real attack pcaps). The agent's alert_threshold is 4.2 while the model's own
+# raw threshold is ~0.4824, so raw scores were 8.7x-16 orders of magnitude off
+# and the comparison 4.2 meant nothing. normalize_score() maps a raw error
+# monotonically onto [0, 100], anchored so that 4.2 *is* the model's decision
+# boundary (misalignment 1x instead of 8.7x).
+#
+# Mapping (reference = the QI-VAE raw anomaly_threshold, default 1.0):
+#   score = ALERT_SCORE_ANCHOR + SCORE_DECADE_GAIN * log10(raw / reference)
+#   clamped to [0, 100]; non-finite raw -> 100 (fail-closed).
+#
+#   raw/ref     score
+#   -------     -----
+#   0.01        0.0     (clamped, log term -12)
+#   0.1         0.0     (clamped)
+#   0.5         2.4
+#   1.0         4.2     <- model threshold == alert threshold
+#   10          10.2
+#   1e3         22.2
+#   1e9         58.2    <- typical attack flow
+#   1e12        76.2    <- SCORE_SANITIZE_SENTINEL for NaN/inf errors
+#   1e16        100.2 -> clamps to 100.0
+#   1e17        100.0   (saturation)
+#
+# Strictly increasing up to raw/ref = 1e16, constant 100 above it: order between
+# flows is preserved, no batch statistics involved.
+ALERT_SCORE_ANCHOR: float = 4.2
+SCORE_DECADE_GAIN: float = 6.0
+SCORE_MAX: float = 100.0
+DEFAULT_SCORE_REFERENCE: float = 1.0
+
+
+def normalize_score(raw: float, reference: Optional[float] = None) -> float:
+    """
+    Map an unbounded raw anomaly score onto a monotonic [0, 100] scale.
+
+    This is the ONLY score normalization applied in the pipeline. It is
+    deliberately stateless (no fitted parameters, no batch statistics) so a
+    given raw error always yields the same reported score.
+
+    Args:
+        raw: Raw model score (QI-VAE reconstruction error).
+        reference: Raw value that maps exactly to the alert threshold 4.2.
+            Defaults to the model's own anomaly threshold when the caller has
+            it; falls back to DEFAULT_SCORE_REFERENCE.
+
+    Returns:
+        Score in [0, 100]. Non-finite input returns SCORE_MAX (fail-closed:
+        a poisoned score must look maximally anomalous, never benign).
+    """
+    if reference is None or not np.isfinite(reference) or reference <= 0:
+        reference = DEFAULT_SCORE_REFERENCE
+
+    value = float(raw)
+    if not np.isfinite(value):
+        # NaN/inf: fail-closed -> treat as maximally anomalous.
+        return SCORE_MAX
+    if value <= 0.0:
+        return 0.0
+
+    score = ALERT_SCORE_ANCHOR + SCORE_DECADE_GAIN * np.log10(value / reference)
+    return float(min(max(score, 0.0), SCORE_MAX))
+
 
 class QZeroPredictor:
     """
@@ -429,14 +493,27 @@ class QZeroPredictor:
         method: str = "qivae",
     ) -> np.ndarray:
         """
-        Get anomaly scores for new data.
+        Get anomaly scores for new data, normalized to [0, 100].
 
         Args:
             X: Input features
             method: Method to use ("qivae", "qsvm")
 
         Returns:
-            Anomaly scores (0-1)
+            Anomaly scores on a bounded, monotonic [0, 100] scale.
+
+        Scaling contract (Fase 0.7): this method is the SINGLE feature-scaling
+        point for scores — `self.scaler.transform` is applied here and nowhere
+        upstream (the detector used to pre-transform its input, which made every
+        score double-scaled twice over: detector + predict + here).
+
+        Normalization: QI-VAE reconstruction errors are unbounded, so they are
+        mapped through `normalize_score` with the model's own raw
+        `anomaly_threshold` as reference. That anchor makes the reported alert
+        threshold 4.2 coincide with the model's real decision boundary, so the
+        ordering of flows and the anomaly/normal split stay identical while the
+        magnitude becomes interpretable. QSVM probabilities are already bounded
+        in [0, 1] and are only rescaled to the same 0-100 range.
         """
         if not self.model_fitted:
             raise RuntimeError("Model not trained. Call train_all() first.")
@@ -445,27 +522,38 @@ class QZeroPredictor:
             X = self.scaler.transform(X)
 
         if method == "qivae" and self.qivae_model:
-            return self.qivae_model.reconstruction_errors(X)
+            raw = self.qivae_model.reconstruction_errors(X)
+            reference = getattr(self.qivae_model, "anomaly_threshold", None)
+            return np.array(
+                [normalize_score(v, reference) for v in np.asarray(raw).ravel()],
+                dtype=float,
+            )
         elif method == "qsvm" and self.qsvm_model:
-            # Use probability of class 1 (anomaly)
+            # Use probability of class 1 (anomaly); already bounded in [0, 1].
             try:
                 proba = self.qsvm_model.model.predict_proba(X)
                 # proba[:, 1] es la clase anomalía en clasificación binaria
-                return proba[:, 1]
+                return np.clip(proba[:, 1], 0.0, 1.0) * SCORE_MAX
             except Exception:
                 # Fallback to predictions
-                return self.qsvm_model.predict(X).astype(float)
+                return self.qsvm_model.predict(X).astype(float) * SCORE_MAX
         else:
             raise ValueError(f"Unknown method: {method}")
     def get_threshold(self) -> float:
         """
-        Get anomaly threshold from QIVAE model.
+        Get the alerting threshold on the normalized [0, 100] score scale.
 
         Returns:
-            Threshold value for anomaly detection.
+            Threshold value for anomaly detection, expressed in the same units
+            as `get_anomaly_score`. When a QI-VAE is fitted the raw
+            `anomaly_threshold` is mapped through `normalize_score`, which yields
+            ALERT_SCORE_ANCHOR (4.2) by construction — the model boundary and the
+            agent's alert threshold are therefore the same number. The 0.5
+            default is kept for an unfitted predictor.
         """
         if self.qivae_model:
-            return self.qivae_model.anomaly_threshold
+            raw = self.qivae_model.anomaly_threshold
+            return normalize_score(raw, raw)
         return 0.5  # Default fallback
 
     def evaluate(self) -> Dict[str, Any]:

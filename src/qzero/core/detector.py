@@ -201,7 +201,11 @@ class NetworkTrafficAnalyzer:
                         X = np.hstack([X, padding])
                     else:
                         X = X[:, :expected]
-                X = self.predictor.scaler.transform(X)
+                # NOTE (Fase 0.7): the StandardScaler is deliberately NOT applied
+                # here. predictor.predict() and predictor.get_anomaly_score()
+                # each apply self.scaler exactly once; transforming here as well
+                # produced the triple-scaling bug (max|z| 58534 -> 19 -> 41.7).
+                # The single scaling point is QZeroPredictor.
 
             predictions = self.predictor.predict(X, method=method)
             n_anomalies = int(predictions.sum())
