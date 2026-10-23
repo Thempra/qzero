@@ -148,9 +148,16 @@ def flow_key(src: str, dst: str, dst_port, protocol) -> str:
 # Expresión SQL equivalente a flow_key() sobre una fila de ``alerts``. Se usa
 # en el LEFT JOIN contra flow_state: si se desalineara con flow_key(), un flujo
 # marcado como benigno volvería a aparecer en la cola de triaje.
+#
+# NULLIF(x, '') antes del COALESCE no es redundante: en Python la cadena vacía
+# se normaliza a '0' (flow_key), pero SQL la dejaba pasar tal cual, así que un
+# agente que reportara dst_port="" escribía la clave ``src,dst,,proto`` y el
+# flujo marcado como benigno resucitaba en la cola. No ocurre con los datos de
+# producción actuales (0 filas con '' o NULL en dst_port/protocol), pero la
+# divergencia existía; test_fase1_flows.py la comprueba caso por caso.
 _FLOW_KEY_SQL = (
-    "({src} || ',' || {dst} || ',' || COALESCE({dst_port}, 0)"
-    " || ',' || COALESCE({protocol}, 0))"
+    "({src} || ',' || {dst} || ',' || COALESCE(NULLIF({dst_port}, ''), 0)"
+    " || ',' || COALESCE(NULLIF({protocol}, ''), 0))"
 )
 
 

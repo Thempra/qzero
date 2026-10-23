@@ -312,3 +312,32 @@ def test_flows_routes_are_behind_auth_middleware():
     assert res["flows"] == 503
     assert res["flows_patch"] == 503
     assert res["health"] == 200
+
+
+def test_python_and_sql_flow_keys_never_diverge(store):
+    """flow_key() y _flow_key_sql() deben dar la MISMA cadena en todos los casos.
+
+    Si divergen, el PATCH guarda una clave que el LEFT JOIN del listado no
+    encuentra: el analista marca un flujo como benigno y el flujo reaparece en
+    la cola de triaje. La cadena vacía era el caso roto (SQL la dejaba pasar,
+    Python la normalizaba a 0); se cierra con NULLIF antes del COALESCE.
+    """
+    from qzero.api.hub import _flow_key_sql
+
+    cases = [
+        (443, 6), (None, None), ("", ""), ("", 6), (443, ""),
+        (443.0, 6.0), (" 443", 6), ("abc", "x"), (0, 0),
+    ]
+    for dst_port, protocol in cases:
+        _seed(store, dst_port=dst_port, protocol=protocol)
+        row = store._conn.execute(
+            "SELECT typeof(dst_port), dst_port, typeof(protocol), protocol "
+            "FROM alerts ORDER BY id DESC LIMIT 1").fetchone()
+        sql_key = store._conn.execute(
+            f"SELECT {_flow_key_sql()} FROM alerts ORDER BY id DESC LIMIT 1"
+        ).fetchone()[0]
+        py_key = flow_key("10.0.0.5", "1.2.3.4", row[1], row[3])
+        assert py_key == sql_key, (
+            f"divergen con dst_port={dst_port!r} protocol={protocol!r} "
+            f"(guardado como {row[0]}/{row[2]}): python={py_key!r} sql={sql_key!r}")
+        store._conn.execute("DELETE FROM alerts")
