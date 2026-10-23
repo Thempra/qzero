@@ -97,16 +97,22 @@ Objetivo: que QZero deje de ser un riesgo y empiece a decir la verdad.
 **Deuda conocida de Fase 0:** el rate limit es por worker y en memoria (con varios workers no se comparte); ningún despliegue usa password hasheada todavía; `offline_notified` se pierde en cada restart.
 
 ### FASE 1 — Producto mínimo vendible (semanas 2-3, ~10 d-hombre)
-| ID | Entrega | Depende de |
-|---|---|---|
-| 1.1 | `GET /api/v1/flows`: `GROUP BY src,dst,dst_port,proto` + índice compuesto, p50/p99/max score, volumen/min | 0.1 |
-| 1.2 | Tabla `flow_state` + `PATCH /flows/{key}/state` (requiere auth) | 1.1, 0.1 |
-| 1.3 | Consola "Mesa de triaje": cola de casos + inspector fijo 62/38, read-only | 1.1 |
-| 1.4 | `PROMISCUOUS=1` + SPAN/TAP + captura de ≥5.000 flujos benignos reales | acceso a red |
-| 1.5 | `calibrate_threshold.py` ejecutado: umbral = p99,9 de benignos | 1.4 |
-| 1.6 | Benchmark honesto reproducible (`HONEST-BENCHMARK.md` + script) | — |
-| 1.7 | Script de throughput real (Gbps, CPU/RAM) | — |
-| 1.8 | Criterio de éxito de PoC firmable en 1 página | — |
+| ID | Entrega | Depende de | Estado |
+|---|---|---|---|
+| 1.1 | `GET /api/v1/flows`: `GROUP BY src,dst,dst_port,proto` + índice compuesto, p50/p99/max score, volumen/min | 0.1 | **HECHO** `ab07eaf` |
+| 1.2 | Tabla `flow_state` + `PATCH /flows/{key}/state` (requiere auth) | 1.1, 0.1 | **HECHO** `ab07eaf` |
+| 1.3 | Consola "Mesa de triaje": cola de casos + inspector fijo 62/38, read-only | 1.1 | pendiente |
+| 1.4 | `PROMISCUOUS=1` + SPAN/TAP + captura de ≥5.000 flujos benignos reales | acceso a red | pendiente |
+| 1.5 | `calibrate_threshold.py` ejecutado: umbral = p99,9 de benignos | 1.4 | pendiente |
+| 1.6 | Benchmark honesto reproducible (`HONEST-BENCHMARK.md` + script) | — | **HECHO** `dc4ad26` |
+| 1.7 | Script de throughput real (Gbps, CPU/RAM) | — | **HECHO** `dc4ad26` |
+| 1.8 | Criterio de éxito de PoC firmable en 1 página | — | pendiente |
+
+**Lo entregado en 1.1/1.2:** `GET /api/v1/flows` (ventana 1-1440 min, `limit` ≤200, orden por severidad/score/volumen, `only_untriaged`) y `PATCH /api/v1/flows/{key}/state` (`nuevo|investigando|benigno|malicioso`, 400 si inválido). Índice covering `idx_alerts_flow_window` + `idx_alerts_flow_score` por expresión `COALESCE`; agregación antes del LEFT JOIN (910→631 ms a 1440 min sobre 1,7 M filas, 43,3 ms HTTP). Ambas rutas tras auth (503 sin `ADMIN_PASSWORD` en subproceso limpio). Corregida una divergencia real entre `flow_key()` y `_flow_key_sql()` en la cadena vacía (`'0,0'` vs `',,'`) que resucitaba flujos marcados como benignos.
+
+**Lo entregado en 1.6/1.7:** veredicto **DEGENERADO** — 48 filas únicas de 2.942 flujos (1,63 %), 6 de 14 features con varianza cero, 98,47 % de flujos con ≤1 paquete forward; un stump de un solo feature (`flow_duration`, 0,8334) supera al modelo (0,2581) y casi al baseline trivial (0,8149). Throughput: mediana de 3 repeticiones 2.059,8 flujos/s end-to-end y **326,2 pcap→scores** (la cifra citable). Reproducción independiente con más carga dio 1.193,9, un 42 % menos: la cifra es sensible a contención de CPU y así queda documentado.
+
+**La conclusión que importa de 1.6:** sin tráfico benigno real (1.4) y sin conversación bidireccional, no hay forma de medir detección. El corpus actual no puede demostrar capacidad; solo puede demostrar que el pipeline corre. 1.4 y 1.5 son el verdadero cuello de botella del producto, no la consola.
 
 ### FASE 2 — Negocio (post-gate, 3-6 meses)
 - 3 assessments pagados en 90 días o pivot a OSS puro. **Gate duro.**
