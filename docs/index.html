@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>QZero — Detección de amenazas de red con QI-VAE y QSVM</title>
-<meta name="description" content="QZero es una plataforma NDR open source, self-hosted, con licencia MIT. Motores Quantum-Inspired VAE y QSVM que puntúan cada flujo de red con una score continua. Cero firmas.">
+<title>QZero — NDR open source: un VAE puntúa cada flujo de red</title>
+<meta name="description" content="QZero es una plataforma NDR open source, self-hosted, con licencia MIT. Un autoencoder variacional (VAE) puntúa cada flujo de red con un score continuo. Cero firmas. La rama de kernel cuántico es I+D experimental con resultado negativo publicado.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0E14'/%3E%3Ctext x='16' y='22.5' font-family='monospace' font-size='18' font-weight='700' fill='%23E6EAF2' text-anchor='middle'%3EQ%3C/text%3E%3Crect x='18' y='19' width='7' height='3' fill='%233B82F6'/%3E%3C/svg%3E">
 <style>
 @font-face{font-family:'Schibsted Grotesk';font-style:normal;font-weight:400;font-display:swap;src:url(assets/fonts/schibsted-latin.woff2) format('woff2')}
@@ -244,7 +244,7 @@ footer a{color:var(--hi)}
       <span class="lnc"><span class="ln"><span class="es">Detecta el ataque</span><span class="en">See the attack</span></span></span>
       <span class="lnc"><span class="ln"><span class="es">antes de la firma.</span><span class="en">before its signature.</span></span></span>
     </h1>
-    <p class="lede"><span class="en">QZero is an open-source, self-hosted NDR. A quantum-inspired variational autoencoder learns what normal looks like on your network and scores every flow with a continuous number, not a boolean. Zero signatures. Zero cloud.</span><span class="es">QZero es un NDR open source y autoalojado. Un autoencoder variacional inspirado en computación cuántica aprende qué es normal en tu red y puntúa cada flujo con un número continuo, no un booleano. Cero firmas. Cero nube.</span></p>
+    <p class="lede"><span class="en">QZero is an open-source, self-hosted NDR. A variational autoencoder learns what normal looks like on your network and scores every flow with a continuous number, not a boolean. Zero signatures. Zero cloud. The quantum-kernel branch is experimental R&amp;D, and its benchmark came out negative — published as-is below.</span><span class="es">QZero es un NDR open source y autoalojado. Un autoencoder variacional aprende qué es normal en tu red y puntúa cada flujo con un número continuo, no un booleano. Cero firmas. Cero nube. La rama de kernel cuántico es I+D experimental y su benchmark salió negativo: lo publicamos tal cual, más abajo.</span></p>
     <p class="cta"><a class="go" href="https://github.com/thempra/qzero"><span class="en">Download QZero free</span><span class="es">Descargar QZero gratis</span></a>
       <a class="link" href="#run"><span class="en">or watch it score real traffic ↓</span><span class="es">o míralo puntuar tráfico real ↓</span></a></p>
   </section>
@@ -289,7 +289,7 @@ footer a{color:var(--hi)}
             <span class="cap"><span class="en">score distribution, this capture</span><span class="es">distribución de scores, esta captura</span></span>
             <canvas class="hist" id="hist" width="560" height="360"></canvas>
           </div>
-          <p class="kv capline"><span class="en">16 050 flows/s on CPU · 0 signatures · 100% self-hosted</span><span class="es">16 050 flujos/s en CPU · 0 firmas · 100% autoalojado</span></p>
+          <p class="kv capline"><span class="en">scores on CPU, no GPU · 0 signatures · self-hosted</span><span class="es">puntúa en CPU, sin GPU · 0 firmas · autoalojado</span></p>
         </aside>
       </div>
     </div>
@@ -320,7 +320,7 @@ footer a{color:var(--hi)}
       <div class="exchange rv">
         <p class="ask"><span class="en">Then, it scores.</span><span class="es">Después, puntúa.</span></p>
         <pre class="call" data-ui><code>$ qzero analyze suspicious.pcap --model-dir models/qzero-candidate</code></pre>
-        <div class="resp"><p><span class="en">A variational autoencoder trained only on normal traffic reconstructs each flow; the harder the reconstruction, the stranger the flow. A quantum-kernel SVM then separates threat from noise. The output is one continuous score per flow — you decide where normal ends, and a PostFilter silences discovery chatter (SSDP, mDNS) before you see an alert.</span><span class="es">Un autoencoder variacional entrenado solo con tráfico normal reconstruye cada flujo. Cuanto más le cuesta, más extraño es el flujo. Una SVM con kernel cuántico separa después amenaza de ruido. El resultado es un score continuo por flujo: tú decides dónde acaba lo normal. Un PostFilter silencia el ruido de descubrimiento (SSDP, mDNS) antes de que veas una alerta.</span></p></div>
+        <div class="resp"><p><span class="en">A variational autoencoder trained only on normal traffic reconstructs each flow; the harder the reconstruction, the stranger the flow. That VAE is the whole deployed engine, and it is classical: <code>use_quantum_encoder=False</code>, no circuits in the weights. The quantum-kernel SVM is an offline experiment, disabled by default (<code>QZERO_USE_QSWM=0</code>). The output is one continuous score per flow — you decide where normal ends, and a PostFilter silences discovery chatter (SSDP, mDNS) before you see an alert.</span><span class="es">Un autoencoder variacional entrenado solo con tráfico normal reconstruye cada flujo. Cuanto más le cuesta, más extraño es el flujo. Ese VAE es todo el motor desplegado, y es clásico: <code>use_quantum_encoder=False</code>, sin circuitos en los pesos. La SVM con kernel cuántico es un experimento offline, apagado por defecto (<code>QZERO_USE_QSWM=0</code>). El resultado es un score continuo por flujo: tú decides dónde acaba lo normal. Un PostFilter silencia el ruido de descubrimiento (SSDP, mDNS) antes de que veas una alerta.</span></p></div>
       </div>
 
       <div class="exchange rv">
@@ -348,10 +348,10 @@ footer a{color:var(--hi)}
   <!-- HONEST NUMBERS -->
   <section class="axis wide" id="truth">
     <h2 class="rv"><span class="en">Numbers that do not flatter us.</span><span class="es">Números que no nos favorecen.</span></h2>
-    <p class="sec-intro rv d1"><span class="en">Security tools love to quote one lucky benchmark. We would rather print the whole bench sheet — QSVM row included, wins and losses. Every row below comes from model-performance-reports/benchmark-pcaps-latest.json in the repo; re-run it and check.</span><span class="es">A las herramientas de seguridad les encanta citar un benchmark afortunado. Nosotros preferimos imprimir el banco completo — fila QSVM incluida, victorias y derrotas. Cada fila viene de model-performance-reports/benchmark-pcaps-latest.json en el repo; vuelve a ejecutarlo y comprueba.</span></p>
+    <p class="sec-intro rv d1"><span class="en">Security tools love to quote one lucky benchmark. We would rather print the whole bench sheet — QSVM row included, wins and losses. Every row below comes from model-performance-reports/benchmark-pcaps-latest.json in the repo; re-run it and check. The full bench sheet, including what we could not measure, is in <a href="https://github.com/thempra/qzero/blob/main/docs/HONEST-BENCHMARK.md">docs/HONEST-BENCHMARK.md</a>.</span><span class="es">A las herramientas de seguridad les encanta citar un benchmark afortunado. Nosotros preferimos imprimir el banco completo — fila QSVM incluida, victorias y derrotas. Cada fila viene de model-performance-reports/benchmark-pcaps-latest.json en el repo; vuelve a ejecutarlo y comprueba. El banco completo, incluido lo que no hemos podido medir, está en <a href="https://github.com/thempra/qzero/blob/main/docs/HONEST-BENCHMARK.md">docs/HONEST-BENCHMARK.md</a>.</span></p>
     <div class="benchwrap rv">
       <table class="bench">
-        <caption><span class="en">Leave-one-attack-type-out over 5 labeled PCAPs (2 942 flows), seed 42, CPU, 2026-10-14. QSVM: 4 qubits, real quantum kernel (Qiskit), train capped at 120 samples. Inference time: whole test set, one flow per second against twenty-six thousand.</span><span class="es">Leave-one-attack-type-out sobre 5 PCAP etiquetados (2 942 flujos), semilla 42, CPU, 2026-10-14. QSVM: 4 qubits, kernel cuántico real (Qiskit), tope de 120 muestras de train. Tiempo de inferencia: test completo, un flujo por segundo contra veintiséis mil.</span></caption>
+        <caption><span class="en">Leave-one-attack-type-out over 5 labeled PCAPs (2 942 flows), seed 42, CPU, 2026-10-14. QSVM: 4 qubits, real quantum kernel (Qiskit), train capped at 120 samples. Source: model-performance-reports/benchmark-pcaps-2026-10-14T23-34-36.md.</span><span class="es">Leave-one-attack-type-out sobre 5 PCAP etiquetados (2 942 flujos), semilla 42, CPU, 2026-10-14. QSVM: 4 qubits, kernel cuántico real (Qiskit), tope de 120 muestras de train. Fuente: model-performance-reports/benchmark-pcaps-2026-10-14T23-34-36.md.</span></caption>
         <thead>
           <tr>
             <th scope="col"><span class="en">attack type</span><span class="es">tipo de ataque</span></th>
@@ -365,12 +365,13 @@ footer a{color:var(--hi)}
           <tr class="q"><td>bruteforce</td><td><b>0.711</b> / 0.707</td><td>0.84 / 0.25</td><td>74.3 s / 0.034 s</td></tr>
           <tr class="q"><td>exfiltration</td><td><b>0.711</b> / 0.707</td><td>0.52 / 0.61</td><td>64.0 s / 0.023 s</td></tr>
           <tr class="q"><td>malware</td><td><b>0.711</b> / 0.707</td><td>0.56 / 0.61</td><td>63.0 s / 0.023 s</td></tr>
-          <tr class="grp"><td><span class="en">mean F1, four folds</span><span class="es">F1 medio, cuatro folds</span></td><td><b>0.569</b> / 0.566</td><td>—</td><td>—</td></tr>
-          <tr class="grp"><td><span class="en">scoring throughput, 2 cores</span><span class="es">throughput de puntuación, 2 cores</span></td><td>—</td><td>—</td><td><b>16 050</b> <span class="en">flows/s</span><span class="es">flujos/s</span></td></tr>
+          <tr class="grp"><td><span class="en">mean F1, four folds</span><span class="es">F1 medio, cuatro folds</span></td><td><b>0.711</b> / 0.707</td><td>—</td><td>—</td></tr>
+          <tr class="grp"><td><span class="en">precision · recall (every fold, both models)</span><span class="es">precision · recall (todos los folds, ambos modelos)</span></td><td>0.55 · 1.00</td><td>0.55 · 1.00</td><td>—</td></tr>
+          <tr class="grp"><td><span class="en">stratified 80/20 split · ROC-AUC</span><span class="es">split estratificado 80/20 · ROC-AUC</span></td><td><b>0.34</b></td><td>0.61</td><td>—</td></tr>
         </tbody>
       </table>
     </div>
-    <p class="verdict rv"><span class="en">Read the sheet honestly: <b>0.711 against 0.707</b> is a statistical shrug, and the QSVM loses on ROC-AUC in three of four folds while burning three orders of magnitude more CPU. The quantum kernel is not magically better, and this page will not pretend it is. The argument is elsewhere: no signatures, unsupervised, the score exists before the name.</span><span class="es">Lee el banco con honestidad: <b>0.711 contra 0.707</b> es un encogimiento estadístico, y el QSVM pierde en ROC-AUC en tres de cuatro folds gastándose tres órdenes de magnitud más de CPU. El kernel cuántico no es mágicamente mejor, y esta página no va a fingir que lo es. El argumento está en otro lado: sin firmas, sin supervisión, el score existe antes que el nombre.</span></p>
+    <p class="verdict rv"><span class="en">Read the sheet honestly: <b>0.711 against 0.707</b> is not an advantage, it is a degenerate benchmark. Both models predict "attack" on 100% of flows (recall 1.00, precision 0.55 — that is just the class prevalence of the fold), so that F1 measures the mix of the split, not detection. The bank itself is the problem: 2 942 flows contain 48 unique rows, 6 of the 14 features have zero variance, and 98.5% of flows are a single packet. On the one non-degenerate test, the stratified 80/20 split, the QSVM scores <b>ROC-AUC 0.34</b> — worse than a coin. There is no quantum advantage here, and this page will not invent one.</span><span class="es">Lee el banco con honestidad: <b>0.711 contra 0.707</b> no es una ventaja, es un banco degenerado. Ambos modelos predicen «ataque» en el 100% de los flujos (recall 1.00, precision 0.55, que es solo la prevalencia de la clase en el fold), así que ese F1 mide la mezcla del split, no la detección. El problema es el banco: 2 942 flujos contienen 48 filas únicas, 6 de las 14 features tienen varianza cero y el 98,5% de los flujos son un solo paquete. En el único test no degenerado, el split estratificado 80/20, el QSVM da <b>ROC-AUC 0,34</b>: peor que una moneda. Aquí no hay ventaja cuántica, y esta página no va a inventarse una.</span></p>
     <div class="confess rv">
       <b class="big">100.0%</b>
       <p><span class="en">Yes, the candidate model also flags normal.pcap at 100%. It is a retraining candidate — and that is exactly why this page shows raw scores and a threshold you control, never a friendly green "all clear".</span><span class="es">Sí, el candidato también marca el normal.pcap al 100%. Es un candidato en reentrenamiento. Por eso esta página muestra scores crudos y un umbral que controlas, nunca un verde "todo despejado" de cortesía.</span></p>
@@ -385,11 +386,11 @@ footer a{color:var(--hi)}
     <div class="exchange rv">
       <pre class="call" data-ui><code><span class="cmd" data-out="install1">$ git clone https://github.com/thempra/qzero.git && cd qzero</span>
 <span class="cmd" data-out="install2">$ pip install -e ".[all]"</span></code></pre>
-      <div class="resp"><p><span class="en">Python 3.10+, no GPU required for scoring (the quantum-kernel SVM trains on CPU).</span><span class="es">Python 3.10+, sin GPU para puntuar (la SVM con kernel cuántico entrena en CPU).</span></p></div>
+      <div class="resp"><p><span class="en">Python 3.10+. Scoring runs on CPU — the VAE is a small PyTorch model, no GPU, no quantum backend. Qiskit is only needed to reproduce the offline QSVM experiment.</span><span class="es">Python 3.10+. La puntuación corre en CPU: el VAE es un modelo PyTorch pequeño, sin GPU y sin backend cuántico. Qiskit solo hace falta para reproducir el experimento QSVM offline.</span></p></div>
     </div>
     <div class="exchange rv">
       <pre class="call" data-ui><code><span class="cmd" data-out="hero">$ qzero analyze suspicious.pcap --model-dir models/qzero-candidate</span></code></pre>
-      <div class="resp"><p><span class="en">The engine loads the VAE and SVM and scores every flow in the file.</span><span class="es">El motor carga el VAE y la SVM y puntúa cada flujo del archivo.</span></p></div>
+      <div class="resp"><p><span class="en">The engine loads the VAE state dict — Linear + BatchNorm tensors, no circuits — and scores every flow in the file.</span><span class="es">El motor carga el state dict del VAE — tensores Linear + BatchNorm, sin circuitos — y puntúa cada flujo del archivo.</span></p></div>
     </div>
     <div class="exchange rv">
       <pre class="call" data-ui><code><span class="cmd" data-out="hub">$ qzero server --port 8000</span></code></pre>

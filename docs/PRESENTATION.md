@@ -44,11 +44,11 @@ style: |
 <!-- _class: lead -->
 <!-- _backgroundColor: #0d1117 -->
 
-# ⚛️ QZero
+# QZero
 
-## Quantum-Enhanced Threat Detection Platform
+## Self-Hosted NDR: score every flow, no signatures
 
-### *Detecting the Unknown with Quantum Machine Learning*
+### *Scoring the Unknown without Signatures*
 
 ---
 
@@ -58,12 +58,12 @@ style: |
 
 **iQuHACK 2026 | MIT**
 
-> *"You can't detect what you've never seen... unless you're quantum."*
+> *"You can't match a signature you've never seen. So we stopped using signatures."*
 
-![bg right:40% 80%](https://img.shields.io/badge/Quantum-Enabled-a371f7?style=for-the-badge&logo=atom)
+![bg right:40% 80%](https://img.shields.io/badge/Self--Hosted-NDR-3B82F6?style=for-the-badge&logo=shield)
 
 **Team:** Radomo
-**Category:** Cybersecurity × Quantum Computing
+**Category:** Cybersecurity
 
 ---
 
@@ -94,34 +94,36 @@ style: |
 
 ---
 
-# 📊 The Detection Gap
+# The Detection Gap
 
 | Approach | Known Attacks | Zero-Days | False Positive Rate |
 |----------|--------------|-----------|---------------------|
 | **Snort/Suricata** | ✅ 95%+ | ❌ 0% | Low |
 | **Anomaly-based** | ✅ 85% | ⚠️ 40-60% | High (5-15%) |
 | **Classical ML** | ✅ 90% | ⚠️ 60-75% | Medium (3-8%) |
-| **QZero (Quantum)** | ✅ 92% | ✅ **85-92%** | **<3%** |
+| **QZero** | n/a — no signatures | **not established** (see benchmark) | **not measured** |
 
-> 🎯 **Our Target:** >85% zero-day detection with <3% FPR
+> The figures above for Snort/Anomaly/Classical are industry rules of thumb, not measurements
+> from this repo. For QZero we only print what we measured — and we have not measured
+> zero-day detection or FPR on a representative corpus yet. Saying so is the point.
 
 ---
 
-# 💡 Our Solution: QZero
+# Our Solution: QZero
 
-## Quantum-Enhanced Anomaly Detection
+## Unsupervised anomaly scoring
 
 <div style="text-align: center; font-size: 1.3em; margin: 40px 0;">
 
-**Classical Features** → **Quantum Encoding** → **Anomaly Detection**
+**Classical Features** → **Variational Autoencoder** → **Continuous score**
 
 </div>
 
 ### Key Innovation
-- 🔮 **Quantum Kernel Methods** (QSVM) for classification
-- 🧠 **Quantum-Inspired VAE** (QI-VAE) for anomaly detection
-- 🚀 Operates in **2^n dimensional** Hilbert space
-- 🎯 Captures correlations **invisible** to classical methods
+- **Continuous score per flow** — the threshold is yours, no signature to match
+- **QI-VAE** (PyTorch, classical encoder) trained only on normal traffic
+- **Experimental branch:** quantum-kernel SVM (QSVM), offline, off by default
+- Benchmark published in full, including where it loses
 
 ---
 
@@ -166,7 +168,7 @@ graph LR
 
 ---
 
-# ⚛️ Quantum SVM (QSVM)
+# Quantum SVM (QSVM) — experimental
 
 ## Quantum Kernel for Classification
 
@@ -180,11 +182,11 @@ K(x, x') = |⟨φ(x)|φ(x')⟩|²
 
 Where **φ(x)** maps classical data to quantum Hilbert space.
 
-### Why It Works
+### Why It Might Help
 - **2^n dimensional** feature space with n qubits
 - Captures **non-linear correlations**
 - **Entanglement** encodes feature interactions
-- Quantum advantage in separating anomalies
+- **Measured result:** ROC-AUC 0.3395 on our split — it did not help
 
 </div>
 <div style="width: 40%;">
@@ -225,7 +227,7 @@ q_3: ┤ H ├┤ P(2.0*x[3]) ├───────────────�
 
 ---
 
-# 🔮 QI-VAE: Quantum-Inspired VAE
+# QI-VAE: the deployed model
 
 ## Unsupervised Anomaly Detection
 
@@ -238,10 +240,10 @@ q_3: ┤ H ├┤ P(2.0*x[3]) ├───────────────�
 3. Reconstruct input
 4. **High reconstruction error = Anomaly**
 
-### Quantum-Inspired Features
-- Amplitude-like normalization
-- Measurement-inspired sampling
-- Optional quantum encoder circuit
+### Under the hood
+- Plain PyTorch VAE, Linear + BatchNorm, no circuits
+- `use_quantum_encoder=False` by default
+- Optional quantum encoder circuit: present in code, never used in the shipped weights
 
 </div>
 <div style="width: 40%;">
@@ -302,55 +304,66 @@ if score > threshold:
 
 ---
 
-# 📈 Results & Benchmarks
+# Results & Benchmarks
 
-## Performance Comparison
+## What was actually measured
 
-| Model | Accuracy | F1-Score | Zero-Day Detection | FPR |
-|-------|----------|----------|-------------------|-----|
-| Random Forest | 89.2% | 0.88 | 68.5% | 4.2% |
-| XGBoost | 91.1% | 0.90 | 72.3% | 3.8% |
-| Classical SVM | 87.5% | 0.86 | 65.2% | 5.1% |
-| MLP Neural Net | 90.3% | 0.89 | 71.0% | 4.0% |
-| **QSVM (Ours)** | **93.2%** | **0.92** | **85.7%** | **2.8%** |
-| **QI-VAE (Ours)** | **91.5%** | **0.91** | **88.2%** | **2.4%** |
+| Model | LOATO F1 (4 folds) | Recalled | Split 80/20 F1 | Split 80/20 ROC-AUC |
+|-------|--------------------|----------|----------------|---------------------|
+| svm_linear (baseline) | 0.7071 | 1.00 | 0.9014 | 0.6055 |
+| random_forest | 0.7071 | 1.00 | 0.9014 | 0.6706 |
+| **QSVM (experimental)** | **0.7111** | 1.00 | 0.8991 | **0.3395** |
+| **QI-VAE (deployed)** | 0.1807 (mean) | 0.09–0.16 | 0.1788 | 0.6178 |
 
-> ✅ **+13-23% improvement** in zero-day detection vs classical baselines!
+Date **2026-10-14**, seed 42, CPU, 2 942 flows from 5 labeled PCAPs.
+Artifacts: `model-performance-reports/benchmark-pcaps-2026-10-14T23-34-36.md` and
+`model-performance-reports/benchmark-pcaps-latest.json` (generated by `scripts/benchmark-pcaps.py`).
+
+> **Read the caveat, it matters more than the table.** The LOATO F1 is degenerate: every
+> classifier predicts "attack" on 100% of flows (recall 1.00, precision ≈ 0.55 = class
+> prevalence), so F1 only reflects the class mix of each fold. And the bank itself does not
+> discriminate — 2 942 flows hold 48 unique rows, 6 of 14 features are constant, 98.5% of
+> flows are a single packet. On the one non-degenerate test the QSVM ROC-AUC is **0.3395**,
+> worse than chance. **There is no demonstrated quantum advantage.**
 
 ---
 
-# 🎯 Key Achievements
+# Key Achievements
 
 <div style="display: flex; justify-content: space-around; text-align: center;">
 
 <div style="padding: 20px;">
 
-## 🔍
-### Zero-Day Detection
-# 85-92%
-*vs 65-72% classical*
+## 01
+### No Signatures
+# 0
+*scores exist before any name*
 
 </div>
 
 <div style="padding: 20px;">
 
-## ⚠️
-### False Positive Rate
-# <3%
-*SOC-friendly alerts*
+## 02
+### Self-hosted
+# 100%
+*no cloud, no telemetry*
 
 </div>
 
 <div style="padding: 20px;">
 
-## ⚛️
+## 03
 ### Quantum Advantage
-# +17%
-*detection improvement*
+# none
+*measured, published, negative*
 
 </div>
 
 </div>
+
+> The previous version of this slide quoted zero-day detection, false-positive rate and a
+> quantum-advantage figure that no artifact in this repo produces. Those numbers are gone.
+> The only defensible figures are in the benchmark section above.
 
 ---
 

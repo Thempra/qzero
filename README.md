@@ -1,6 +1,8 @@
-# QZero — Quantum-Algorithm-Based Threat Detection
+# QZero — Self-Hosted NDR with Unsupervised Flow Scoring
 
-> Real-time network anomaly detection powered by Quantum SVM and Quantum-Inspired Variational Autoencoders.
+> Real-time network anomaly detection: a variational autoencoder scores every flow, no signatures.
+> The quantum-kernel SVM is experimental R&D with a **negative** published result — see
+> [docs/HONEST-BENCHMARK.md](docs/HONEST-BENCHMARK.md).
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -20,15 +22,18 @@
 
 ## Overview
 
-QZero detects zero-day network threats by combining two quantum-inspired learning paradigms:
+QZero scores network flows with an unsupervised model: a variational autoencoder learns what
+normal traffic looks like and assigns each flow a continuous anomaly score. No signatures.
 
-| Model | Type | Role |
-|-------|------|------|
-| **QSVM** | Quantum Support Vector Machine | Binary classification (normal vs. threat) |
-| **QI-VAE** | Quantum-Inspired Variational Autoencoder | Unsupervised anomaly scoring via reconstruction error |
-| **Classical baselines** | Random Forest, SVM-RBF, Gradient Boosting | Benchmark comparison |
+| Model | Type | Status |
+|-------|------|--------|
+| **QI-VAE** | Variational Autoencoder (PyTorch, **classical** encoder) | **Deployed engine.** `use_quantum_encoder=False` |
+| **QSVM** | Quantum-kernel SVM (Qiskit) | **Experimental, offline.** Disabled by default (`QZERO_USE_QSWM=0`); no `qsvm.pkl` ships |
+| **Classical baselines** | SVM-linear/RBF, Random Forest, Logistic Regression, kNN, MLP | Benchmark comparison only |
 
-The system ingests raw PCAP traffic, extracts flow-level features, maps them onto quantum feature spaces (ZZ-feature maps, angle encoding), and produces per-packet anomaly scores with sub-millisecond inference latency.
+The system ingests raw PCAP traffic, extracts 14 flow-level features per flow, and scores them with the classical QI-VAE. Measured on the stratified 80/20 split of `model-performance-reports/benchmark-pcaps-latest.json` (`results.split.strat_80_20["QI-VAE"].inference_time_s`): 588 held-out flows scored in **0.005 s** (~8.5 µs/flow, CPU, one core). The quantum-kernel SVM experiment is offline only and takes **~85 ms/flow** (92.86 s for 1 088 flows) — it is disabled by default (`QZERO_USE_QSWM=0`) and is **not** a speed claim.
+
+> **Honesty note.** "Quantum" here is experimental R&D, not a shipped feature. `qivae.py:51` sets `use_quantum_encoder=False`, and the deployed `qivae.pkl` is a plain state dict of Linear + BatchNorm tensors — no circuits. The QSVM experiment has no published advantage: +0.0154 F1 over a trivial always-positive predictor and +0.0040 over `svm_linear`, on a degenerate 5-PCAP bank (n=60, 95% CI ±0.115), with ROC-AUC 0.3395 on the stratified split — worse than chance. See [docs/HONEST-BENCHMARK.md](docs/HONEST-BENCHMARK.md).
 
 ---
 
@@ -149,12 +154,14 @@ Uses a **ZZ feature map** to encode classical network features into a quantum Hi
 - Fallback: classical SVM with RBF kernel when Qiskit is unavailable
 - Input: 4–8 PCA-reduced features in `[0, π]`
 
-### Quantum-Inspired VAE (QI-VAE)
+### Variational Autoencoder (QI-VAE — classical encoder)
 
-A Variational Autoencoder with **quantum-inspired latent space** sampling:
-- Amplitude normalization in latent space (Born rule analogy)
+A Variational Autoencoder with amplitude-normalized latent sampling:
+- Amplitude normalization in latent space (Born rule analogy, not a quantum circuit)
 - Trained only on normal traffic samples
 - Anomaly score = reconstruction error; threshold set at training time
+- `use_quantum_encoder=False` in the shipped config: the optional quantum encoder
+  circuit exists in code but is not used by the deployed weights
 
 - Backend: PyTorch
 - Input: full feature vector (14 UGRansome features)
