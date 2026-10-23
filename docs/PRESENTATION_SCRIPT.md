@@ -41,12 +41,12 @@
 ## Slide 3: Detection Gap (45 segundos)
 
 ### Qué decir:
-> "Esta tabla resume el estado actual. Los sistemas basados en firmas son excelentes para amenazas conocidas, pero inútiles para zero-days. Los sistemas basados en anomalías detectan algo, pero tienen tasas de falsos positivos del 5 al 15 por ciento, lo que genera fatiga de alertas.
+> "Esta tabla resume el estado del arte, pero ojo: las cifras de Snort, de los sistemas de anomalías y del ML clásico son reglas de mercado, no mediciones nuestras. De QZero no pondría ningún porcentaje: no hemos medido detección de zero-days ni tasa de falsos positivos sobre un corpus representativo.
 >
-> Nuestra meta con QZero es clara: más del 85% de detección de zero-days con menos del 3% de falsos positivos. Y como verán, lo logramos."
+> Lo que sí tenemos medido está en el banco de PCAP: y sale mal. Lo enseñamos igual, porque un objetivo sin medición no es un resultado."
 
 ### Énfasis:
-- Señalar la fila de QZero
+- Señalar la fila de QZero: «no medido»
 - Contrastar con classical ML
 
 ---
@@ -128,7 +128,7 @@
 >
 > Entrenamos solo con tráfico normal. El modelo aprende a reconstruir ese tráfico. Cuando ve tráfico anómalo - como un zero-day - el error de reconstrucción es alto porque el modelo nunca aprendió a reconstruir ese patrón.
 >
-> Agregamos componentes quantum-inspired: normalización tipo amplitud en el espacio latente y sampling inspirado en medición cuántica. También tenemos la opción de usar un encoder cuántico completo."
+> Agregamos un truco de normalización tipo amplitud en el espacio latente, que es una analogía con la regla de Born, no un circuito. Y existe la opción de usar un encoder cuántico completo, pero viene apagada: el modelo desplegado es un VAE clásico. Hay que decirlo así."
 
 ### Punto clave:
 - No necesitamos ejemplos de ataques para entrenar
@@ -153,29 +153,33 @@
 ## Slide 11: Resultados (1 minuto)
 
 ### Qué decir:
-> "Y ahora los resultados. Esta tabla lo dice todo.
+> "Y ahora los resultados, con la letra pequeña delante.
 >
-> Los baselines clásicos - Random Forest, XGBoost, SVM - alcanzan entre 65 y 72 por ciento de detección de zero-days.
+> El banco es leave-one-attack-type-out sobre cinco PCAP etiquetados: dos mil novecientos cuarenta y dos flujos.
 >
-> Nuestro QSVM alcanza 85.7% y el QI-VAE llega a 88.2%. Eso es una mejora del 13 al 23 por ciento.
+> El QSVM da un F1 medio de 0.711 y una SVM lineal da 0.707. Pero cuidado: recall 1.00 en los dos, precision 0.55, que es la prevalencia de la clase. Los dos dicen «ataque» en el cien por cien de los flujos. Ese F1 mide la mezcla del fold, no la detección.
 >
-> Igual de importante, nuestro false positive rate es menor al 3%. Los analistas del SOC no van a estar ahogados en falsas alarmas."
+> Además el banco está degenerado: dos mil novecientos cuarenta y dos flujos con cuarenta y ocho filas únicas, seis de catorce features constantes, y el noventa y ocho coma cinco por ciento de los flujos son un solo paquete.
+>
+> En el único test no degenerado, el split estratificado, el QSVM saca ROC-AUC 0.34. Peor que el azar.
+>
+> Y el QI-VAE, que es el modelo realmente desplegado, saca F1 0.1807 en LOATO. Esos son los números. No hay ventaja cuántica demostrada y no la vamos a anunciar."
 
 ### Énfasis (señalar):
-- La columna de Zero-Day Detection
-- La diferencia entre classical y quantum
-- El FPR bajo
+- Recall 1.00 y precision 0.55: el banco está degenerado
+- ROC-AUC 0.34 del QSVM en el split
+- F1 0.1807 del QI-VAE desplegado
 
 ---
 
 ## Slide 12: Key Achievements (30 segundos)
 
 ### Qué decir:
-> "Para resumir nuestros logros clave: 85 a 92 por ciento de detección de zero-days, menos del 3% de falsos positivos, y un quantum advantage real de más del 17% sobre los mejores métodos clásicos."
+> "Para resumir: cero firmas, cien por cien autoalojado, y un benchmark que publicamos entero aunque nos deje mal. La ventaja cuántica que anunciábamos antes no existe: el QSVM saca ROC-AUC 0.34 en el split estratificado, peor que el azar, y el modelo que de verdad corre en producción es un VAE clásico con F1 0.1807 en LOATO. Seguimos enseñando el banco porque un NDR que se mide mal es peor que ninguno."
 
 ### Tip:
-- Leer los números grandes con confianza
-- Pausa breve en cada estadística
+- No leer ningún número en grande si no está en docs/HONEST-BENCHMARK.md
+- Pausa breve en ROC-AUC 0.34: es el dato incómodo y da credibilidad
 
 ---
 
