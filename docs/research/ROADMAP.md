@@ -73,20 +73,28 @@ Scores hasta `1,9e9` (y `1,2e17` en el candidato) con `alert_threshold=4.2` (`ag
 
 ## 4. Hoja de ruta
 
-### FASE 0 — Desbloquear (semana 1, ~4,5 d-hombre)
-Objetivo: que QZero deje de ser un riesgo y empiece a decir la verdad. **Nada de esto se despliega a `main` sin verificación previa.**
+### FASE 0 — Desbloquear (semana 1, ~4,5 d-hombre) · **CERRADA en dev, pendiente de despliegue**
+Objetivo: que QZero deje de ser un riesgo y empiece a decir la verdad.
 
-| ID | Entrega | Criterio de aceptación |
-|---|---|---|
-| 0.1 | Auth fail-**closed** real: sin `ADMIN_PASSWORD` → 503, nunca 200 | Test: app sin env → `/api/v1/alerts` = 503 |
-| 0.2 | Hash de password (PBKDF2/scrypt) + rate limit en `/login` | Test: 6º intento en 60 s → 429 |
-| 0.3 | Ingest autenticado (`X-Agent-Token` obligatorio) | Test: POST `/alerts` sin token → 401 |
-| 0.4 | Fix `mark_criticals_notified` sin LIMIT (`hub.py:353`) | Test: 60 CRITICAL → solo 50 marcadas |
-| 0.5 | Purga por lotes **fuera** del lock + `VACUUM` programado | Test: ingest responde <500 ms durante purga |
-| 0.6 | Score acotado (`log1p` + cap) + severidad por percentil | Test: ningún score >100 con datos reales |
-| 0.7 | NaN fail-**closed** en `qivae.py` | Test: logvar extremo → predicción 1, no 0 |
-| 0.8 | `QZERO_USE_QIVAE=0` por defecto | Baseline = post-filtro clásico |
-| 0.9 | Landing y docs honestos | `#truth` con F1 real; `PRESENTATION.md` sin cifras inventadas |
+| ID | Entrega | Criterio de aceptación | Estado |
+|---|---|---|---|
+| 0.1 | Auth fail-**closed** real: sin `ADMIN_PASSWORD` → 503, nunca 200 | Test: app sin env → `/api/v1/alerts` = 503 | ✅ `2a214a2` |
+| 0.2 | Hash de password (PBKDF2 200k) + rate limit en `/login` | Test: 6º intento en 60 s → 429 | ✅ `2a214a2` |
+| 0.3 | Ingest autenticado (`X-Agent-Token` obligatorio) | Test: POST `/alerts` sin token → 401 | ✅ `2a214a2` |
+| 0.4 | Fix `mark_criticals_notified` sin LIMIT (`hub.py:353`) | Test: 60 CRITICAL → solo 50 marcadas | ✅ `ccb7b28` |
+| 0.5 | Purga por lotes **fuera** del lock + `VACUUM` programado | Test: ingest responde <500 ms durante purga | ✅ `ccb7b28` |
+| 0.6 | Score acotado (`log1p` + cap) + umbral reanclado | Test: ningún score >100 con datos reales | ✅ `7c2db03` |
+| 0.7 | NaN fail-**closed** en `qivae.py` | Test: logvar extremo → predicción 1, no 0 | ✅ `7c2db03` |
+| 0.8 | `QZERO_USE_QIVAE=0` por defecto | Baseline = post-filtro clásico | ⬜ pendiente (decisión de despliegue) |
+| 0.9 | Landing y docs honestos | `#truth` con F1 real; sin cifras inventadas | ✅ `7d297e7` |
+
+**Verificación propia (no autoinforme de los agentes):**
+- RETENCIÓN: metí el diff en `git stash` y corrí los tests contra el código viejo → **6 de 9 fallan**. Es la prueba de que miden algo real.
+- AUTH: el primer intento condicionó el fail-closed a `"pytest" in sys.modules`. **Backdoor rechazado**: cualquier dependencia que importe pytest abriría el auth. Reescrito a fail-closed incondicional, con el opt-out de la suite en `tests/conftest.py`. Hay un test que falla si el sniffing vuelve.
+- AUTH: el agente justificó el backdoor diciendo que el fail-closed duro "rompería decenas de tests". **Es falso**: 304 passed con fail-closed duro.
+- MOTOR: verificado con aritmética real → `1.9e9 → 61.8`, `raw==ref → 4.2` exacto, `NaN/∞ → 100`, monótono y acotado.
+
+**Deuda conocida de Fase 0:** el rate limit es por worker y en memoria (con varios workers no se comparte); ningún despliegue usa password hasheada todavía; `offline_notified` se pierde en cada restart.
 
 ### FASE 1 — Producto mínimo vendible (semanas 2-3, ~10 d-hombre)
 | ID | Entrega | Depende de |
@@ -129,4 +137,4 @@ Objetivo: que QZero deje de ser un riesgo y empiece a decir la verdad. **Nada de
 - `NO VERIFICADO` — causa del `RestartCount=6` del agente.
 - `NO VERIFICADO` — si la allowlist sobrevive a la purga de 90 días (hoy no existe `flow_state`; se perdería).
 - La purga de 90 días en régimen produce **18 M filas / 9,4 GB**: el diseño SQLite no aguanta un año sin decisiones de arquitectura (particionado o Postgres en Fase 2).
-- Un CISO que abra `qzero.thempra.net` hoy ve IPs internas sin login. **Esto es el riesgo nº1 y se cierra en 0.1.**
+- Un CISO que abra `qzero.thempra.net` hoy ve IPs internas sin login. **Riesgo nº1**: código cerrado en 0.1 (`2a214a2`), pero **producción sigue expuesta** hasta desplegar — la imagen en `.5` es `b4f5d36`, 27 commits atrás. Mientras no haya deploy, el riesgo sigue vivo.
