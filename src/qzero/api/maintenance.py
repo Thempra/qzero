@@ -80,7 +80,15 @@ def build_critical_digest(alerts: list) -> str:
 
 
 async def maintenance_loop(hub_store) -> None:
-    """Single loop; each sub-task runs on its own cadence, never raises."""
+    """Single loop; each sub-task runs on its own cadence, never raises.
+
+    CONFIG IS READ ONCE, AT STARTUP (below). Changing
+    QZERO_ALERT_RETENTION_DAYS (or any other QZERO_MAINT_* env) requires an API
+    restart — editing the env of a running container has no effect until then.
+    Accepted as-is (documented, not fixed): the loop is a single long-lived
+    task and re-reading envs per tick would hide misconfiguration instead of
+    surfacing it at deploy time.
+    """
     retention_days = int(_env("QZERO_ALERT_RETENTION_DAYS", "90") or 0)
     scan_sec = int(_env("QZERO_MAINT_INTERVAL_SEC", "60") or 60)
     purge_sec = int(_env("QZERO_RETENTION_INTERVAL_SEC", "3600") or 3600)
@@ -89,6 +97,11 @@ async def maintenance_loop(hub_store) -> None:
 
     last_purge = 0.0
     last_tg = None  # datetime of last digest sent
+    # KNOWN LIMITATION: in-memory only, so every restart forgets what was
+    # already warned about and re-sends one "agente caído" per stale agent
+    # (false offline notice right after each deploy/restart). Persisting it
+    # (e.g. an agents.offline_notified column) is pending — see
+    # docs/research/impl-fase0-retencion.md.
     offline_notified: set = set()  # agents already warned (reset on recovery)
     loop = asyncio.get_event_loop()
 
@@ -97,11 +110,20 @@ async def maintenance_loop(hub_store) -> None:
         now = loop.time()
 
         # 1) Retention ------------------------------------------------
+        # purge_old_alerts() now takes/releases the hub lock PER BATCH, so this
+        # executor thread no longer starves ingest for the whole purge. It runs
+        # in an executor only to keep the event loop free.
+        # NOT done here: VACUUM. hub_store.vacuum() blocks every write for the
+        # length of a full DB rebuild and needs ~1x the DB size free — trigger
+        # it explicitly (scheduled/manual), never from this loop.
         if retention_days > 0 and now - last_purge >= purge_sec:
             last_purge = now
             try:
-                await loop.run_in_executor(
+                deleted = await loop.run_in_executor(
                     None, hub_store.purge_old_alerts, retention_days)
+                if deleted:
+                    logger.info("Retention pass freed %d rows; run a scheduled "
+                                "VACUUM to reclaim disk", deleted)
             except Exception as e:  # noqa: BLE001
                 logger.warning("Retention purge failed: %s", e)
 
@@ -118,7 +140,11 @@ async def maintenance_loop(hub_store) -> None:
                     ok = await loop.run_in_executor(
                         None, send_telegram, build_critical_digest(pending))
                     if ok:
-                        hub_store.mark_criticals_notified()
+                        # Acknowledge ONLY the ids actually delivered: the old
+                        # severity-wide UPDATE also marked every CRITICAL past
+                        # the pop limit, silently losing them.
+                        hub_store.mark_criticals_notified(
+                            [a["id"] for a in pending])
                         last_tg = datetime.now(timezone.utc)
                         logger.info(
                             "Telegram digest: %d CRITICAL alert(s)", len(pending))

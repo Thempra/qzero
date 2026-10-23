@@ -14,6 +14,7 @@ import logging
 import os
 import sqlite3
 import threading
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -299,31 +300,51 @@ class HubStore:
     # Retention (Hito 1.1)
     # ------------------------------------------------------------------
 
-    def purge_old_alerts(self, retention_days: int) -> int:
+    # Batch size and inter-batch yield for purge_old_alerts(). Measured on the
+    # production container: ~627 deleted rows/s, i.e. ~7.6 s per 5000-row batch
+    # and ~9.3 min to purge 349,955 rows. Holding self._lock for the WHOLE loop
+    # (the old behaviour) starved ingest_alert_batch for that entire window —
+    # run_in_executor only keeps the event loop free, not the hub lock. 1000
+    # rows ≈ 1.5 s of lock per batch, and the sleep lets a waiting ingest win
+    # the lock between batches (<500 ms ingest latency, verified by tests).
+    PURGE_BATCH_SIZE = 1000
+    PURGE_YIELD_SEC = 0.005
+
+    def purge_old_alerts(self, retention_days: int,
+                         batch_size: int | None = None,
+                         yield_sec: float | None = None) -> int:
         """Delete alerts older than retention_days in batches. Returns deleted.
 
         The alert volume on Nuke (~1.9M rows historically) makes an unbounded
-        SQLite file a real operational risk. Rows are deleted in batches so a
-        first purge over years of history cannot lock the DB for long, and the
-        O(1) counters stay truthful because deleted rows are subtracted here
-        (ingest only ever adds).
+        SQLite file a real operational risk. Rows are deleted in batches, and
+        the write lock is taken and RELEASED per batch (never around the whole
+        loop) so concurrent ingest keeps reporting while a long purge runs.
+        The O(1) counters stay truthful because a full recount runs afterwards
+        (ingest only ever adds; the recount is the only post-purge cost).
+
+        NOTE: this only empties free pages, it does not shrink hub.db — see
+        vacuum() for that, which must be triggered explicitly/scheduled.
         """
         if retention_days <= 0:  # 0/negative disables retention (keep all)
             return 0
-        cutoff = datetime.now() - timedelta(days=retention_days)
+        batch = batch_size if batch_size is not None else self.PURGE_BATCH_SIZE
+        pause = yield_sec if yield_sec is not None else self.PURGE_YIELD_SEC
+        cutoff = (datetime.now() - timedelta(days=retention_days)).isoformat()
         deleted = 0
-        batch = 5000
-        with self._lock:
-            while True:
+        while True:
+            with self._lock:  # held for ONE batch only, then dropped
                 cur = self._conn.execute(
                     "DELETE FROM alerts WHERE id IN ("
                     " SELECT id FROM alerts WHERE timestamp < ? LIMIT ?)",
-                    (cutoff.isoformat(), batch),
+                    (cutoff, batch),
                 )
-                deleted += cur.rowcount
+                n = cur.rowcount
                 self._conn.commit()
-                if cur.rowcount < batch:
-                    break
+            deleted += n
+            if n < batch:
+                break
+            if pause:
+                time.sleep(pause)  # yield: let a waiting ingest grab the lock
         if deleted:
             # Purges are rare; afford a full recount so by_severity is truthful
             # too (the incremental counters only know about inserts).
@@ -334,28 +355,92 @@ class HubStore:
                         deleted, retention_days)
         return deleted
 
+    def vacuum(self) -> Dict:
+        """Rebuild hub.db to hand free pages back to the filesystem.
+
+        Delete-only purges never shrink the file (auto_vacuum=0,
+        journal_mode=delete — measured: identical size before/after), so this
+        is the only way to reclaim disk after a large purge.
+
+        WARNING — this BLOCKS ALL WRITES for as long as it takes (SQLite needs
+        exclusive access) and needs up to ~1x the DB size in free disk space
+        for the temporary copy. Never call it from the maintenance loop, never
+        while a purge is running: only on demand / from a scheduled job outside
+        ingest hours.
+
+        Returns {"size_before": bytes, "size_after": bytes, "reclaimed": bytes}.
+        """
+        # Outside any transaction: VACUUM cannot run inside one.
+        size_before = self.db_path.stat().st_size if self.db_path.exists() else 0
+        with self._lock:
+            self._conn.commit()
+            self._conn.execute("VACUUM")
+            self._conn.commit()
+        size_after = self.db_path.stat().st_size if self.db_path.exists() else 0
+        logger.info("Hub VACUUM: %d -> %d bytes (reclaimed %d)",
+                    size_before, size_after, size_before - size_after)
+        return {
+            "size_before": size_before,
+            "size_after": size_after,
+            "reclaimed": size_before - size_after,
+        }
+
     # ------------------------------------------------------------------
     # Telegram CRITICAL digest (Hito 1.2) — queue side
     # ------------------------------------------------------------------
 
-    def pop_pending_criticals(self) -> list:
-        """Return critical alerts not yet digested (max 50). Not marked yet —
-        call mark_criticals_notified() only after a successful send."""
+    def pop_pending_criticals(self, limit: int = 50) -> list:
+        """Return critical alerts not yet digested (max `limit`). Not marked yet
+        — call mark_criticals_notified(ids) with the ids returned here, only
+        after a successful send.
+
+        The `id` column is included so the caller can acknowledge exactly what
+        it delivered. Acknowledging by severity alone (the old contract) marked
+        every pending CRITICAL, so anything beyond the LIMIT was silently
+        swallowed and never notified.
+        """
         with self._lock:
             rows = self._conn.execute(
-                "SELECT agent_name, src, dst, dst_port, protocol, severity "
+                "SELECT id, agent_name, src, dst, dst_port, protocol, severity "
                 "FROM alerts WHERE severity = 'CRITICAL' "
-                "AND notified_telegram = 0 ORDER BY id DESC LIMIT 50"
+                "AND notified_telegram = 0 ORDER BY id DESC LIMIT ?",
+                (limit,),
             ).fetchall()
         return [dict(r) for r in rows]
 
-    def mark_criticals_notified(self) -> None:
+    def mark_criticals_notified(self, ids: Optional[List[int]] = None) -> int:
+        """Mark CRITICAL alerts as digested. Returns the number of rows marked.
+
+        Pass the exact ids returned by pop_pending_criticals() — that is the
+        only loss-safe way: a severity-wide UPDATE also marks the alerts that
+        were NOT in the digest (over the LIMIT), losing them forever.
+
+        Backwards compatibility: calling with no argument keeps the old
+        signature working, but is capped to the same newest-50 window that
+        pop_pending_criticals() returns instead of every pending row, so a
+        legacy caller cannot silently drop a backlog either.
+        """
         with self._lock:
-            self._conn.execute(
-                "UPDATE alerts SET notified_telegram = 1 "
-                "WHERE severity = 'CRITICAL' AND notified_telegram = 0"
-            )
+            if ids is None:
+                cur = self._conn.execute(
+                    "UPDATE alerts SET notified_telegram = 1 WHERE id IN ("
+                    " SELECT id FROM alerts WHERE severity = 'CRITICAL' "
+                    " AND notified_telegram = 0 ORDER BY id DESC LIMIT 50)"
+                )
+            else:
+                ids = [int(i) for i in ids]
+                if not ids:
+                    return 0
+                placeholders = ",".join("?" * len(ids))
+                cur = self._conn.execute(
+                    "UPDATE alerts SET notified_telegram = 1 "
+                    f"WHERE id IN ({placeholders}) "
+                    "AND severity = 'CRITICAL' AND notified_telegram = 0",
+                    ids,
+                )
+            n = cur.rowcount
             self._conn.commit()
+        return n
 
     # ------------------------------------------------------------------
     # Queries
