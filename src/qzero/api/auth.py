@@ -4,6 +4,13 @@ QZero Hito 3.7 — auth a nivel de aplicación del hub.
 Contrato (docs/backend-schema.md §2):
   * ``POST /api/v1/auth/login`` con ``ADMIN_PASSWORD`` (env, **fail-closed**:
     sin password configurada las rutas protegidas devuelven 503, nunca open).
+    El modo se controla con ``QZERO_AUTH_ENFORCE`` (1/0); si no está definido
+    el default es fail-closed (ver ``auth_enforced()``).
+  * ``ADMIN_PASSWORD`` admite claro (compatibilidad) o hash
+    ``pbkdf2_sha256$<iter>$<salt_b64>$<hash_b64>`` (``hash_password()``).
+  * Rate limit del login en memoria por IP: máx. 5 fallos / 60 s -> 429.
+  * ``QZERO_AGENT_TOKEN`` definido => el ingest exige ``X-Agent-Token``
+    siempre (``QZERO_REQUIRE_AGENT_TOKEN`` solo añade el 503 si falta token).
   * Token SPA "JWT-lite": header+payload base64url firmados con HMAC-SHA256,
     con ``exp`` y ``token_version``. Cambiar ``QZERO_AUTH_TOKEN_VERSION``
     revoca TODOS los tokens emitidos (los clientes vuelven a loguearse).
@@ -25,7 +32,10 @@ import hmac
 import json
 import logging
 import os
+import re
 import secrets
+import sys
+import threading
 import time
 
 logger = logging.getLogger(__name__)
@@ -46,7 +56,7 @@ def _truthy(raw: str | None) -> bool:
 
 
 def admin_password() -> str:
-    """ADMIN_PASSWORD env, vacío = auth sin configurar (fail-closed)."""
+    """ADMIN_PASSWORD env (claro o ``pbkdf2_sha256$...``), vacío = sin configurar."""
     return os.environ.get("ADMIN_PASSWORD", "")
 
 
@@ -54,8 +64,117 @@ def auth_enabled() -> bool:
     return bool(admin_password())
 
 
+# ── Modo de enforcement (Fase 0.1) ──────────────────────────────────────────
+# Criterio de seguridad: un despliegue sin ADMIN_PASSWORD devuelve 503.
+#   QZERO_AUTH_ENFORCE=1 (o sin definir) -> fail-closed. Es el default DURO.
+#   QZERO_AUTH_ENFORCE=0                 -> sin enforcement. SOLO para la
+#                                           suite de tests, que declara este
+#                                           opt-out en tests/conftest.py.
+# El código de producción NO inspecciona sys.modules ni detecta runners: un
+# backdoor que se abre solo porque algo importó pytest es un fallo de
+# seguridad, no una comodidad. (Una versión anterior de este parche hacía
+# exactamente eso; se retiró.)
+
+def auth_enforced() -> bool:
+    raw = os.environ.get("QZERO_AUTH_ENFORCE")
+    if raw is not None and raw.strip() != "":
+        return _truthy(raw)
+    return True  # fail-closed por defecto, sin excepciones
+
+
+def auth_enforce_mode() -> str:
+    """"on" | "off" — modo efectivo, para /api/v1/auth/status y logs."""
+    return "on" if auth_enforced() else "off"
+
+
+# ── Contraseñas: soporte de hash PBKDF2 (Fase 0.2) ──────────────────────────
+PBKDF2_PREFIX = "pbkdf2_sha256"
+PBKDF2_ITERATIONS = 200_000
+_HASH_RE = re.compile(r"^pbkdf2_sha256\$(\d+)\$([A-Za-z0-9_\-=]+)\$([A-Za-z0-9_\-=]+)$")
+
+
+def hash_password(password: str, iterations: int = PBKDF2_ITERATIONS,
+                  salt: bytes | None = None) -> str:
+    """Devuelve ``pbkdf2_sha256$<iter>$<salt_b64>$<hash_b64>`` (stdlib)."""
+    if iterations < 1:
+        raise ValueError("iterations must be >= 1")
+    salt = salt or secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"),
+                                 salt, int(iterations))
+    return f"{PBKDF2_PREFIX}${int(iterations)}${_b64e(salt)}${_b64e(digest)}"
+
+
+def verify_password(password: str, configured: str) -> bool:
+    """Constant-time. Acepta hash pbkdf2 o, por compatibilidad, claro.
+
+    Codifica a UTF-8 antes de compare_digest: comparar ``str`` no-ASCII
+    lanzaba TypeError (500 en el login).
+    """
+    if not isinstance(password, str) or not isinstance(configured, str):
+        return False
+    match = _HASH_RE.match(configured)
+    if match:
+        iterations, salt_b64, hash_b64 = match.groups()
+        try:
+            expected = _b64d(hash_b64)
+            actual = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"),
+                                         _b64d(salt_b64), int(iterations))
+        except (ValueError, TypeError):
+            logger.warning("ADMIN_PASSWORD con formato de hash inválido.")
+            return False
+        return hmac.compare_digest(actual, expected)
+    return hmac.compare_digest(password.encode("utf-8"),
+                               configured.encode("utf-8"))
+
+
+# ── Rate limit del login (Fase 0.2) ─────────────────────────────────────────
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_WINDOW_SECONDS = 60
+
+_login_failures: dict[str, list[float]] = {}
+_login_lock = threading.Lock()
+
+
+def reset_login_limits() -> None:
+    """Limpia el estado del rate limiter (tests / reinicio de credenciales)."""
+    with _login_lock:
+        _login_failures.clear()
+
+
+def login_retry_after(client_ip: str) -> int:
+    """Segundos de bloqueo restantes para esa IP (0 = permitido)."""
+    now = time.time()
+    with _login_lock:
+        stamps = [t for t in _login_failures.get(client_ip, [])
+                  if now - t < LOGIN_WINDOW_SECONDS]
+        if stamps:
+            _login_failures[client_ip] = stamps
+        else:
+            _login_failures.pop(client_ip, None)
+        if len(stamps) < LOGIN_MAX_ATTEMPTS:
+            return 0
+        return max(1, int(LOGIN_WINDOW_SECONDS - (now - stamps[0])) + 1)
+
+
+def register_login_failure(client_ip: str) -> None:
+    """Anota un fallo de login para esa IP (ventana deslizante de 60 s)."""
+    now = time.time()
+    with _login_lock:
+        stamps = [t for t in _login_failures.get(client_ip, [])
+                  if now - t < LOGIN_WINDOW_SECONDS]
+        stamps.append(now)
+        _login_failures[client_ip] = stamps
+
+
 def agent_token_required() -> bool:
-    """QZERO_REQUIRE_AGENT_TOKEN=1 exige X-Agent-Token en el ingest."""
+    """True si el ingest debe autenticarse.
+
+    Fase 0.3: basta con que ``QZERO_AGENT_TOKEN`` esté definido — el token se
+    exige SIEMPRE y el flag ``QZERO_REQUIRE_AGENT_TOKEN=1`` solo añade el 503
+    cuando falta el token (un flag a 0 no puede desactivar la exigencia).
+    """
+    if os.environ.get("QZERO_AGENT_TOKEN"):
+        return True
     return _truthy(os.environ.get("QZERO_REQUIRE_AGENT_TOKEN"))
 
 
@@ -139,21 +258,25 @@ def check_agent_token(header_value: str | None) -> bool:
             "QZERO_REQUIRE_AGENT_TOKEN activo sin QZERO_AGENT_TOKEN: "
             "ingest rechazado (fail-closed).")
         return False
-    return bool(header_value) and hmac.compare_digest(header_value, required)
+    if not header_value:
+        return False
+    return hmac.compare_digest(header_value.encode("utf-8"),
+                               required.encode("utf-8"))
 
 
 def login(password: str, ttl_seconds: int = DEFAULT_TTL_SECONDS) -> dict | None:
     """Comprueba ADMIN_PASSWORD (constant-time) y emite el token SPA.
 
     Devuelve None si credenciales inválidas o auth sin configurar
-    (fail-closed: sin ADMIN_PASSWORD no se emiten tokens).
+    (fail-closed: sin ADMIN_PASSWORD no se emiten tokens). El rate limit por
+    IP se aplica en el endpoint (``login_retry_after``), que es donde se
+    conoce la IP del cliente.
     """
     configured = admin_password()
     if not configured:
         logger.warning("Login intentado sin ADMIN_PASSWORD configurada (503).")
         return None
-    if not isinstance(password, str) or not hmac.compare_digest(
-            password, configured):
+    if not verify_password(password, configured):
         return None
     token, expires_at = issue_token(ttl_seconds=ttl_seconds)
     logger.info("Login OK (token_version=%s)", token_version())
@@ -171,4 +294,13 @@ def auth_status() -> dict:
     return {
         "auth_required": auth_enabled(),
         "agent_token_required": agent_token_required(),
+        "auth_enforced": auth_enforced(),
     }
+
+
+if __name__ == "__main__":  # pragma: no cover - utilidad de operador
+    # python -m qzero.api.auth "<password>"  -> ADMIN_PASSWORD=pbkdf2_sha256$...
+    import getpass
+
+    _pw = sys.argv[1] if len(sys.argv) > 1 else getpass.getpass("password: ")
+    print(hash_password(_pw))
