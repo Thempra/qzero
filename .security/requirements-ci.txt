@@ -32,6 +32,10 @@ scapy>=2.5.0
 qiskit>=1.0.0
 qiskit-aer>=0.13.0
 qiskit-machine-learning>=0.7.0
+# torch SOLO en variante CPU: la rueda por defecto de PyPI arrastra CUDA
+# (~2 GB de nvidia-*), y en el runner eso agota el timeout del job antes de
+# llegar a Sonar. Con el índice de CPU son ~200 MB y no necesita GPU.
+--extra-index-url https://download.pytorch.org/whl/cpu
 torch>=2.0.0
 
 # Utilidades importadas por src/

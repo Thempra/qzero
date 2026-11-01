@@ -19,7 +19,10 @@ concurrency:
 jobs:
   scan:
     runs-on: docker
-    timeout-minutes: 20
+    # 20 min no cabía: instalar deps + suite de 380 tests con cobertura (14 min
+    # en local, más en runner compartido) + escáneres. Con 20 el job moría por
+    # timeout antes de llegar a Sonar, y el fallo se leía como "SAST en rojo".
+    timeout-minutes: 50
     container:
       image: cimg/base:current
     env:
