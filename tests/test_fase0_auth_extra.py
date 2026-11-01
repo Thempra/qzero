@@ -29,6 +29,12 @@ print("login", c.post("/api/v1/auth/login", json={"password": "x"}).status_code)
 def _run(env_extra: dict) -> dict:
     env = dict(os.environ)
     env.pop("PYTEST_CURRENT_TEST", None)
+    # No heredar NADA de config de QZero del shell: si el entorno del proceso
+    # padre trae QZERO_* (o el propio opt-out de conftest), este subproceso
+    # deja de ser "un despliegue limpio" y el test falla según cómo se invocó
+    # la suite, no según el código. Solo pasan las claves de `env_extra`.
+    for k in [k for k in env if k.startswith(("QZERO_", "ADMIN_", "BUGSINK_"))]:
+        env.pop(k, None)
     env.pop("QZERO_AUTH_ENFORCE", None)  # no heredar el opt-out de conftest
     env.update(env_extra)
     env["PYTHONPATH"] = str(REPO / "src")

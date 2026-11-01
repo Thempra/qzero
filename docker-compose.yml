@@ -31,6 +31,10 @@ services:
       - QZERO_AUTH_TOKEN_VERSION=${QZERO_AUTH_TOKEN_VERSION:-1}
       - QZERO_REQUIRE_AGENT_TOKEN=${QZERO_REQUIRE_AGENT_TOKEN:-0}
       - QZERO_AGENT_TOKEN=${QZERO_AGENT_TOKEN:-}
+      # Error tracking (BugSink, protocolo Sentry). Vacío = desactivado.
+      # El DSN lleva la clave pública del proyecto: va por entorno, nunca en git.
+      - BUGSINK_DSN=${BUGSINK_DSN:-}
+      - APP_ENV=${QZERO_ENV:-production}
       # Model config
       - QZERO_N_QUBITS=${QZERO_N_QUBITS:-4}
       - QZERO_DEFAULT_THRESHOLD=${QZERO_DEFAULT_THRESHOLD:-0.7}

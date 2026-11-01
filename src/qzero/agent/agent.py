@@ -180,6 +180,14 @@ class QZeroAgent:
 
     def run(self, keep_running=True) -> None:
         """Run the monitoring loop forever (or until KeyboardInterrupt)."""
+        # El agente es un proceso suelto: si no inicializa el tracker aquí,
+        # los fallos de captura/análisis solo existen en su stdout.
+        try:
+            from qzero.api.observability import init_sentry
+            init_sentry()
+        except Exception:  # noqa: BLE001 — el tracker nunca impide arrancar
+            logger.debug("BugSink no disponible", exc_info=True)
+
         self._ensure_models()
 
         if self.config.interface == "any":
@@ -289,6 +297,10 @@ class QZeroAgent:
             return alerts
         except Exception as e:  # noqa: BLE001
             logger.exception("Analysis error")
+            # Import local: el agente no debe arrastrar FastAPI (vive en
+            # qzero.api) solo para reportar una excepción.
+            from qzero.api.observability import sentry_capture
+            sentry_capture(e, module="agent._analyze_window")
             return []
         finally:
             if tmp_path:

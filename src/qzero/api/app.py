@@ -28,6 +28,7 @@ from pydantic import BaseModel
 from .schemas import StatusResponse, AnalyzeResponse
 from .monitor import monitor_service
 from .hub import hub_store, FLOW_STATES
+from .observability import init_sentry, sentry_capture
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,28 @@ app = FastAPI(
     description="Quantum-algorithm-based network anomaly detection.",
     version="3.0.0",
 )
+
+# Referencias fuertes a las tareas de fondo: el event loop solo guarda
+# referencias débiles y el GC puede llevarse una tarea a medio ejecutar.
+_BACKGROUND_TASKS: set = set()
+
+
+def _on_background_done(task) -> None:
+    """Olvida la tarea y reporta su muerte si terminó con excepción.
+
+    El mantenimiento es un `while True` que solo sale si algo lo rompe. Sin
+    este callback, esa rotura queda como "Task exception was never retrieved"
+    en stderr y el hub se queda sin retención, sin digest y sin avisos de
+    agente caído, aparentemente sano.
+    """
+    _BACKGROUND_TASKS.discard(task)
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is not None:
+        logger.error("Tarea de fondo terminó con error", exc_info=exc)
+        sentry_capture(exc, task="maintenance_loop")
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -537,11 +560,51 @@ async def hub_set_agent_config(agent_id: str, payload: dict):
 @app.on_event("startup")
 async def _start_hub_maintenance():
     """Hito 1: background retention + Telegram digest + agent liveness."""
+    # El tracker se inicializa aquí y no al importar el módulo: los tests
+    # importan app sin querer enviar nada, y el arranque es el único punto
+    # donde ya está leído el entorno del contenedor.
+    init_sentry()
+
     from .maintenance import maintenance_loop
-    asyncio.create_task(maintenance_loop(hub_store))
+    # S7502: la tarea debe quedar referenciada. El event loop solo mantiene
+    # referencias débiles a las tareas, así que sin guardarla aquí el GC
+    # puede recolectarla a mitad de ejecución y el mantenimiento moriría en
+    # silencio (el bug clásico de asyncio.create_task).
+    task = asyncio.create_task(maintenance_loop(hub_store))
+    _BACKGROUND_TASKS.add(task)
+    task.add_done_callback(_on_background_done)
+
+
+@app.on_event("shutdown")
+async def _stop_hub_maintenance():
+    """Cancela el mantenimiento para no dejar tareas colgando al cerrar."""
+    for task in list(_BACKGROUND_TASKS):
+        task.cancel()
+    if _BACKGROUND_TASKS:
+        await asyncio.gather(*_BACKGROUND_TASKS, return_exceptions=True)
+    _BACKGROUND_TASKS.clear()
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+@app.exception_handler(Exception)
+async def _report_unhandled(request, exc):
+    """Cualquier excepción no controlada llega al tracker antes del 500.
+
+    FastAPI/Starlette ya devuelve 500 y escribe el error al log, pero nadie lo
+    envía a BugSink: sin este handler, un fallo en producción solo existe en
+    los logs del contenedor y se pierde al rotar.
+    """
+    sentry_capture(
+        exc,
+        path=str(request.url.path),
+        method=request.method,
+    )
+    logger.error("Excepción no controlada en %s %s", request.method,
+                 request.url.path, exc_info=exc)
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=500, content={"detail": "internal server error"})
+
 
 def create_app() -> FastAPI:
     """Return the FastAPI application instance."""

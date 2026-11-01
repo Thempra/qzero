@@ -21,6 +21,8 @@ import os
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
+from .observability import sentry_capture
+
 logger = logging.getLogger(__name__)
 
 
@@ -126,6 +128,7 @@ async def maintenance_loop(hub_store) -> None:
                                 "VACUUM to reclaim disk", deleted)
             except Exception as e:  # noqa: BLE001
                 logger.warning("Retention purge failed: %s", e)
+                sentry_capture(e, task="retention_purge")
 
         # 2) Telegram CRITICAL digest (rate-limited) -------------------
         if _env("QZERO_TELEGRAM_BOT_TOKEN") and _env("QZERO_TELEGRAM_CHAT_ID"):
@@ -135,6 +138,7 @@ async def maintenance_loop(hub_store) -> None:
                     pending = hub_store.pop_pending_criticals()
                 except Exception as e:  # noqa: BLE001
                     logger.warning("Critical query failed: %s", e)
+                    sentry_capture(e, task="pop_pending_criticals")
                     pending = []
                 if pending:
                     ok = await loop.run_in_executor(
@@ -152,7 +156,8 @@ async def maintenance_loop(hub_store) -> None:
         # 3) Agent liveness (Hito 1.3) ---------------------------------
         try:
             agents = hub_store.list_agents()
-        except Exception:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
+            sentry_capture(e, task="list_agents")
             agents = []
         now_dt = datetime.now(timezone.utc)
         for ag in agents:
