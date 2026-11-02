@@ -1,4 +1,7 @@
 # Deps mínimas para ejecutar la suite en CI (el workflow añade pytest/pytest-cov).
+# pytest-asyncio es obligatorio: sin él, los tests marcados @pytest.mark.asyncio
+# fallan en vez de saltarse ('async def functions are not natively supported').
+pytest-asyncio>=0.21.0
 #
 # Se instala esto en vez de requirements.txt completo para no arrastrar
 # jupyter/streamlit/matplotlib ni, sobre todo, la GPU. Todo lo que importan

@@ -101,10 +101,20 @@ jobs:
           COVDIR=$(dirname "$(sed -n 's/^sonar.python.coverage.reportPaths=\([^,]*\).*/\1/p' repo/sonar-project.properties | head -1)")
           mkdir -p "repo/$COVDIR"
           MKARGS=$(cat "$MK")
+          set +e
           ( cd repo && PYTHONPATH="$(pwd):$PYTHONPATH" python3 -m pytest $MKARGS \
               --cov-report=xml:"$(pwd)/$COVDIR/coverage.xml" -q -p no:cacheprovider \
-              --continue-on-collection-errors -o addopts= ) || true
+              --continue-on-collection-errors -o addopts= ) 2>&1 | tee /tmp/pytest.out
+          PYTEST_RC=${PIPESTATUS[0]}
+          set -e
           ls -la "repo/$COVDIR/" | head -5
+          # El step no corta el job (Sonar y los escáneres deben correr igual),
+          # pero un test rojo NO puede pasar en silencio: el antiguo '|| true'
+          # ocultó durante días 5 fallos y 7 ficheros que ni se importaban.
+          if [ "$PYTEST_RC" -ne 0 ]; then
+            echo "::error::pytest terminó con código $PYTEST_RC (ver resumen arriba)"
+            echo "PYTEST_FAILED=1" >> "$GITHUB_ENV"
+          fi
       - name: SonarQube (SAST + calidad) — 1er análisis
         # El gate NO corta aquí: se evalúa igual, pero el rojo se emite en el
         # último paso. Así los escáneres y DefectDojo reciben sus informes
@@ -178,8 +188,14 @@ jobs:
         # El gate de Sonar se difirió aquí a propósito: es lo único que puede
         # dejar el job en rojo, y sólo después de haber alimentado DefectDojo.
         run: |
+          RC=0
           if [ -n "$SONAR_GATE_FAILED" ]; then
             echo "::error::SonarQube quality gate FAILED"
-            exit 1
+            RC=1
           fi
-          echo "gate OK o sin proyecto Sonar"
+          if [ -n "$PYTEST_FAILED" ]; then
+            echo "::error::La suite de tests no pasó en el runner (no es el gate de Sonar)"
+            RC=1
+          fi
+          if [ "$RC" -eq 0 ]; then echo "gate OK y suite en verde"; fi
+          exit $RC
