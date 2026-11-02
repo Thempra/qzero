@@ -11,6 +11,9 @@ fastapi>=0.110.0
 uvicorn[standard]>=0.27.0
 python-multipart>=0.0.9
 pydantic>=2.0.0
+# httpx lo exige starlette.testclient: sin él, todos los ficheros que usan
+# TestClient se caen en colección y su cobertura se pierde (7 ficheros).
+httpx>=0.27.0
 click>=8.1.0
 pyyaml>=6.0.0
 
