@@ -152,6 +152,14 @@ Dos trampas de CI en el camino: el step de tests moría con **exit 141 (SIGPIPE)
 | CPSTIC / licitaciones ENS Media-Alta | `art. 19 RD 311/2022` exige producto cualificado. 50-100 k€, 12-18 meses |
 | Vender por NIS2 | España **no ha traspuesto** (TJUE, jul 2026) |
 
+**Sonar CE es de rama única: publicar `main` reabrió `python:S7502` (2026-11-03).** Con el gate ya verde en `dev` (run 664), la issue `72ca562e` volvió a `OPEN` y el gate pasó a `ERROR` con `coverage 0%`. No era una regresión del código: `app.py:432` sí guarda la tarea en `_BACKGROUND_TASKS` desde `7c2db03`. Lo que pasó es que **Sonar Community no tiene ramas** — el proyecto `qzero` guarda un único juego de métricas y `project_branches` devuelve una sola (`main`, `isMain=true`) —, así que cualquier análisis sustituye al anterior. Un push a `main` el 2026-11-03 a las 11:45 (run 565, commit `19e7544`, del 29-oct y **sin** el fix) publicó el código viejo: Sonar volvió a ver el `asyncio.create_task` desnudo y la cobertura cayó a 0% porque `.security/pytest-cov` no existe en `main`.
+
+Comprobado contra la fuente que Sonar tenía guardada (`/api/sources/raw`): la copia de `app.py` en el servidor era la vieja, no la de `dev`.
+
+Arreglo (`5647aaa` en `dev`, `5cce1ca` en `main`): el paso de Sonar solo publica cuando `REF_NAME == SONAR_CANONICAL_REF` (`dev`). Las demás ramas corren gitleaks/trivy/semgrep/checkov/bandit y suben a DefectDojo, pero no publican análisis, y el Veredicto lo dice en el log. Verificado en los dos sentidos: run **666** (`dev`) publica y sale `QUALITY GATE STATUS: PASSED` con `437 passed`; run **667** (`main`) imprime `Rama 'main' != canónica 'dev': análisis sin publicar` y el gate **sigue OK**, con S7502 en 0 abiertas. Producción no se movió: sigue `SOURCE_COMMIT=b4f5d36`.
+
+La lección queda como regla: en un Sonar CE, el gate mide **la última rama que publicó**, no la que te interesa. Si el repo tiene `main` y `dev`, hay que decidir explícitamente cuál manda.
+
 ---
 
 ## 6. Riesgos abiertos
