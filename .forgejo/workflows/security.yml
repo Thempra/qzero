@@ -107,7 +107,13 @@ jobs:
               --continue-on-collection-errors -o addopts= ) 2>&1 | tee /tmp/pytest.out
           PYTEST_RC=${PIPESTATUS[0]}
           set -e
-          ls -la "repo/$COVDIR/" | head -5
+          # Sin `| head`: cuando head cierra el pipe, ls muere con SIGPIPE (141)
+          # y con pipefail se lleva por delante el step entero.
+          if [ -f "repo/$COVDIR/coverage.xml" ]; then
+            ls -l "repo/$COVDIR/coverage.xml"
+          else
+            echo "::warning::no se generó $COVDIR/coverage.xml"
+          fi
           # El step no corta el job (Sonar y los escáneres deben correr igual),
           # pero un test rojo NO puede pasar en silencio: el antiguo '|| true'
           # ocultó durante días 5 fallos y 7 ficheros que ni se importaban.
