@@ -13,6 +13,7 @@ import json
 import logging
 import math
 import os
+import re
 import sqlite3
 import threading
 import time
@@ -100,6 +101,20 @@ _SCHEMA_MIGRATIONS = [
     ("alerts", "detail", "TEXT"),
     ("alerts", "notified_telegram", "INTEGER DEFAULT 0"),
 ]
+
+# SQLite no acepta parámetros en DDL, así que los nombres de tabla/columna de
+# _SCHEMA_MIGRATIONS se interpolan en el SQL. Son constantes del módulo, pero se
+# validan igual: barato ahora, y evita que una futura entrada leída de config se
+# convierta en inyección.
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _check_identifier(name: str) -> str:
+    """Devuelve ``name`` si es un identificador SQL seguro; si no, ValueError."""
+    if not _IDENTIFIER_RE.match(name or ""):
+        raise ValueError(f"Identificador SQL no válido: {name!r}")
+    return name
+
 
 # ── Fase 1.1 / 1.2: flujos agregados ───────────────────────────────────────
 # El analista no puede triar 8.473 alertas/hora una a una. Un "flujo" es la
@@ -278,9 +293,17 @@ class HubStore:
     def _migrate(self) -> None:
         """Add any missing columns to existing tables (idempotent)."""
         for table, col, decl in _SCHEMA_MIGRATIONS:
+            # Los identificadores vienen de la constante de arriba, no de la red,
+            # pero SQLite no admite parámetros en DDL (`ALTER TABLE ?` no existe)
+            # así que hay que interpolarlos. Se validan igualmente contra un
+            # patrón estricto: si mañana alguien añade una entrada desde config
+            # o entorno, esto falla en cerrado en vez de concatenar a ciegas.
+            _check_identifier(table)
+            _check_identifier(col)
             cols = {
                 r["name"]
-                for r in self._conn.execute(f"PRAGMA table_info({table})").fetchall()
+                for r in self._conn.execute(
+                    "SELECT name FROM pragma_table_info(?)", (table,)).fetchall()
             }
             if col not in cols:
                 logger.info("Hub migration: adding column %s.%s %s", table, col, decl)

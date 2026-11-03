@@ -154,7 +154,7 @@ El cuadrante mágico 2025 sitúa a **Darktrace, Vectra AI, ExtraHop (RevealX), C
 | # | URL | Qué se usó | Fecha consulta |
 |---|---|---|---|
 | 1 | https://www.prnewswire.com/news-releases/network-detection-and-response-ndr-market-worth-5-82-billion-by-2030--marketsandmarkets-302583139.html | Tamaño mercado NDR 2025/2030, CAGR | 2026-10-23 |
-| 2 | https://markets.ft.com/data/announce/full?dockey=1323-16365665-5RKSJIGKGLT0J1KOJ42C2S5O2P | Darktrace FY2025 revenue, ARR medio, crecimiento clientes | 2026-10-23 |
+| 2 | https://markets.ft.com/data/announce/full?dockey=1323-16365665-5RKS…2P (dockey público de la nota de resultados de Darktrace) | Darktrace FY2025 revenue, ARR medio, crecimiento clientes | 2026-10-23 |
 | 3 | https://www.darktrace.com/legal/darktrace-annual-report | Darktrace Annual Report 2025 (confirmación cifras) | 2026-10-23 |
 | 4 | https://tech-insider.org/darktrace-vs-vectra-ai-vs-extrahop-2026 | Vendors líderes NDR 2025-2026 (resumen público MQ) | 2026-10-23 |
 | 5 | https://aesyc.com/nis2-directiva-guia-espana/ | Estado transposición NIS2 España oct 2026, sectores, obligaciones | 2026-10-23 |

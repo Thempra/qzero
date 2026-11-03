@@ -99,7 +99,7 @@ comparación con `git log`/`git ls-tree` local.
 
 **Evidencia.**
 ```
-imagen = v8pwtcz…_qzero-api:b4f5d36d1219c257a23426f265c4a79146cede1c
+imagen = v8pwtcz…_qzero-api:b4f5d36  (digest completo: b4f5d36d1219…cede1c)
 SOURCE_COMMIT=b4f5d36  (= 2026-10-14 20:46:21 "chore: reorganización del repo")
 created = 2026-10-14T19:41:20Z
 /app/src/qzero/api/ -> __init__.py app.py dashboard.html hub.py hub_dashboard.html monitor.py schemas.py
