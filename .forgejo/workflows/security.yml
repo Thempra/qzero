@@ -33,6 +33,8 @@ jobs:
       COMMIT_SHA: ${{ github.sha }}
       REF_NAME: ${{ github.ref_name }}
       GH_TOK: ${{ github.token }}
+      # Sonar CE no tiene ramas: solo se publica el análisis de esta rama.
+      SONAR_CANONICAL_REF: dev
       BAO_ADDR: https://vault.thempra.net
       # Un rol JWT por organización: replica el alcance que tenían los secretos
       # de org de Forgejo, sin ampliarlo.
@@ -116,6 +118,17 @@ jobs:
           curl -fsSL -o /tmp/sonar.zip https://repo1.maven.org/maven2/org/sonarsource/scanner/cli/sonar-scanner-cli/8.1.0.6389/sonar-scanner-cli-8.1.0.6389.zip
           sudo unzip -q -o /tmp/sonar.zip -d /opt
           cd repo
+          # Sonar CE no tiene ramas: el proyecto qzero guarda un único juego de
+          # métricas, así que el análisis de CUALQUIER rama sustituye al
+          # anterior. Un push a main con código viejo reabrió python:S7502 y
+          # dejó la cobertura a 0% (run 565, 2026-11-03) aunque dev estaba en
+          # verde. Solo se publica el análisis de la rama canónica; el resto de
+          # ramas corre escáneres y DefectDojo pero no publica en Sonar.
+          if [ "$REF_NAME" != "$SONAR_CANONICAL_REF" ]; then
+            echo "Rama '$REF_NAME' != canónica '$SONAR_CANONICAL_REF': análisis sin publicar (no pisa métricas)."
+            echo "SONAR_SKIPPED=1" >> "$GITHUB_ENV"
+            exit 0
+          fi
           # Sin `-Dsonar.login`: el scanner lee SONAR_TOKEN del entorno, así el
           # token no aparece en /proc/<pid>/cmdline (visible por cualquiera del
           # contenedor y por `ps`).
