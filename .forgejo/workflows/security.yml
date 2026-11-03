@@ -36,6 +36,10 @@ jobs:
       COMMIT_SHA: ${{ github.sha }}
       REF_NAME: ${{ github.ref_name }}
       GH_TOK: ${{ github.token }}
+      # Sonar CE no tiene ramas: el único análisis que se publica es el de esta
+      # rama. Si se publicara también el de `main` (código viejo), sus métricas
+      # sustituirían a las de `dev` y reabrirían issues ya corregidas.
+      SONAR_CANONICAL_REF: dev
       BAO_ADDR: https://vault.thempra.net
       # Un rol JWT por organización: replica el alcance que tenían los secretos
       # de org de Forgejo, sin ampliarlo.
@@ -135,6 +139,17 @@ jobs:
           curl -fsSL -o /tmp/sonar.zip https://repo1.maven.org/maven2/org/sonarsource/scanner/cli/sonar-scanner-cli/8.1.0.6389/sonar-scanner-cli-8.1.0.6389.zip
           sudo unzip -q -o /tmp/sonar.zip -d /opt
           cd repo
+          # Sonar CE es de rama única: el proyecto NO tiene ramas, así que el
+          # último análisis pisa las métricas del anterior, venga de la rama que
+          # venga. Un push a `main` con código viejo reabrió python:S7502 y tumbó
+          # el gate aunque `dev` estaba limpio (run 565, 2026-11-03). Solo se
+          # publica el análisis de SONAR_CANONICAL_REF; las demás ramas se
+          # analizan y se descartan.
+          if [ "$REF_NAME" != "$SONAR_CANONICAL_REF" ]; then
+            echo "Rama '$REF_NAME' != canónica '$SONAR_CANONICAL_REF': análisis sin publicar (no pisa las métricas)."
+            echo "SONAR_SKIPPED=1" >> "$GITHUB_ENV"
+            exit 0
+          fi
           # Sin `-Dsonar.login`: el scanner lee SONAR_TOKEN del entorno, así el
           # token no aparece en /proc/<pid>/cmdline (visible por cualquiera del
           # contenedor y por `ps`).
@@ -202,6 +217,9 @@ jobs:
           if [ -n "$PYTEST_FAILED" ]; then
             echo "::error::La suite de tests no pasó en el runner (no es el gate de Sonar)"
             RC=1
+          fi
+          if [ -n "$SONAR_SKIPPED" ]; then
+            echo "Sonar: análisis no publicado (rama distinta de $SONAR_CANONICAL_REF); escáneres y DefectDojo sí han corrido."
           fi
           if [ "$RC" -eq 0 ]; then echo "gate OK y suite en verde"; fi
           exit $RC
