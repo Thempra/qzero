@@ -108,6 +108,16 @@ _SCHEMA_MIGRATIONS = [
 # convierta en inyección.
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
+# El DDL de cada migración se escribe literal y se busca aquí por (tabla,
+# columna). Así no hay ni una sola sentencia SQL construida en tiempo de
+# ejecución: ni concatenación ni f-string que un analizador tenga que aprobar.
+# `decl` sigue en _SCHEMA_MIGRATIONS para el log y para documentar la columna.
+_MIGRATION_DDL = {
+    ("alerts", "packets"): "ALTER TABLE alerts ADD COLUMN packets INTEGER DEFAULT 0",
+    ("alerts", "detail"): "ALTER TABLE alerts ADD COLUMN detail TEXT",
+    ("alerts", "notified_telegram"): "ALTER TABLE alerts ADD COLUMN notified_telegram INTEGER DEFAULT 0",
+}
+
 
 def _check_identifier(name: str) -> str:
     """Devuelve ``name`` si es un identificador SQL seguro; si no, ValueError."""
@@ -307,7 +317,7 @@ class HubStore:
             }
             if col not in cols:
                 logger.info("Hub migration: adding column %s.%s %s", table, col, decl)
-                self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+                self._conn.execute(_MIGRATION_DDL[(table, col)])
 
     # ------------------------------------------------------------------
     # Summary counters (incremental, O(1))

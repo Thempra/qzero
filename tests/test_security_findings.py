@@ -61,6 +61,15 @@ def test_migrate_still_adds_missing_columns(tmp_path):
     store.close()
 
 
+def test_every_schema_migration_has_a_literal_ddl():
+    """El DDL es literal: si falta una entrada, la migración no debe adivinar."""
+    faltan = [
+        (t, c) for t, c, _ in hub_mod._SCHEMA_MIGRATIONS
+        if (t, c) not in hub_mod._MIGRATION_DDL
+    ]
+    assert not faltan, f"migraciones sin DDL literal: {faltan}"
+
+
 def test_migrate_rejects_poisoned_schema_migration(monkeypatch, tmp_path):
     """Si una entrada de _SCHEMA_MIGRATIONS viniera de fuera, falla en cerrado."""
     monkeypatch.setattr(
