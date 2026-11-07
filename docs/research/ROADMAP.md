@@ -160,6 +160,14 @@ Arreglo (`5647aaa` en `dev`, `5cce1ca` en `main`): el paso de Sonar solo publica
 
 La lección queda como regla: en un Sonar CE, el gate mide **la última rama que publicó**, no la que te interesa. Si el repo tiene `main` y `dev`, hay que decidir explícitamente cuál manda.
 
+**Los 4 findings no volvieron: los reabrió `main` (2026-11-07).** DefectDojo abrió cuatro issues nuevas (#18–#21) sobre los mismos hallazgos 8950/8961/8963/8966 que se habían cerrado el 3-nov. Otra vez la explicación no era el código: el `test 60` de DefectDojo llevaba `commit_hash = 5cce1ca9`, es decir, el escaneo de **`main`**, que va 34 commits por detrás de `dev` y nunca recibió `c3192d3f`/`3623bbc1`. Mismo patrón que Sonar: dos ramas, un solo juego de resultados.
+
+Arreglo portado a `main` en `2e55999` (Dockerfile con usuario 10001, `_MIGRATION_DDL` literal + `pragma_table_info(?)` parametrizado, esquema del WebSocket derivado de `QZERO_PUBLIC_URL`). Verificación en dos sentidos: **semgrep da 6 hallazgos con el código anterior** (en las líneas exactas de los findings: `Dockerfile:34`, `hub.py:103/107`, `main.py:112`) y **0 con el arreglo**; `tests/test_security_findings.py` pasa 18/18 y falla 16 con el código viejo; suite de `main` **310 passed, 10 skipped**.
+
+Run **703** (`main`, `2e55999`) `success` → el reimport cierra los 4 en DefectDojo (`active=false`, `is_mitigated=true`, `test 60` ahora con `commit_hash=2e55999`) y `security_issues_sync.py` cierra **#18–#21**: 0 issues abiertas, 21 cerradas. Sonar sigue `gate: OK` porque el guard impide que `main` publique.
+
+Moraleja que ya costó dos veces: **con Sonar CE + DefectDojo sobre una sola rama, arreglar `dev` no arregla `main`, y el escáner siempre tiene razón sobre el commit que miró.** Antes de "reabrir un arreglo", comprobar el `commit_hash` del test.
+
 ---
 
 ## 6. Riesgos abiertos
