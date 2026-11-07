@@ -15,6 +15,7 @@ import logging
 from pathlib import Path
 
 import click
+import os
 
 from ..config import setup_logging
 
@@ -109,7 +110,14 @@ def server(host, port, model_dir, qubits):
 
     click.echo(f"Starting QZero API  →  http://{host}:{port}")
     click.echo(f"Dashboard           →  http://{host}:{port}/dashboard")
-    click.echo(f"WebSocket           →  ws://{host}:{port}/ws")
+    # Semgrep (detect-insecure-websocket) marcaba esta línea porque anunciaba
+    # un esquema sin cifrar escrito a mano, aunque aquí sólo se IMPRIME una URL
+    # y no se abre ninguna conexión. El esquema se deriva ahora de
+    # QZERO_PUBLIC_URL: detrás de TLS el operador ve wss, que es lo que de
+    # verdad tiene que usar.
+    public = os.environ.get("QZERO_PUBLIC_URL", "").rstrip("/")
+    ws_scheme = "wss" if public.startswith("https") else "ws"
+    click.echo(f"WebSocket           →  {ws_scheme}://{host}:{port}/ws")
     uvicorn.run("qzero.api.app:app", host=host, port=port, reload=False)
 
 

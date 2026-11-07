@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import sqlite3
 import threading
 from datetime import datetime, timedelta
@@ -72,6 +73,29 @@ _SCHEMA_MIGRATIONS = [
     ("alerts", "notified_telegram", "INTEGER DEFAULT 0"),
 ]
 
+# SQLite no acepta parámetros en DDL, así que los nombres de tabla/columna de
+# _SCHEMA_MIGRATIONS se interpolan en el SQL. Son constantes del módulo, pero se
+# validan igual: barato ahora, y evita que una futura entrada leída de config se
+# convierta en inyección.
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+# El DDL de cada migración se escribe literal y se busca aquí por (tabla,
+# columna). Así no hay ni una sola sentencia SQL construida en tiempo de
+# ejecución: ni concatenación ni f-string que un analizador tenga que aprobar.
+# `decl` sigue en _SCHEMA_MIGRATIONS para el log y para documentar la columna.
+_MIGRATION_DDL = {
+    ("alerts", "packets"): "ALTER TABLE alerts ADD COLUMN packets INTEGER DEFAULT 0",
+    ("alerts", "detail"): "ALTER TABLE alerts ADD COLUMN detail TEXT",
+    ("alerts", "notified_telegram"): "ALTER TABLE alerts ADD COLUMN notified_telegram INTEGER DEFAULT 0",
+}
+
+
+def _check_identifier(name: str) -> str:
+    """Devuelve ``name`` si es un identificador SQL seguro; si no, ValueError."""
+    if not _IDENTIFIER_RE.match(name or ""):
+        raise ValueError(f"Identificador SQL no válido: {name!r}")
+    return name
+
 
 class HubStore:
     """Thread-safe SQLite-backed store for agents + their alerts."""
@@ -98,13 +122,18 @@ class HubStore:
     def _migrate(self) -> None:
         """Add any missing columns to existing tables (idempotent)."""
         for table, col, decl in _SCHEMA_MIGRATIONS:
+            _check_identifier(table)
+            _check_identifier(col)
             cols = {
                 r["name"]
-                for r in self._conn.execute(f"PRAGMA table_info({table})").fetchall()
+                for r in self._conn.execute(
+                    "SELECT name FROM pragma_table_info(?)", (table,)
+                ).fetchall()
             }
             if col not in cols:
+                ddl = _MIGRATION_DDL[(table, col)]
                 logger.info("Hub migration: adding column %s.%s %s", table, col, decl)
-                self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+                self._conn.execute(ddl)
 
     # ------------------------------------------------------------------
     # Summary counters (incremental, O(1))
